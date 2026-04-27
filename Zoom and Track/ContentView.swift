@@ -377,6 +377,13 @@ struct ContentView: View {
                 Button("Open Recording…") {
                     viewModel.openRecording()
                 }
+
+                if viewModel.recordingSummary != nil {
+                    Button("Export…") {
+                        viewModel.exportRecording()
+                    }
+                    .disabled(!viewModel.canExportRecording)
+                }
             }
             .zIndex(2)
 
@@ -448,6 +455,15 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .sheet(isPresented: Binding(
+            get: { viewModel.isExportSheetPresented },
+            set: { if !$0 { viewModel.dismissExportSheet() } }
+        )) {
+            exportProgressSheet
+                .frame(width: 420)
+                .padding(24)
+                .interactiveDismissDisabled(viewModel.exportState.isInProgress)
+        }
     }
 
     private var settingsView: some View {
@@ -728,85 +744,27 @@ struct ContentView: View {
         zoomMarkers: [ZoomPlanItem],
         contentCoordinateSize: CGSize
     ) -> ZoomPreviewState? {
-        guard contentCoordinateSize.width > 0, contentCoordinateSize.height > 0 else {
+        guard let state = SharedMotionEngine.activeZoomState(
+            at: currentTime,
+            zoomMarkers: zoomMarkers,
+            contentCoordinateSize: contentCoordinateSize,
+            coordinateSpace: .topLeft
+        ) else {
             return nil
         }
-
-        let enabledMarkers = zoomMarkers
-            .filter(\.enabled)
-            .sorted { $0.sourceEventTimestamp < $1.sourceEventTimestamp }
-        guard !enabledMarkers.isEmpty else {
-            return nil
-        }
-
-        var currentState = ZoomPreviewState(scale: 1, normalizedPoint: CGPoint(x: 0.5, y: 0.5))
-
-        for marker in enabledMarkers {
-            let timeline = zoomTimeline(for: marker)
-            if currentTime < timeline.startTime {
-                break
-            }
-
-            let normalizedPoint = CGPoint(
-                x: min(max(marker.centerX / contentCoordinateSize.width, 0), 1),
-                y: min(max(marker.centerY / contentCoordinateSize.height, 0), 1)
-            )
-            let stateEvent = ZoomStateEvent(
-                marker: marker,
-                normalizedPoint: normalizedPoint,
-                scale: max(CGFloat(marker.zoomScale), 1)
-            )
-
-            switch marker.zoomType {
-            case .inOut:
-                if currentTime <= timeline.endTime {
-                    return inOutPreviewState(at: currentTime, stateEvent: stateEvent, timeline: timeline)
-                }
-                currentState = ZoomPreviewState(scale: 1, normalizedPoint: normalizedPoint)
-
-            case .inOnly:
-                if currentTime <= timeline.peakTime {
-                    return inOnlyPreviewState(at: currentTime, stateEvent: stateEvent, timeline: timeline)
-                }
-                currentState = ZoomPreviewState(scale: stateEvent.scale, normalizedPoint: normalizedPoint)
-
-            case .outOnly:
-                if currentTime <= timeline.endTime {
-                    return outOnlyPreviewState(
-                        at: currentTime,
-                        currentState: currentState,
-                        targetPoint: normalizedPoint,
-                        timeline: timeline,
-                        easeStyle: marker.easeStyle,
-                        bounceAmount: marker.bounceAmount
-                    )
-                }
-                currentState = ZoomPreviewState(scale: 1, normalizedPoint: normalizedPoint)
-            }
-        }
-
-        return currentState.scale > 1.0001 ? currentState : nil
+        return ZoomPreviewState(scale: state.scale, normalizedPoint: state.normalizedPoint)
     }
 
     private func zoomPreviewOffset(for previewState: ZoomPreviewState?, in fittedRect: CGRect) -> CGSize {
         guard let previewState, fittedRect.width > 0, fittedRect.height > 0 else {
             return .zero
         }
-
-        let scaledWidth = fittedRect.width * previewState.scale
-        let scaledHeight = fittedRect.height * previewState.scale
-        let targetX = previewState.normalizedPoint.x * fittedRect.width
-        let targetY = previewState.normalizedPoint.y * fittedRect.height
-
-        let desiredX = (fittedRect.width / 2) - (targetX * previewState.scale)
-        let desiredY = (fittedRect.height / 2) - (targetY * previewState.scale)
-
-        let minX = fittedRect.width - scaledWidth
-        let minY = fittedRect.height - scaledHeight
-
-        return CGSize(
-            width: min(max(desiredX, minX), 0),
-            height: min(max(desiredY, minY), 0)
+        return SharedMotionEngine.previewOffset(
+            for: SharedMotionEngine.PreviewState(
+                scale: previewState.scale,
+                normalizedPoint: previewState.normalizedPoint
+            ),
+            outputSize: fittedRect.size
         )
     }
 
@@ -1606,6 +1564,78 @@ struct ContentView: View {
                 viewModel.revealInFinder()
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+
+    private var exportProgressSheet: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(exportSheetTitle)
+                .font(.title3.weight(.semibold))
+
+            if let exportStatusMessage = viewModel.exportStatusMessage {
+                Text(exportStatusMessage)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: progressValueForDisplay)
+                .progressViewStyle(.linear)
+
+            Text("\(Int(progressValueForDisplay * 100))%")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            HStack {
+                if case .completed = viewModel.exportState {
+                    Button("Reveal in Finder") {
+                        viewModel.revealExportInFinder()
+                    }
+                }
+
+                Spacer()
+
+                switch viewModel.exportState {
+                case .preparing, .exporting, .finalizing:
+                    Button("Cancel") {
+                        viewModel.cancelExport()
+                    }
+                default:
+                    Button("Done") {
+                        viewModel.dismissExportSheet()
+                    }
+                }
+            }
+        }
+    }
+
+    private var exportSheetTitle: String {
+        switch viewModel.exportState {
+        case .idle:
+            return "Export"
+        case .preparing:
+            return "Preparing Export"
+        case .exporting:
+            return "Exporting Video"
+        case .finalizing:
+            return "Finalizing Movie"
+        case .completed:
+            return "Export Complete"
+        case .failed:
+            return "Export Failed"
+        case .cancelled:
+            return "Export Cancelled"
+        }
+    }
+
+    private var progressValueForDisplay: Double {
+        let progress = max(0, min(viewModel.exportProgress, 1))
+        switch viewModel.exportState {
+        case .completed:
+            return 1
+        case .failed, .cancelled, .idle:
+            return progress
+        default:
+            return max(progress, 0.02)
         }
     }
 

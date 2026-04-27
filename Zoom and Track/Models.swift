@@ -331,3 +331,326 @@ struct RecordingInspectionSummary {
     let duration: Double?
     let zoomMarkers: [ZoomPlanItem]
 }
+
+enum SharedMotionEngine {
+    enum CoordinateSpace {
+        case topLeft
+        case bottomLeft
+    }
+
+    struct PreviewState {
+        let scale: CGFloat
+        let normalizedPoint: CGPoint
+    }
+
+    struct Timeline {
+        let startTime: Double
+        let peakTime: Double
+        let holdUntil: Double
+        let endTime: Double
+    }
+
+    private enum MotionDirection {
+        case entering
+        case exiting
+    }
+
+    private struct MotionProgressSample {
+        let scale: Double
+        let pan: Double
+    }
+
+    private enum MotionTuning {
+        static let bounceApproachFraction = 0.82
+        static let bounceMaxOvershoot = 0.14
+        static let bounceMinOvershoot = 0.04
+        static let bounceOscillationCount = 2.6
+        static let panBounceInfluence = 0.35
+    }
+
+    static func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
+        let startTime = max(0, marker.startTime)
+        switch marker.zoomType {
+        case .inOut, .outOnly:
+            return (startTime, max(marker.endTime, marker.sourceEventTimestamp))
+        case .inOnly:
+            return (startTime, max(marker.holdUntil, marker.sourceEventTimestamp))
+        }
+    }
+
+    static func zoomTimeline(for marker: ZoomPlanItem) -> Timeline {
+        let peakTime = marker.sourceEventTimestamp
+        let safeLeadIn = max(marker.leadInTime, 0)
+        let safeZoomIn = max(marker.zoomInDuration, 0.05)
+        let safeHold = max(marker.holdDuration, 0.05)
+        let safeZoomOut = max(marker.zoomOutDuration, 0.05)
+        let fallbackStart = max(0, peakTime - safeLeadIn - safeZoomIn)
+        let fallbackHoldUntil = peakTime + safeHold
+        let fallbackEnd = fallbackHoldUntil + safeZoomOut
+
+        switch marker.zoomType {
+        case .inOut:
+            let safeStart = marker.startTime.isFinite ? max(0, min(marker.startTime, peakTime)) : fallbackStart
+            let safeHoldUntil = marker.holdUntil.isFinite ? max(marker.holdUntil, peakTime) : fallbackHoldUntil
+            let safeEndTime = marker.endTime.isFinite ? max(marker.endTime, safeHoldUntil) : fallbackEnd
+            return Timeline(startTime: safeStart, peakTime: peakTime, holdUntil: safeHoldUntil, endTime: safeEndTime)
+        case .inOnly:
+            let safeStart = marker.startTime.isFinite ? max(0, min(marker.startTime, peakTime)) : fallbackStart
+            let safeHoldUntil = marker.holdUntil.isFinite ? max(marker.holdUntil, peakTime) : fallbackHoldUntil
+            return Timeline(startTime: safeStart, peakTime: peakTime, holdUntil: safeHoldUntil, endTime: safeHoldUntil)
+        case .outOnly:
+            let safeStart = marker.startTime.isFinite ? max(marker.startTime, peakTime) : peakTime
+            let safeEndTime = marker.endTime.isFinite ? max(marker.endTime, safeStart) : peakTime + safeZoomOut
+            return Timeline(startTime: safeStart, peakTime: peakTime, holdUntil: safeStart, endTime: safeEndTime)
+        }
+    }
+
+    static func activeZoomState(
+        at currentTime: Double,
+        zoomMarkers: [ZoomPlanItem],
+        contentCoordinateSize: CGSize,
+        coordinateSpace: CoordinateSpace
+    ) -> PreviewState? {
+        guard contentCoordinateSize.width > 0, contentCoordinateSize.height > 0 else {
+            return nil
+        }
+
+        let enabledMarkers = zoomMarkers
+            .filter(\.enabled)
+            .sorted { $0.sourceEventTimestamp < $1.sourceEventTimestamp }
+        guard !enabledMarkers.isEmpty else {
+            return nil
+        }
+
+        var currentState = PreviewState(scale: 1, normalizedPoint: CGPoint(x: 0.5, y: 0.5))
+
+        for marker in enabledMarkers {
+            let timeline = zoomTimeline(for: marker)
+            if currentTime < timeline.startTime {
+                break
+            }
+
+            let normalizedPoint = normalizedPoint(
+                for: marker,
+                contentCoordinateSize: contentCoordinateSize,
+                coordinateSpace: coordinateSpace
+            )
+            let stateEvent = PreviewState(
+                scale: max(CGFloat(marker.zoomScale), 1),
+                normalizedPoint: normalizedPoint
+            )
+
+            switch marker.zoomType {
+            case .inOut:
+                if currentTime <= timeline.endTime {
+                    return inOutPreviewState(at: currentTime, stateEvent: stateEvent, timeline: timeline, marker: marker)
+                }
+                currentState = PreviewState(scale: 1, normalizedPoint: normalizedPoint)
+            case .inOnly:
+                if currentTime <= timeline.peakTime {
+                    return inOnlyPreviewState(at: currentTime, stateEvent: stateEvent, timeline: timeline, marker: marker)
+                }
+                currentState = PreviewState(scale: stateEvent.scale, normalizedPoint: normalizedPoint)
+            case .outOnly:
+                if currentTime <= timeline.endTime {
+                    return outOnlyPreviewState(
+                        at: currentTime,
+                        currentState: currentState,
+                        targetPoint: normalizedPoint,
+                        timeline: timeline,
+                        easeStyle: marker.easeStyle,
+                        bounceAmount: marker.bounceAmount
+                    )
+                }
+                currentState = PreviewState(scale: 1, normalizedPoint: normalizedPoint)
+            }
+        }
+
+        return currentState.scale > 1.0001 ? currentState : nil
+    }
+
+    static func previewOffset(for previewState: PreviewState, outputSize: CGSize) -> CGSize {
+        let scaledWidth = outputSize.width * previewState.scale
+        let scaledHeight = outputSize.height * previewState.scale
+        let targetX = previewState.normalizedPoint.x * outputSize.width
+        let targetY = previewState.normalizedPoint.y * outputSize.height
+        let desiredX = (outputSize.width / 2) - (targetX * previewState.scale)
+        let desiredY = (outputSize.height / 2) - (targetY * previewState.scale)
+        let minX = outputSize.width - scaledWidth
+        let minY = outputSize.height - scaledHeight
+
+        return CGSize(
+            width: min(max(desiredX, minX), 0),
+            height: min(max(desiredY, minY), 0)
+        )
+    }
+
+    private static func normalizedPoint(
+        for marker: ZoomPlanItem,
+        contentCoordinateSize: CGSize,
+        coordinateSpace: CoordinateSpace
+    ) -> CGPoint {
+        let normalizedX = min(max(marker.centerX / contentCoordinateSize.width, 0), 1)
+        let baseY = min(max(marker.centerY / contentCoordinateSize.height, 0), 1)
+        let normalizedY = coordinateSpace == .bottomLeft ? (1 - baseY) : baseY
+        return CGPoint(x: normalizedX, y: normalizedY)
+    }
+
+    private static func inOutPreviewState(
+        at currentTime: Double,
+        stateEvent: PreviewState,
+        timeline: Timeline,
+        marker: ZoomPlanItem
+    ) -> PreviewState {
+        if currentTime <= timeline.peakTime {
+            let progress = motionProgress(
+                currentTime: currentTime,
+                startTime: timeline.startTime,
+                endTime: timeline.peakTime,
+                easeStyle: marker.easeStyle,
+                direction: .entering,
+                bounceAmount: marker.bounceAmount
+            )
+            return PreviewState(
+                scale: interpolate(from: 1, to: stateEvent.scale, progress: progress.scale),
+                normalizedPoint: CGPoint(
+                    x: interpolate(from: 0.5, to: stateEvent.normalizedPoint.x, progress: progress.pan),
+                    y: interpolate(from: 0.5, to: stateEvent.normalizedPoint.y, progress: progress.pan)
+                )
+            )
+        }
+
+        if currentTime <= timeline.holdUntil {
+            return stateEvent
+        }
+
+        let progress = motionProgress(
+            currentTime: currentTime,
+            startTime: timeline.holdUntil,
+            endTime: timeline.endTime,
+            easeStyle: marker.easeStyle,
+            direction: .exiting,
+            bounceAmount: marker.bounceAmount
+        )
+        return PreviewState(
+            scale: max(interpolate(from: stateEvent.scale, to: 1, progress: progress.scale), 1),
+            normalizedPoint: CGPoint(
+                x: interpolate(from: stateEvent.normalizedPoint.x, to: 0.5, progress: progress.pan),
+                y: interpolate(from: stateEvent.normalizedPoint.y, to: 0.5, progress: progress.pan)
+            )
+        )
+    }
+
+    private static func inOnlyPreviewState(
+        at currentTime: Double,
+        stateEvent: PreviewState,
+        timeline: Timeline,
+        marker: ZoomPlanItem
+    ) -> PreviewState {
+        if currentTime <= timeline.peakTime {
+            let progress = motionProgress(
+                currentTime: currentTime,
+                startTime: timeline.startTime,
+                endTime: timeline.peakTime,
+                easeStyle: marker.easeStyle,
+                direction: .entering,
+                bounceAmount: marker.bounceAmount
+            )
+            return PreviewState(
+                scale: interpolate(from: 1, to: stateEvent.scale, progress: progress.scale),
+                normalizedPoint: CGPoint(
+                    x: interpolate(from: 0.5, to: stateEvent.normalizedPoint.x, progress: progress.pan),
+                    y: interpolate(from: 0.5, to: stateEvent.normalizedPoint.y, progress: progress.pan)
+                )
+            )
+        }
+
+        return stateEvent
+    }
+
+    private static func outOnlyPreviewState(
+        at currentTime: Double,
+        currentState: PreviewState,
+        targetPoint: CGPoint,
+        timeline: Timeline,
+        easeStyle: ZoomEaseStyle,
+        bounceAmount: Double
+    ) -> PreviewState {
+        let progress = motionProgress(
+            currentTime: currentTime,
+            startTime: timeline.startTime,
+            endTime: timeline.endTime,
+            easeStyle: easeStyle,
+            direction: .exiting,
+            bounceAmount: bounceAmount
+        )
+        return PreviewState(
+            scale: max(interpolate(from: currentState.scale, to: 1, progress: progress.scale), 1),
+            normalizedPoint: CGPoint(
+                x: interpolate(from: currentState.normalizedPoint.x, to: targetPoint.x, progress: progress.pan),
+                y: interpolate(from: currentState.normalizedPoint.y, to: targetPoint.y, progress: progress.pan)
+            )
+        )
+    }
+
+    private static func normalizedProgress(_ value: Double, start: Double, end: Double) -> Double {
+        guard end > start else { return 1 }
+        return min(max((value - start) / (end - start), 0), 1)
+    }
+
+    private static func interpolate(from: CGFloat, to: CGFloat, progress: Double) -> CGFloat {
+        from + ((to - from) * CGFloat(progress))
+    }
+
+    private static func motionProgress(
+        currentTime: Double,
+        startTime: Double,
+        endTime: Double,
+        easeStyle: ZoomEaseStyle,
+        direction: MotionDirection,
+        bounceAmount: Double
+    ) -> MotionProgressSample {
+        let progress = normalizedProgress(currentTime, start: startTime, end: endTime)
+        let scaleProgress = easeStyle == .bounce
+            ? bounceProgress(progress, amount: bounceAmount)
+            : eased(progress, style: easeStyle, direction: direction)
+        let panProgress: Double
+        if easeStyle == .bounce {
+            let smoothProgress = eased(progress, style: .smooth, direction: direction)
+            panProgress = smoothProgress + ((scaleProgress - smoothProgress) * MotionTuning.panBounceInfluence)
+        } else {
+            panProgress = eased(progress, style: easeStyle, direction: direction)
+        }
+        return MotionProgressSample(scale: scaleProgress, pan: panProgress)
+    }
+
+    private static func bounceProgress(_ progress: Double, amount: Double) -> Double {
+        let clampedAmount = min(max(amount, 0), 1)
+        let approachFraction = MotionTuning.bounceApproachFraction
+        if progress <= approachFraction {
+            let approachProgress = normalizedProgress(progress, start: 0, end: approachFraction)
+            return eased(approachProgress, style: .smooth, direction: .entering)
+        }
+
+        let bounceProgress = normalizedProgress(progress, start: approachFraction, end: 1)
+        let overshoot = MotionTuning.bounceMinOvershoot + (MotionTuning.bounceMaxOvershoot * clampedAmount)
+        let envelope = pow(1 - bounceProgress, 2.2) * overshoot
+        let oscillation = sin(bounceProgress * .pi * MotionTuning.bounceOscillationCount)
+        return 1 + (envelope * oscillation)
+    }
+
+    private static func eased(_ progress: Double, style: ZoomEaseStyle, direction: MotionDirection) -> Double {
+        switch style {
+        case .smooth:
+            return 0.5 - (cos(progress * .pi) * 0.5)
+        case .fastIn:
+            return direction == .entering ? (1 - pow(1 - progress, 3)) : pow(progress, 3)
+        case .fastOut:
+            return direction == .entering ? pow(progress, 3) : (1 - pow(1 - progress, 3))
+        case .linear:
+            return progress
+        case .bounce:
+            return progress
+        }
+    }
+}

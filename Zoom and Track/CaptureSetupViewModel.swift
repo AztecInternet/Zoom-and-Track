@@ -24,6 +24,25 @@ final class CaptureSetupViewModel: ObservableObject {
         case fadingOut
     }
 
+    enum ExportState: Equatable {
+        case idle
+        case preparing
+        case exporting
+        case finalizing
+        case completed
+        case failed(String)
+        case cancelled
+
+        var isInProgress: Bool {
+            switch self {
+            case .preparing, .exporting, .finalizing:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
     @Published var displays: [ShareableCaptureTarget] = []
     @Published var windows: [ShareableCaptureTarget] = []
     @Published var selectedTargetID: String?
@@ -44,6 +63,10 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published var markerPreviewStatusMessage: String?
     @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
     @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
+    @Published private(set) var exportState: ExportState = .idle
+    @Published private(set) var exportProgress: Double = 0
+    @Published private(set) var exportStatusMessage: String?
+    @Published private(set) var exportedRecordingURL: URL?
     
     private var hasRestoredLastRecording = false
     private var activePlaybackScopeURL: URL?
@@ -61,6 +84,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private var activeRenderedPreviewShouldDelete = false
     private var renderedPreviewSourceStartTime: Double?
     private var renderingPreviewMarkerID: String?
+    private var exportTask: Task<Void, Never>?
 
     private let permissionsService = PermissionsService()
     private let screenCaptureService = ScreenCaptureService()
@@ -69,6 +93,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private let inputEventCaptureService = InputEventCaptureService()
     private let markerPreviewRenderService = MarkerPreviewRenderService()
     private let markerPreviewCacheService = MarkerPreviewCacheService()
+    private let exportRenderService = ExportRenderService()
     private let previewTransitionFadeInDuration: TimeInterval = 0.12
     private let previewTransitionHoldDuration: TimeInterval = 0.28
     private let previewTransitionFadeOutDuration: TimeInterval = 0.16
@@ -118,6 +143,14 @@ final class CaptureSetupViewModel: ObservableObject {
 
     var isRenderedPreviewActive: Bool {
         playbackPresentationMode == .playingRenderedPreview && previewPlayer != nil
+    }
+
+    var canExportRecording: Bool {
+        recordingSummary != nil && !exportState.isInProgress
+    }
+
+    var isExportSheetPresented: Bool {
+        exportState != .idle
     }
 
     func load() async {
@@ -199,6 +232,79 @@ final class CaptureSetupViewModel: ObservableObject {
                 statusMessage = "Playback could not load \(bundleURL.path): \(error.localizedDescription)"
             }
         }
+    }
+
+    func exportRecording() {
+        guard let summary = recordingSummary, !exportState.isInProgress else { return }
+        guard let outputURL = chooseExportDestination(defaultName: summary.bundleName) else { return }
+
+        cancelPendingMarkerPreviewRender()
+        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
+        cancelPreviewMode()
+        playbackTransitionPlateState = .hidden
+        playbackPresentationMode = .normal
+
+        exportState = .preparing
+        exportProgress = 0
+        exportStatusMessage = "Preparing export…"
+        exportedRecordingURL = nil
+
+        exportTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let result = try await exportRenderService.exportRecording(
+                    recordingURL: summary.recordingURL,
+                    summary: summary,
+                    outputURL: outputURL
+                ) { phase, progress in
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        self.exportProgress = max(0, min(progress, 1))
+                        switch phase {
+                        case .preparing:
+                            self.exportState = .preparing
+                            self.exportStatusMessage = "Preparing export…"
+                        case .exporting:
+                            self.exportState = .exporting
+                            self.exportStatusMessage = "Exporting video…"
+                        case .finalizing:
+                            self.exportState = .finalizing
+                            self.exportStatusMessage = "Finalizing movie…"
+                        }
+                    }
+                }
+                exportedRecordingURL = result.outputURL
+                exportProgress = 1
+                exportState = .completed
+                exportStatusMessage = "Export complete."
+                NSWorkspace.shared.activateFileViewerSelecting([result.outputURL])
+            } catch is CancellationError {
+                exportState = .cancelled
+                exportStatusMessage = "Export cancelled."
+            } catch {
+                exportState = .failed(error.localizedDescription)
+                exportStatusMessage = "Export failed."
+            }
+            exportTask = nil
+        }
+    }
+
+    func cancelExport() {
+        exportTask?.cancel()
+        exportRenderService.cancelExport()
+    }
+
+    func dismissExportSheet() {
+        guard !exportState.isInProgress else { return }
+        exportState = .idle
+        exportProgress = 0
+        exportStatusMessage = nil
+        exportedRecordingURL = nil
+    }
+
+    func revealExportInFinder() {
+        guard let exportedRecordingURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([exportedRecordingURL])
     }
 
     func startMarkerPreview(_ markerID: String) {
@@ -584,6 +690,8 @@ final class CaptureSetupViewModel: ObservableObject {
 
     private func releasePlaybackState() {
         cancelPendingMarkerPreviewRender()
+        exportTask?.cancel()
+        exportRenderService.cancelExport()
         removeMainPlaybackObserver()
         removePreviewPlaybackObserver()
         mainPlayer?.pause()
@@ -605,6 +713,17 @@ final class CaptureSetupViewModel: ObservableObject {
         cleanupRenderedPreviewFile()
         projectBundleService.endPlaybackAccess(activePlaybackScopeURL)
         activePlaybackScopeURL = nil
+    }
+
+    private func chooseExportDestination(defaultName: String) -> URL? {
+        let panel = NSSavePanel()
+        panel.canCreateDirectories = true
+        panel.allowedContentTypes = [.movie]
+        panel.nameFieldStringValue = "\(defaultName) Export.mov"
+        panel.isExtensionHidden = false
+        panel.title = "Export Video"
+        panel.prompt = "Export"
+        return panel.runModal() == .OK ? panel.url : nil
     }
 
     private func seekPlayback(to seconds: Double) {

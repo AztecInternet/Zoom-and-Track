@@ -50,7 +50,7 @@ final class MarkerPreviewRenderService {
             CGAffineTransform(translationX: -orientedRect.origin.x, y: -orientedRect.origin.y)
         )
         let outputSize = cappedRenderSize(for: orientedSize, maxWidth: 1440)
-        let previewBounds = previewBounds(for: selectedMarker)
+        let previewBounds = SharedMotionEngine.previewBounds(for: selectedMarker)
         let sourceStartTime = max(0, previewBounds.startTime - previewPaddingBefore)
         let sourceEndTime = min(
             max(previewBounds.endTime + previewPaddingAfter, sourceStartTime + 0.05),
@@ -101,17 +101,18 @@ final class MarkerPreviewRenderService {
             }
 
             let sourceTime = sourceStartTime + request.compositionTime.seconds
-            let previewState = self.activeZoomPreviewState(
+            let previewState = SharedMotionEngine.activeZoomState(
                 at: sourceTime,
                 zoomMarkers: markers,
-                contentCoordinateSize: contentCoordinateSize
+                contentCoordinateSize: contentCoordinateSize,
+                coordinateSpace: .bottomLeft
             )
 
             var image = request.sourceImage.transformed(by: baseOrientationTransform)
             image = image.transformed(by: CGAffineTransform(scaleX: baseScale, y: baseScale))
 
             if let previewState {
-                let offset = self.zoomPreviewOffset(for: previewState, outputSize: outputSize)
+                let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
                 image = image.transformed(by: CGAffineTransform(scaleX: previewState.scale, y: previewState.scale))
                 image = image.transformed(by: CGAffineTransform(translationX: offset.width, y: offset.height))
             }
@@ -469,6 +470,207 @@ final class MarkerPreviewRenderService {
         let x = currentState.normalizedPoint.x + ((targetPoint.x - currentState.normalizedPoint.x) * progress.pan)
         let y = currentState.normalizedPoint.y + ((targetPoint.y - currentState.normalizedPoint.y) * progress.pan)
         return ZoomPreviewState(scale: scale, normalizedPoint: CGPoint(x: x, y: y))
+    }
+}
+
+enum ExportRenderPhase {
+    case preparing
+    case exporting
+    case finalizing
+}
+
+struct ExportRenderResult {
+    let outputURL: URL
+    let renderSize: CGSize
+}
+
+final class ExportRenderService {
+    private let ciContext = CIContext()
+    private let maxFallbackWidth: CGFloat = 3840
+    private var activeExportSession: AVAssetExportSession?
+
+    func cancelExport() {
+        activeExportSession?.cancelExport()
+    }
+
+    func exportRecording(
+        recordingURL: URL,
+        summary: RecordingInspectionSummary,
+        outputURL: URL,
+        progressHandler: @escaping @Sendable (ExportRenderPhase, Double) -> Void
+    ) async throws -> ExportRenderResult {
+        progressHandler(.preparing, 0.02)
+
+        let asset = AVURLAsset(url: recordingURL)
+        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+        guard let sourceVideoTrack = videoTracks.first else {
+            throw NSError(
+                domain: "ExportRenderService",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "The recording is missing a video track."]
+            )
+        }
+
+        let audioTrack = try await asset.loadTracks(withMediaType: .audio).first
+        let naturalSize = try await sourceVideoTrack.load(.naturalSize)
+        let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+        let nominalFrameRate = try await sourceVideoTrack.load(.nominalFrameRate)
+        let assetDuration = try await asset.load(.duration)
+
+        let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+        let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+        guard orientedSize.width > 0, orientedSize.height > 0 else {
+            throw NSError(
+                domain: "ExportRenderService",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "The recording has an invalid video size."]
+            )
+        }
+
+        let baseOrientationTransform = preferredTransform.concatenating(
+            CGAffineTransform(translationX: -orientedRect.origin.x, y: -orientedRect.origin.y)
+        )
+        let outputSize = stabilizedRenderSize(for: orientedSize)
+        let markers = summary.zoomMarkers.filter(\.enabled)
+
+        let composition = AVMutableComposition()
+        guard let compositionVideoTrack = composition.addMutableTrack(
+            withMediaType: .video,
+            preferredTrackID: kCMPersistentTrackID_Invalid
+        ) else {
+            throw NSError(
+                domain: "ExportRenderService",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Could not create a composition video track."]
+            )
+        }
+        try compositionVideoTrack.insertTimeRange(
+            CMTimeRange(start: .zero, duration: assetDuration),
+            of: sourceVideoTrack,
+            at: .zero
+        )
+
+        if let audioTrack,
+           let compositionAudioTrack = composition.addMutableTrack(
+                withMediaType: .audio,
+                preferredTrackID: kCMPersistentTrackID_Invalid
+           ) {
+            try? compositionAudioTrack.insertTimeRange(
+                CMTimeRange(start: .zero, duration: assetDuration),
+                of: audioTrack,
+                at: .zero
+            )
+        }
+
+        let frameRate = max(nominalFrameRate.isFinite && nominalFrameRate > 0 ? nominalFrameRate : 30, 30)
+        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(frameRate.rounded()))
+        let outputRect = CGRect(origin: .zero, size: outputSize)
+        let baseScale = outputSize.width / orientedSize.width
+
+        let videoComposition = AVMutableVideoComposition(asset: composition) { [weak self] request in
+            guard let self else {
+                request.finish(with: NSError(domain: "ExportRenderService", code: 4))
+                return
+            }
+
+            let sourceTime = request.compositionTime.seconds
+            let previewState = SharedMotionEngine.activeZoomState(
+                at: sourceTime,
+                zoomMarkers: markers,
+                contentCoordinateSize: summary.contentCoordinateSize,
+                coordinateSpace: .bottomLeft
+            )
+
+            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+            image = image.transformed(by: CGAffineTransform(scaleX: baseScale, y: baseScale))
+
+            if let previewState {
+                let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
+                image = image.transformed(by: CGAffineTransform(scaleX: previewState.scale, y: previewState.scale))
+                image = image.transformed(by: CGAffineTransform(translationX: offset.width, y: offset.height))
+            }
+
+            request.finish(with: image.cropped(to: outputRect), context: self.ciContext)
+        }
+        videoComposition.renderSize = outputSize
+        videoComposition.frameDuration = frameDuration
+
+        try? FileManager.default.removeItem(at: outputURL)
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            throw NSError(
+                domain: "ExportRenderService",
+                code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "Could not create an export session."]
+            )
+        }
+
+        activeExportSession = exportSession
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mov
+        exportSession.shouldOptimizeForNetworkUse = false
+        exportSession.videoComposition = videoComposition
+
+        progressHandler(.exporting, 0.05)
+
+        do {
+            try await export(exportSession: exportSession, progressHandler: progressHandler)
+            progressHandler(.finalizing, 1.0)
+            activeExportSession = nil
+            return ExportRenderResult(outputURL: outputURL, renderSize: outputSize)
+        } catch {
+            activeExportSession = nil
+            if error is CancellationError {
+                try? FileManager.default.removeItem(at: outputURL)
+            }
+            throw error
+        }
+    }
+
+    private func export(
+        exportSession: AVAssetExportSession,
+        progressHandler: @escaping @Sendable (ExportRenderPhase, Double) -> Void
+    ) async throws {
+        let progressTask = Task {
+            while !Task.isCancelled {
+                progressHandler(.exporting, Double(exportSession.progress))
+                try? await Task.sleep(for: .milliseconds(120))
+            }
+        }
+
+        defer {
+            progressTask.cancel()
+        }
+
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                exportSession.exportAsynchronously {
+                    switch exportSession.status {
+                    case .completed:
+                        continuation.resume()
+                    case .failed:
+                        continuation.resume(throwing: exportSession.error ?? NSError(domain: "ExportRenderService", code: 6))
+                    case .cancelled:
+                        continuation.resume(throwing: CancellationError())
+                    default:
+                        continuation.resume(throwing: NSError(domain: "ExportRenderService", code: 7))
+                    }
+                }
+            }
+        } onCancel: {
+            exportSession.cancelExport()
+        }
+    }
+
+    private func stabilizedRenderSize(for sourceSize: CGSize) -> CGSize {
+        guard sourceSize.width > maxFallbackWidth else {
+            return CGSize(width: floor(sourceSize.width), height: floor(sourceSize.height))
+        }
+
+        let scale = maxFallbackWidth / sourceSize.width
+        return CGSize(
+            width: floor(maxFallbackWidth),
+            height: floor(sourceSize.height * scale)
+        )
     }
 }
 
