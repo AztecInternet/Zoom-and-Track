@@ -2023,7 +2023,7 @@ struct ContentView: View {
         let tooltipWidth: CGFloat = 240
         let tooltipHalfWidth = tooltipWidth / 2
         let tooltipX = min(max(anchor.x, tooltipHalfWidth), max(width - tooltipHalfWidth, tooltipHalfWidth))
-        let tooltipY: CGFloat = -80
+        let tooltipY: CGFloat = -120
 
         return VStack(alignment: .leading, spacing: 4) {
             Text("Marker #\(markerNumber)")
@@ -2040,7 +2040,19 @@ struct ContentView: View {
                 .font(.system(size: 11))
             Text("Zoom \(String(format: "%.1fx", marker.zoomScale))")
                 .font(.system(size: 11))
-            Text("Duration \(String(format: "%.2fs", marker.totalSegmentDuration))")
+            Text("Lead-In \(String(format: "%.2fs", marker.leadInTime))")
+                .font(.system(size: 11))
+            if marker.zoomType != .outOnly {
+                Text("Zoom In \(String(format: "%.2fs", marker.zoomInDuration))")
+                    .font(.system(size: 11))
+            }
+            if marker.zoomType != .outOnly {
+                Text("Hold \(String(format: "%.2fs", marker.holdDuration))")
+                    .font(.system(size: 11))
+            }
+            Text("Zoom Out \(String(format: "%.2fs", marker.zoomOutDuration))")
+                .font(.system(size: 11))
+            Text("Total \(String(format: "%.2fs", marker.totalSegmentDuration))")
                 .font(.system(size: 11))
             Text(marker.enabled ? "Enabled" : "Disabled")
                 .font(.system(size: 11))
