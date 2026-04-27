@@ -12,6 +12,8 @@ struct RenderedMarkerPreview {
 
 final class MarkerPreviewRenderService {
     private let ciContext = CIContext()
+    private let previewPaddingBefore: Double = 0.10
+    private let previewPaddingAfter: Double = 0.10
 
     func renderPreview(
         recordingURL: URL,
@@ -32,6 +34,7 @@ final class MarkerPreviewRenderService {
         let naturalSize = try await sourceVideoTrack.load(.naturalSize)
         let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
         let nominalFrameRate = try await sourceVideoTrack.load(.nominalFrameRate)
+        let assetDuration = try await asset.load(.duration).seconds
 
         let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
         let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
@@ -48,8 +51,11 @@ final class MarkerPreviewRenderService {
         )
         let outputSize = cappedRenderSize(for: orientedSize, maxWidth: 1440)
         let previewBounds = previewBounds(for: selectedMarker)
-        let sourceStartTime = max(0, previewBounds.startTime)
-        let sourceEndTime = max(previewBounds.endTime, sourceStartTime + 0.05)
+        let sourceStartTime = max(0, previewBounds.startTime - previewPaddingBefore)
+        let sourceEndTime = min(
+            max(previewBounds.endTime + previewPaddingAfter, sourceStartTime + 0.05),
+            max(assetDuration, sourceStartTime + 0.05)
+        )
         let sourceTimeRange = CMTimeRange(
             start: CMTime(seconds: sourceStartTime, preferredTimescale: 600),
             end: CMTime(seconds: sourceEndTime, preferredTimescale: 600)

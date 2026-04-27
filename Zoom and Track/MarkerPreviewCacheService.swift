@@ -5,7 +5,7 @@ import Foundation
 final class MarkerPreviewCacheService {
     private let fileManager = FileManager.default
     private let cacheLifetime: TimeInterval = 7 * 24 * 60 * 60
-    private let previewRenderVersion = 1
+    private let previewRenderVersion = 2
 
     func cachedPreview(
         for recordingURL: URL,

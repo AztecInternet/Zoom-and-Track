@@ -380,7 +380,7 @@ struct ContentView: View {
             }
             .zIndex(2)
 
-            if let player = viewModel.player, let summary = viewModel.recordingSummary {
+            if let mainPlayer = viewModel.mainPlayer, let summary = viewModel.recordingSummary {
                 GeometryReader { geometry in
                     let safeAspectRatio = max(summary.videoAspectRatio, 0.1)
                     let inspectorWidth: CGFloat = 320
@@ -396,14 +396,17 @@ struct ContentView: View {
                     HStack(alignment: .top, spacing: 22) {
                         VStack(alignment: .leading, spacing: 12) {
                             playbackVideoCard(
-                                player: player,
+                                mainPlayer: mainPlayer,
+                                previewPlayer: viewModel.previewPlayer,
                                 aspectRatio: summary.videoAspectRatio,
                                 selectedMarker: viewModel.selectedZoomMarker,
                                 contentCoordinateSize: summary.contentCoordinateSize,
                                 zoomMarkers: summary.zoomMarkers,
                                 currentTime: viewModel.currentPlaybackTime,
                                 isRenderedPreviewActive: viewModel.isRenderedPreviewActive,
-                                renderingStatusMessage: viewModel.markerPreviewStatusMessage
+                                renderingStatusMessage: viewModel.markerPreviewStatusMessage,
+                                playbackPresentationMode: viewModel.playbackPresentationMode,
+                                playbackTransitionPlateState: viewModel.playbackTransitionPlateState
                             )
                                 .frame(height: videoHeight)
                                 .layoutPriority(1)
@@ -557,14 +560,17 @@ struct ContentView: View {
     }
 
     private func playbackVideoCard(
-        player: AVPlayer,
+        mainPlayer: AVPlayer,
+        previewPlayer: AVPlayer?,
         aspectRatio: CGFloat,
         selectedMarker: ZoomPlanItem?,
         contentCoordinateSize: CGSize,
         zoomMarkers: [ZoomPlanItem],
         currentTime: Double,
         isRenderedPreviewActive: Bool,
-        renderingStatusMessage: String?
+        renderingStatusMessage: String?,
+        playbackPresentationMode: CaptureSetupViewModel.PlaybackPresentationMode,
+        playbackTransitionPlateState: CaptureSetupViewModel.PlaybackTransitionPlateState
     ) -> some View {
         let safeAspectRatio = max(aspectRatio, 0.1)
 
@@ -582,11 +588,18 @@ struct ContentView: View {
                     )
 
                 ZStack {
-                    PlaybackVideoSurface(player: player)
+                    PlaybackVideoSurface(player: mainPlayer)
                         .frame(width: fittedRect.width, height: fittedRect.height)
                         .scaleEffect(previewState?.scale ?? 1, anchor: .topLeading)
                         .offset(zoomPreviewOffset(for: previewState, in: fittedRect))
                         .blur(radius: playbackVideoHeightDragOrigin == nil ? 0 : 4)
+
+                    if let previewPlayer {
+                        PlaybackVideoSurface(player: previewPlayer)
+                            .frame(width: fittedRect.width, height: fittedRect.height)
+                            .opacity(playbackPresentationMode == .playingRenderedPreview ? 1 : 0)
+                            .animation(.easeInOut(duration: 0.16), value: playbackPresentationMode == .playingRenderedPreview)
+                    }
                 }
                 .frame(width: fittedRect.width, height: fittedRect.height)
                 .clipped()
@@ -645,8 +658,69 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .allowsHitTesting(false)
             }
+
+            if playbackTransitionPlateState != .hidden {
+                ZStack {
+                    Color.black
+                        .opacity(0.8)
+                    Color.accentColor
+                        .opacity(0.2)
+
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 330)
+                        .opacity(0.96)
+
+                    if playbackPresentationMode == .previewCompletedSlate {
+                        VStack {
+                            Spacer()
+                            Text("Choose another Zoom Marker from the list or use the transport controls below to play the entire timeline.")
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .padding(.bottom, 20)
+                                .padding(.horizontal, 24)
+                        }
+                    }
+                }
+                .opacity(playbackTransitionPlateOpacity(for: playbackTransitionPlateState))
+                .animation(
+                    .easeInOut(duration: playbackTransitionPlateAnimationDuration(for: playbackTransitionPlateState)),
+                    value: playbackTransitionPlateState
+                )
+                .allowsHitTesting(false)
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func playbackTransitionPlateOpacity(
+        for state: CaptureSetupViewModel.PlaybackTransitionPlateState
+    ) -> Double {
+        switch state {
+        case .hidden:
+            return 0
+        case .fadingIn, .visible:
+            return 1
+        case .fadingOut:
+            return 0
+        }
+    }
+
+    private func playbackTransitionPlateAnimationDuration(
+        for state: CaptureSetupViewModel.PlaybackTransitionPlateState
+    ) -> Double {
+        switch state {
+        case .hidden:
+            return 0
+        case .fadingIn:
+            return 0.12
+        case .visible:
+            return 0
+        case .fadingOut:
+            return 0.16
+        }
     }
 
     private func activeZoomPreviewState(
