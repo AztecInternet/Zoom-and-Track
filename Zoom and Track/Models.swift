@@ -101,19 +101,142 @@ struct ZoomPlanEnvelope: Codable {
     let items: [ZoomPlanItem]
 }
 
+enum ZoomEaseStyle: String, Codable, CaseIterable, Identifiable {
+    case smooth
+    case fastIn
+    case fastOut
+    case linear
+    case bounce
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .smooth:
+            return "Smooth"
+        case .fastIn:
+            return "Fast In"
+        case .fastOut:
+            return "Fast Out"
+        case .linear:
+            return "Linear"
+        case .bounce:
+            return "Bounce"
+        }
+    }
+}
+
+enum ZoomType: String, Codable, CaseIterable, Identifiable {
+    case inOut
+    case inOnly
+    case outOnly
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .inOut:
+            return "Zoom In & Out"
+        case .inOnly:
+            return "Zoom In Only"
+        case .outOnly:
+            return "Zoom Out Only"
+        }
+    }
+}
+
 struct ZoomPlanItem: Codable, Identifiable {
-    let id: String
-    let type: String
-    let sourceEventTimestamp: Double
-    let rawX: Double?
-    let rawY: Double?
-    let centerX: Double
-    let centerY: Double
-    let zoomScale: Double
-    let startTime: Double
-    let holdUntil: Double
-    let endTime: Double
-    let enabled: Bool
+    var id: String
+    var type: String
+    var sourceEventTimestamp: Double
+    var rawX: Double?
+    var rawY: Double?
+    var centerX: Double
+    var centerY: Double
+    var zoomScale: Double
+    var startTime: Double
+    var holdUntil: Double
+    var endTime: Double
+    var enabled: Bool
+    var duration: Double
+    var easeStyle: ZoomEaseStyle
+    var zoomType: ZoomType
+    var bounceAmount: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case type
+        case sourceEventTimestamp
+        case rawX
+        case rawY
+        case centerX
+        case centerY
+        case zoomScale
+        case startTime
+        case holdUntil
+        case endTime
+        case enabled
+        case duration
+        case easeStyle
+        case zoomType
+        case bounceAmount
+    }
+
+    init(
+        id: String,
+        type: String,
+        sourceEventTimestamp: Double,
+        rawX: Double?,
+        rawY: Double?,
+        centerX: Double,
+        centerY: Double,
+        zoomScale: Double,
+        startTime: Double,
+        holdUntil: Double,
+        endTime: Double,
+        enabled: Bool,
+        duration: Double,
+        easeStyle: ZoomEaseStyle,
+        zoomType: ZoomType,
+        bounceAmount: Double
+    ) {
+        self.id = id
+        self.type = type
+        self.sourceEventTimestamp = sourceEventTimestamp
+        self.rawX = rawX
+        self.rawY = rawY
+        self.centerX = centerX
+        self.centerY = centerY
+        self.zoomScale = zoomScale
+        self.startTime = startTime
+        self.holdUntil = holdUntil
+        self.endTime = endTime
+        self.enabled = enabled
+        self.duration = duration
+        self.easeStyle = easeStyle
+        self.zoomType = zoomType
+        self.bounceAmount = bounceAmount
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        type = try container.decode(String.self, forKey: .type)
+        sourceEventTimestamp = try container.decode(Double.self, forKey: .sourceEventTimestamp)
+        rawX = try container.decodeIfPresent(Double.self, forKey: .rawX)
+        rawY = try container.decodeIfPresent(Double.self, forKey: .rawY)
+        centerX = try container.decode(Double.self, forKey: .centerX)
+        centerY = try container.decode(Double.self, forKey: .centerY)
+        zoomScale = try container.decodeIfPresent(Double.self, forKey: .zoomScale) ?? 1.8
+        startTime = try container.decode(Double.self, forKey: .startTime)
+        holdUntil = try container.decode(Double.self, forKey: .holdUntil)
+        endTime = try container.decode(Double.self, forKey: .endTime)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        duration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? max(endTime - startTime, 0.5)
+        easeStyle = try container.decodeIfPresent(ZoomEaseStyle.self, forKey: .easeStyle) ?? .smooth
+        zoomType = try container.decodeIfPresent(ZoomType.self, forKey: .zoomType) ?? .inOut
+        bounceAmount = try container.decodeIfPresent(Double.self, forKey: .bounceAmount) ?? 0.35
+    }
 }
 
 struct RecordingInspectionSummary {

@@ -309,6 +309,17 @@ struct ProjectBundleService {
         url?.stopAccessingSecurityScopedResource()
     }
 
+    func saveZoomPlan(_ zoomPlan: ZoomPlanEnvelope, in bundleURL: URL) throws {
+        let accessURL = try beginPlaybackAccess(for: bundleURL)
+        defer {
+            endPlaybackAccess(accessURL)
+        }
+
+        let zoomPlanURL = bundleURL.appendingPathComponent("zoomPlan.json")
+        let data = try JSONEncoder.zoomPlanEncoder.encode(zoomPlan)
+        try data.write(to: zoomPlanURL)
+    }
+
     private func moviesDirectory() throws -> URL {
         guard let directory = fileManager.urls(for: .moviesDirectory, in: .userDomainMask).first else {
             throw NSError(domain: "ProjectBundleService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Movies directory is unavailable."])
@@ -380,7 +391,11 @@ struct ProjectBundleService {
                     startTime: max(0, event.timestamp - 0.35),
                     holdUntil: event.timestamp + 1.15,
                     endTime: event.timestamp + 1.55,
-                    enabled: true
+                    enabled: true,
+                    duration: 1.9,
+                    easeStyle: .smooth,
+                    zoomType: .inOut,
+                    bounceAmount: 0.35
                 )
             )
             lastIncludedTimestamp = event.timestamp
