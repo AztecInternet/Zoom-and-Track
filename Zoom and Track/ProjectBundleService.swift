@@ -378,6 +378,13 @@ struct ProjectBundleService {
 
             let index = zoomItems.count + 1
             let normalizedPoint = normalizeToVideoCoordinates(event: event, captureSource: captureSource)
+            let leadInTime = 0.15
+            let zoomInDuration = 0.30
+            let holdDuration = 1.15
+            let zoomOutDuration = 0.40
+            let startTime = max(0, event.timestamp - leadInTime - zoomInDuration)
+            let holdUntil = event.timestamp + holdDuration
+            let endTime = holdUntil + zoomOutDuration
             zoomItems.append(
                 ZoomPlanItem(
                     id: String(format: "zoom-%04d", index),
@@ -388,11 +395,15 @@ struct ProjectBundleService {
                     centerX: normalizedPoint.x,
                     centerY: normalizedPoint.y,
                     zoomScale: 1.8,
-                    startTime: max(0, event.timestamp - 0.35),
-                    holdUntil: event.timestamp + 1.15,
-                    endTime: event.timestamp + 1.55,
+                    startTime: startTime,
+                    holdUntil: holdUntil,
+                    endTime: endTime,
+                    leadInTime: leadInTime,
+                    zoomInDuration: zoomInDuration,
+                    holdDuration: holdDuration,
+                    zoomOutDuration: zoomOutDuration,
                     enabled: true,
-                    duration: 1.9,
+                    duration: leadInTime + zoomInDuration + holdDuration + zoomOutDuration,
                     easeStyle: .smooth,
                     zoomType: .inOut,
                     bounceAmount: 0.35

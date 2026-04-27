@@ -157,6 +157,10 @@ struct ZoomPlanItem: Codable, Identifiable {
     var startTime: Double
     var holdUntil: Double
     var endTime: Double
+    var leadInTime: Double
+    var zoomInDuration: Double
+    var holdDuration: Double
+    var zoomOutDuration: Double
     var enabled: Bool
     var duration: Double
     var easeStyle: ZoomEaseStyle
@@ -175,6 +179,10 @@ struct ZoomPlanItem: Codable, Identifiable {
         case startTime
         case holdUntil
         case endTime
+        case leadInTime
+        case zoomInDuration
+        case holdDuration
+        case zoomOutDuration
         case enabled
         case duration
         case easeStyle
@@ -194,6 +202,10 @@ struct ZoomPlanItem: Codable, Identifiable {
         startTime: Double,
         holdUntil: Double,
         endTime: Double,
+        leadInTime: Double,
+        zoomInDuration: Double,
+        holdDuration: Double,
+        zoomOutDuration: Double,
         enabled: Bool,
         duration: Double,
         easeStyle: ZoomEaseStyle,
@@ -211,6 +223,10 @@ struct ZoomPlanItem: Codable, Identifiable {
         self.startTime = startTime
         self.holdUntil = holdUntil
         self.endTime = endTime
+        self.leadInTime = leadInTime
+        self.zoomInDuration = zoomInDuration
+        self.holdDuration = holdDuration
+        self.zoomOutDuration = zoomOutDuration
         self.enabled = enabled
         self.duration = duration
         self.easeStyle = easeStyle
@@ -232,10 +248,67 @@ struct ZoomPlanItem: Codable, Identifiable {
         holdUntil = try container.decode(Double.self, forKey: .holdUntil)
         endTime = try container.decode(Double.self, forKey: .endTime)
         enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
-        duration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? max(endTime - startTime, 0.5)
         easeStyle = try container.decodeIfPresent(ZoomEaseStyle.self, forKey: .easeStyle) ?? .smooth
         zoomType = try container.decodeIfPresent(ZoomType.self, forKey: .zoomType) ?? .inOut
         bounceAmount = try container.decodeIfPresent(Double.self, forKey: .bounceAmount) ?? 0.35
+
+        let legacyDuration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? max(endTime - startTime, 0.5)
+        let legacyPhases = ZoomPlanItem.legacyPhaseTiming(totalDuration: legacyDuration)
+
+        leadInTime = try container.decodeIfPresent(Double.self, forKey: .leadInTime) ?? legacyPhases.leadInTime
+        zoomInDuration = try container.decodeIfPresent(Double.self, forKey: .zoomInDuration) ?? legacyPhases.zoomInDuration
+        holdDuration = try container.decodeIfPresent(Double.self, forKey: .holdDuration) ?? legacyPhases.holdDuration
+        zoomOutDuration = try container.decodeIfPresent(Double.self, forKey: .zoomOutDuration) ?? legacyPhases.zoomOutDuration
+        switch zoomType {
+        case .inOut:
+            duration = max(leadInTime + zoomInDuration + holdDuration + zoomOutDuration, 0.5)
+        case .inOnly:
+            duration = max(leadInTime + zoomInDuration + holdDuration, 0.5)
+        case .outOnly:
+            duration = max(zoomOutDuration, 0.25)
+        }
+    }
+
+    var totalSegmentDuration: Double {
+        switch zoomType {
+        case .inOut:
+            return max(leadInTime + zoomInDuration + holdDuration + zoomOutDuration, 0.5)
+        case .inOnly:
+            return max(leadInTime + zoomInDuration + holdDuration, 0.5)
+        case .outOnly:
+            return max(zoomOutDuration, 0.25)
+        }
+    }
+
+    static func legacyPhaseTiming(totalDuration: Double) -> (leadInTime: Double, zoomInDuration: Double, holdDuration: Double, zoomOutDuration: Double) {
+        let safeTotal = max(totalDuration, 0.25)
+        let baseLeadIn = 0.15
+        let baseZoomIn = min(0.30, safeTotal * 0.18)
+        let baseZoomOut = min(0.40, safeTotal * 0.22)
+        let minimumHold = 0.25
+
+        if safeTotal >= baseLeadIn + baseZoomIn + baseZoomOut + minimumHold {
+            return (
+                leadInTime: baseLeadIn,
+                zoomInDuration: baseZoomIn,
+                holdDuration: safeTotal - baseLeadIn - baseZoomIn - baseZoomOut,
+                zoomOutDuration: baseZoomOut
+            )
+        }
+
+        let availableAfterLead = max(safeTotal - baseLeadIn, 0.1)
+        let weightTotal = 0.18 + 0.22 + 0.60
+        let scale = availableAfterLead / weightTotal
+        let scaledZoomIn = max(0.08, 0.18 * scale)
+        let scaledZoomOut = max(0.08, 0.22 * scale)
+        let scaledHold = max(availableAfterLead - scaledZoomIn - scaledZoomOut, 0.09)
+
+        return (
+            leadInTime: min(baseLeadIn, safeTotal * 0.25),
+            zoomInDuration: scaledZoomIn,
+            holdDuration: scaledHold,
+            zoomOutDuration: scaledZoomOut
+        )
     }
 }
 

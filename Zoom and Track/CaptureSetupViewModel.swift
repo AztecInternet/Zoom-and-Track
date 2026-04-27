@@ -80,6 +80,10 @@ final class CaptureSetupViewModel: ObservableObject {
         recordingSummary?.zoomMarkers.first { $0.id == selectedZoomMarkerID }
     }
 
+    var activePreviewMarkerID: String? {
+        previewMarkerID
+    }
+
     func load() async {
         hasScreenRecordingPermission = permissionsService.hasScreenRecordingPermission()
         recordingCoordinator.onStateChange?(.loadingTargets, "Loading capture targets…")
@@ -253,10 +257,31 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
-    func setSelectedMarkerDuration(_ duration: Double) {
+    func setSelectedMarkerLeadInTime(_ leadInTime: Double) {
         updateSelectedMarker { marker in
-            marker.duration = duration
-            applyDuration(duration, to: &marker)
+            marker.leadInTime = min(max(leadInTime, 0), 2.0)
+            syncMarkerTiming(&marker)
+        }
+    }
+
+    func setSelectedMarkerZoomInDuration(_ zoomInDuration: Double) {
+        updateSelectedMarker { marker in
+            marker.zoomInDuration = min(max(zoomInDuration, 0.05), 3.0)
+            syncMarkerTiming(&marker)
+        }
+    }
+
+    func setSelectedMarkerHoldDuration(_ holdDuration: Double) {
+        updateSelectedMarker { marker in
+            marker.holdDuration = min(max(holdDuration, 0.05), 10.0)
+            syncMarkerTiming(&marker)
+        }
+    }
+
+    func setSelectedMarkerZoomOutDuration(_ zoomOutDuration: Double) {
+        updateSelectedMarker { marker in
+            marker.zoomOutDuration = min(max(zoomOutDuration, 0.05), 3.0)
+            syncMarkerTiming(&marker)
         }
     }
 
@@ -269,6 +294,7 @@ final class CaptureSetupViewModel: ObservableObject {
     func setSelectedMarkerZoomType(_ zoomType: ZoomType) {
         updateSelectedMarker { marker in
             marker.zoomType = zoomType
+            syncMarkerTiming(&marker)
         }
     }
 
@@ -449,13 +475,31 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
-    private func applyDuration(_ duration: Double, to marker: inout ZoomPlanItem) {
-        let clampedDuration = min(max(duration, 0.5), 10.0)
-        let endTime = marker.startTime + clampedDuration
-        let easeOutTail = min(0.4, max(clampedDuration * 0.25, 0.1))
-        marker.duration = clampedDuration
-        marker.holdUntil = max(marker.startTime, endTime - easeOutTail)
-        marker.endTime = endTime
+    private func syncMarkerTiming(_ marker: inout ZoomPlanItem) {
+        marker.leadInTime = min(max(marker.leadInTime, 0), 2.0)
+        marker.zoomInDuration = min(max(marker.zoomInDuration, 0.05), 3.0)
+        marker.holdDuration = min(max(marker.holdDuration, 0.05), 10.0)
+        marker.zoomOutDuration = min(max(marker.zoomOutDuration, 0.05), 3.0)
+
+        switch marker.zoomType {
+        case .inOut:
+            marker.startTime = max(0, marker.sourceEventTimestamp - marker.leadInTime - marker.zoomInDuration)
+            marker.holdUntil = marker.sourceEventTimestamp + marker.holdDuration
+            marker.endTime = marker.holdUntil + marker.zoomOutDuration
+            marker.duration = marker.totalSegmentDuration
+
+        case .inOnly:
+            marker.startTime = max(0, marker.sourceEventTimestamp - marker.leadInTime - marker.zoomInDuration)
+            marker.holdUntil = marker.sourceEventTimestamp + marker.holdDuration
+            marker.endTime = marker.holdUntil
+            marker.duration = marker.totalSegmentDuration
+
+        case .outOnly:
+            marker.startTime = marker.sourceEventTimestamp
+            marker.holdUntil = marker.sourceEventTimestamp
+            marker.endTime = marker.sourceEventTimestamp + marker.zoomOutDuration
+            marker.duration = marker.totalSegmentDuration
+        }
     }
 
     private func nextZoomMarkerID(from markers: [ZoomPlanItem]) -> String {
@@ -466,7 +510,7 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
-        let startTime = max(0, min(marker.startTime, marker.sourceEventTimestamp))
+        let startTime = max(0, marker.startTime)
         switch marker.zoomType {
         case .inOut, .outOnly:
             return (startTime, max(marker.endTime, marker.sourceEventTimestamp))

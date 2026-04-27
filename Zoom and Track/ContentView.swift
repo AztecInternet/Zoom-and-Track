@@ -19,6 +19,9 @@ struct ContentView: View {
     @State private var suppressMarkerListAutoScrollUntil: Date?
     @State private var hoveredTimelineMarkerID: String?
     @State private var isDraggingTimeline = false
+    @State private var inspectorFocusedTimingPhase: MarkerTimingPhase?
+    @State private var hoveredTimelinePhase: MarkerTimingPhase?
+    @State private var hoveredTimelineTooltipAnchor: CGPoint?
 
     private struct OverlayMapping {
         let point: CGPoint
@@ -48,6 +51,24 @@ struct ContentView: View {
     private struct MotionProgressSample {
         let scale: Double
         let pan: Double
+    }
+
+    private struct TimelineSegmentLayout: Identifiable {
+        let marker: ZoomPlanItem
+        let markerNumber: Int
+        let lane: Int
+        let startRatio: Double
+        let eventRatio: Double
+        let endRatio: Double
+
+        var id: String { marker.id }
+    }
+
+    private enum MarkerTimingPhase: String {
+        case leadIn = "Lead-In"
+        case zoomIn = "Zoom In"
+        case hold = "Hold"
+        case zoomOut = "Zoom Out"
     }
 
     private enum MotionTuning {
@@ -357,6 +378,7 @@ struct ContentView: View {
                     viewModel.openRecording()
                 }
             }
+            .zIndex(2)
 
             if let player = viewModel.player, let summary = viewModel.recordingSummary {
                 GeometryReader { geometry in
@@ -364,9 +386,9 @@ struct ContentView: View {
                     let inspectorWidth: CGFloat = 320
                     let activeInspectorWidth = isPlaybackInspectorVisible ? inspectorWidth : 0
                     let contentWidth = max(geometry.size.width - activeInspectorWidth - (isPlaybackInspectorVisible ? 22 : 0), 320)
-                    let transportHeight: CGFloat = 52
-                    let totalVerticalSpacing: CGFloat = 20
-                    let maxVideoHeight = max(180, geometry.size.height - transportHeight - totalVerticalSpacing)
+                    let reservedBottomHeight: CGFloat = 156
+                    let totalVerticalSpacing: CGFloat = 16
+                    let maxVideoHeight = max(180, min(geometry.size.height - reservedBottomHeight - totalVerticalSpacing, geometry.size.height * 0.7))
                     let minVideoHeight = min(280, maxVideoHeight)
                     let defaultVideoHeight = min(max(contentWidth / safeAspectRatio, minVideoHeight), maxVideoHeight)
                     let videoHeight = min(max(playbackVideoHeightOverride ?? defaultVideoHeight, minVideoHeight), maxVideoHeight)
@@ -396,6 +418,7 @@ struct ContentView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .zIndex(0)
                     .onChange(of: summary.recordingURL) {
                         playbackVideoHeightOverride = nil
                         playbackVideoHeightDragOrigin = nil
@@ -681,18 +704,31 @@ struct ContentView: View {
 
     private func zoomTimeline(for marker: ZoomPlanItem) -> (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double) {
         let peakTime = marker.sourceEventTimestamp
-        let fallbackStart = max(0, peakTime - 0.35)
-        let fallbackHoldUntil = peakTime + max(marker.duration, 0.5)
-        let fallbackEnd = fallbackHoldUntil + 0.4
+        let safeLeadIn = max(marker.leadInTime, 0)
+        let safeZoomIn = max(marker.zoomInDuration, 0.05)
+        let safeHold = max(marker.holdDuration, 0.05)
+        let safeZoomOut = max(marker.zoomOutDuration, 0.05)
+        let fallbackStart = max(0, peakTime - safeLeadIn - safeZoomIn)
+        let fallbackHoldUntil = peakTime + safeHold
+        let fallbackEnd = fallbackHoldUntil + safeZoomOut
 
-        let startTime = min(marker.startTime, peakTime)
-        let safeStart = startTime.isFinite ? startTime : fallbackStart
-        let holdUntil = max(marker.holdUntil, peakTime, fallbackHoldUntil)
-        let safeHoldUntil = holdUntil.isFinite ? holdUntil : fallbackHoldUntil
-        let endTime = max(marker.endTime, safeHoldUntil, fallbackEnd)
-        let safeEndTime = endTime.isFinite ? endTime : fallbackEnd
+        switch marker.zoomType {
+        case .inOut:
+            let safeStart = marker.startTime.isFinite ? max(0, min(marker.startTime, peakTime)) : fallbackStart
+            let safeHoldUntil = marker.holdUntil.isFinite ? max(marker.holdUntil, peakTime) : fallbackHoldUntil
+            let safeEndTime = marker.endTime.isFinite ? max(marker.endTime, safeHoldUntil) : fallbackEnd
+            return (safeStart, peakTime, safeHoldUntil, safeEndTime)
 
-        return (safeStart, peakTime, safeHoldUntil, safeEndTime)
+        case .inOnly:
+            let safeStart = marker.startTime.isFinite ? max(0, min(marker.startTime, peakTime)) : fallbackStart
+            let safeHoldUntil = marker.holdUntil.isFinite ? max(marker.holdUntil, peakTime) : fallbackHoldUntil
+            return (safeStart, peakTime, safeHoldUntil, safeHoldUntil)
+
+        case .outOnly:
+            let safeStart = marker.startTime.isFinite ? max(marker.startTime, peakTime) : peakTime
+            let safeEndTime = marker.endTime.isFinite ? max(marker.endTime, safeStart) : peakTime + safeZoomOut
+            return (safeStart, peakTime, safeStart, safeEndTime)
+        }
     }
 
     private func zoomScale(
@@ -868,6 +904,10 @@ struct ContentView: View {
 
     private func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
         let duration = max(summary.duration ?? 0, 0.001)
+        let segmentLayouts = timelineSegmentLayouts(for: summary.zoomMarkers, duration: duration)
+        let trackCenterY: CGFloat = 34
+        let segmentOriginY: CGFloat = 16
+        let hoveredTooltipEntry = hoveredTimelineTooltipEntry(in: summary)
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -882,45 +922,70 @@ struct ContentView: View {
 
             GeometryReader { geometry in
                 let width = max(geometry.size.width, 1)
-                let playheadX = CGFloat(min(max(viewModel.currentPlaybackTime / duration, 0), 1)) * width
+                let playheadX = timelineX(for: viewModel.currentPlaybackTime, duration: duration, width: width)
 
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(Color.secondary.opacity(0.16))
                         .frame(height: 8)
+                        .position(x: width / 2, y: trackCenterY)
 
                     if isDraggingTimeline {
                         Capsule()
                             .fill(Color.accentColor.opacity(0.14))
                             .frame(height: 8)
+                            .position(x: width / 2, y: trackCenterY)
                     }
 
-                    ForEach(Array(summary.zoomMarkers.enumerated()), id: \.element.id) { index, marker in
-                        timelineMarker(
-                            marker: marker,
-                            markerNumber: index + 1,
+                    ForEach(segmentLayouts) { layout in
+                        let displayedPhase = displayedTimelinePhase(for: layout.marker)
+                        timelineSegment(
+                            layout: layout,
                             width: width,
-                            duration: duration,
-                            isSelected: viewModel.selectedZoomMarkerID == marker.id,
-                            isEnabled: marker.enabled
+                            verticalOrigin: segmentOriginY,
+                            isSelected: viewModel.selectedZoomMarkerID == layout.marker.id,
+                            isEnabled: layout.marker.enabled,
+                            activePhase: displayedPhase
                         )
                     }
 
-                    Rectangle()
-                        .fill(Color.accentColor)
-                        .frame(width: 3, height: 26)
-                        .overlay(alignment: .top) {
-                            Circle()
-                                .fill(Color.accentColor)
-                                .frame(width: 9, height: 9)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(0.55), lineWidth: 1)
-                                )
-                                .offset(y: -7)
-                        }
-                        .shadow(color: Color.accentColor.opacity(isDraggingTimeline ? 0.42 : 0.22), radius: isDraggingTimeline ? 6 : 3, x: 0, y: 0)
-                        .offset(x: min(max(playheadX - 1.5, 0), max(width - 3, 0)), y: -9)
+                    if let hoveredTooltipEntry,
+                       let hoveredAnchor = hoveredTimelineTooltipAnchor {
+                        timelineMarkerTooltipOverlay(
+                            markerID: hoveredTooltipEntry.marker.id,
+                            markerNumber: hoveredTooltipEntry.markerNumber,
+                            marker: hoveredTooltipEntry.marker,
+                            phase: hoveredTimelinePhase,
+                            anchor: hoveredAnchor,
+                            width: width
+                        )
+                    }
+
+                    ZStack {
+                        Rectangle()
+                            .fill(Color.accentColor)
+                            .frame(width: 3, height: 40)
+
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 11, height: 11)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                            )
+                            .offset(y: -19)
+
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.001))
+                            .frame(width: 22, height: 22)
+                            .offset(y: -19)
+                    }
+                    .frame(width: 22, height: 52)
+                    .shadow(color: Color.accentColor.opacity(isDraggingTimeline ? 0.42 : 0.22), radius: isDraggingTimeline ? 6 : 3, x: 0, y: 0)
+                    .position(
+                        x: min(max(playheadX, 11), max(width - 11, 11)),
+                        y: trackCenterY - 2
+                    )
                 }
                 .contentShape(Rectangle())
                 .highPriorityGesture(
@@ -960,8 +1025,13 @@ struct ContentView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .animation(.easeInOut(duration: 0.12), value: isDraggingTimeline)
+                .onHover { isHovering in
+                    if !isHovering {
+                        clearTimelineHover()
+                    }
+                }
             }
-            .frame(height: 22)
+            .frame(height: 60)
 
             HStack {
                 Text("0")
@@ -978,41 +1048,407 @@ struct ContentView: View {
         .background(cardBackground)
     }
 
-    private func timelineMarker(
-        marker: ZoomPlanItem,
-        markerNumber: Int,
+    private func timelineSegment(
+        layout: TimelineSegmentLayout,
         width: CGFloat,
-        duration: Double,
+        verticalOrigin: CGFloat,
         isSelected: Bool,
-        isEnabled: Bool
+        isEnabled: Bool,
+        activePhase: MarkerTimingPhase?
     ) -> some View {
-        let positionRatio = min(max(marker.sourceEventTimestamp / max(duration, 0.001), 0), 1)
-        let markerX = CGFloat(positionRatio) * width
+        let marker = layout.marker
         let isHovered = hoveredTimelineMarkerID == marker.id
         let baseColor: Color = isSelected ? .accentColor : (isEnabled ? Color.primary.opacity(0.72) : Color.secondary.opacity(0.35))
+        let laneHeight: CGFloat = 9
+        let laneSpacing: CGFloat = 4
+        let laneY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
+        let startX = CGFloat(layout.startRatio) * width
+        let endX = CGFloat(layout.endRatio) * width
+        let eventX = CGFloat(layout.eventRatio) * width
+        let barWidth = max(endX - startX, 10)
+        let emphasisWidth: CGFloat = min(max(barWidth * 0.28, 8), 18)
+        let markerBodyHeight: CGFloat = isSelected ? 18 : 14
+        let markerBodyWidth: CGFloat = isSelected ? 8 : 6
+        let hoverHighlightColor = (isSelected ? Color.accentColor : baseColor).opacity(isHovered ? (isEnabled ? 0.22 : 0.12) : 0)
+        let hoverTargetPadding: CGFloat = 7
+        let hoverTargetWidth = max(barWidth + (hoverTargetPadding * 2), 18)
+        let hoverTargetHeight: CGFloat = 28
+        let hoverAnchor = CGPoint(x: startX + (barWidth / 2), y: max(laneY - 20, 10))
+        let localMinX = max(min(startX, eventX - 8) - hoverTargetPadding, 0)
+        let localMaxX = min(max(endX, eventX + 8) + hoverTargetPadding, width)
+        let localWidth = max(localMaxX - localMinX, hoverTargetWidth)
+        let localCenterX = localMinX + (localWidth / 2)
+        let localBarCenterX = (startX + (barWidth / 2)) - localMinX
+        let localEventX = eventX - localMinX
+        let localHoverCenterX = localBarCenterX
+        let localHeight: CGFloat = 34
+        let localCenterY = localHeight / 2
+        let localMarkerCenterY = localCenterY + 0.5
+        let labelY: CGFloat = 6
+        let highlightedBarWidth = barWidth + 10
+        let highlightedBarX = min(
+            max(localBarCenterX, highlightedBarWidth / 2),
+            max(localWidth - (highlightedBarWidth / 2), highlightedBarWidth / 2)
+        )
 
         return ZStack {
+            timelineSegmentBar(
+                marker: marker,
+                baseColor: baseColor,
+                isSelected: isSelected,
+                isEnabled: isEnabled,
+                width: barWidth,
+                emphasisWidth: emphasisWidth,
+                absoluteBarStartX: startX
+            )
+            .frame(width: barWidth, height: laneHeight)
+            .position(x: localBarCenterX, y: localCenterY)
+
             Capsule()
                 .fill(baseColor)
-                .frame(width: isSelected ? 8 : 6, height: isSelected ? 18 : 14)
+                .frame(width: markerBodyWidth, height: markerBodyHeight)
+                .position(
+                    x: min(max(localEventX, markerBodyWidth / 2), max(localWidth - (markerBodyWidth / 2), markerBodyWidth / 2)),
+                    y: localMarkerCenterY
+                )
+
             if isSelected {
                 Capsule()
                     .stroke(Color.accentColor.opacity(0.35), lineWidth: 4)
                     .frame(width: 12, height: 22)
+                    .position(
+                        x: min(max(localEventX, 6), max(localWidth - 6, 6)),
+                        y: localMarkerCenterY
+                    )
+            }
+
+            if let activePhase {
+                let labelX = timelinePhaseCenterX(for: marker, phase: activePhase, width: width) - localMinX
+
+                Text(activePhase.rawValue)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color(nsColor: .windowBackgroundColor).opacity(0.92))
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .stroke(Color.accentColor.opacity(0.18), lineWidth: 1)
+                            )
+                    )
+                    .position(
+                        x: labelX,
+                        y: labelY
+                    )
+                    .allowsHitTesting(false)
+            }
+
+            if isHovered {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(hoverHighlightColor, lineWidth: 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(hoverHighlightColor.opacity(0.28))
+                    )
+                    .frame(width: highlightedBarWidth, height: 22)
+                    .position(
+                        x: highlightedBarX,
+                        y: localCenterY
+                    )
+                    .allowsHitTesting(false)
+            }
+
+            Rectangle()
+                .fill(Color.clear)
+                .frame(width: hoverTargetWidth, height: hoverTargetHeight)
+                .position(
+                    x: min(max(localHoverCenterX, hoverTargetWidth / 2), max(localWidth - (hoverTargetWidth / 2), hoverTargetWidth / 2)),
+                    y: localCenterY
+                )
+                .contentShape(Rectangle())
+                .onHover { isHovering in
+                    if isHovering {
+                        setTimelineHover(markerID: marker.id, phase: nil, anchor: hoverAnchor)
+                    } else if hoveredTimelineMarkerID == marker.id {
+                        clearTimelineHover()
+                    }
+                }
+        }
+        .frame(width: localWidth, height: localHeight)
+        .position(x: localCenterX, y: localCenterY + verticalOrigin)
+        .brightness(isHovered ? 0.06 : 0)
+    }
+
+    @ViewBuilder
+    private func timelineSegmentBar(
+        marker: ZoomPlanItem,
+        baseColor: Color,
+        isSelected: Bool,
+        isEnabled: Bool,
+        width: CGFloat,
+        emphasisWidth: CGFloat,
+        absoluteBarStartX: CGFloat
+    ) -> some View {
+        let timeline = zoomTimeline(for: marker)
+        let fillOpacity = isEnabled ? 0.82 : 0.34
+        let leadColor = baseColor.opacity(isEnabled ? 0.24 : 0.14)
+        let zoomInColor = baseColor.opacity(fillOpacity)
+        let holdColor = baseColor.opacity(isEnabled ? 0.58 : 0.26)
+        let zoomOutColor = baseColor.opacity(isEnabled ? 0.42 : 0.22)
+        let totalWidth = max(width, 1)
+        let leadWidth = max(phaseWidth(from: timeline.startTime, to: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: totalWidth), marker.zoomType == .outOnly ? 0 : 2)
+        let zoomInWidth = max(phaseWidth(from: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), to: timeline.peakTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: totalWidth), marker.zoomType == .outOnly ? 0 : 4)
+        let holdWidth = max(phaseWidth(from: timeline.peakTime, to: timeline.holdUntil, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: totalWidth), marker.zoomType == .outOnly ? 0 : 2)
+        let zoomOutWidth = max(phaseWidth(from: timeline.holdUntil, to: timeline.endTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: totalWidth), marker.zoomType == .outOnly ? totalWidth : 4)
+
+        Capsule()
+            .fill(Color.clear)
+            .overlay {
+                HStack(spacing: 0) {
+                    switch marker.zoomType {
+                    case .inOut:
+                        timelinePhaseBlock(color: leadColor, width: leadWidth)
+                        timelinePhaseBlock(color: zoomInColor, width: zoomInWidth)
+                        timelinePhaseBlock(color: holdColor, width: holdWidth)
+                        timelinePhaseBlock(color: zoomOutColor, width: zoomOutWidth)
+                    case .inOnly:
+                        timelinePhaseBlock(color: leadColor, width: leadWidth)
+                        timelinePhaseBlock(color: zoomInColor, width: zoomInWidth)
+                        timelinePhaseBlock(color: holdColor, width: holdWidth)
+                    case .outOnly:
+                        timelinePhaseBlock(color: zoomOutColor, width: max(totalWidth, emphasisWidth))
+                    }
+                }
+                .clipShape(Capsule())
+            }
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? Color.accentColor.opacity(0.45) : Color.clear, lineWidth: 1)
+            )
+            .overlay {
+                if isSelected {
+                    selectedTimelinePhaseOverlay(
+                        marker: marker,
+                        timeline: timeline,
+                        width: totalWidth,
+                        isEnabled: isEnabled,
+                        absoluteBarStartX: absoluteBarStartX
+                    )
+                }
+            }
+    }
+
+    private func timelinePhaseBlock(color: Color, width: CGFloat) -> some View {
+        Rectangle()
+            .fill(color)
+            .frame(width: max(width, 0))
+    }
+
+    private func selectedTimelinePhaseOverlay(
+        marker: ZoomPlanItem,
+        timeline: (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double),
+        width: CGFloat,
+        isEnabled: Bool,
+        absoluteBarStartX: CGFloat
+    ) -> some View {
+        let phaseBounds = timelinePhaseBoundsMap(for: marker, timeline: timeline, width: width)
+        let dividerTimes = phaseDividerTimes(for: marker, timeline: timeline)
+        let dividerColor = Color.white.opacity(isEnabled ? 0.38 : 0.22)
+
+        return ZStack(alignment: .leading) {
+            ForEach(dividerTimes, id: \.self) { time in
+                Rectangle()
+                    .fill(dividerColor)
+                    .frame(width: 1, height: 9)
+                    .position(
+                        x: min(max(phaseX(for: time, timeline: timeline, width: width), 0.5), max(width - 0.5, 0.5)),
+                        y: 4.5
+                    )
+                    .allowsHitTesting(false)
+            }
+
+            HStack(spacing: 0) {
+                ForEach(phaseBounds, id: \.phase.rawValue) { item in
+                    let phaseAnchor = CGPoint(
+                        x: absoluteBarStartX + phaseStartOffset(for: item.phase, marker: marker, timeline: timeline, width: width) + (item.width / 2),
+                        y: -8
+                    )
+                    Color.clear
+                        .frame(width: max(item.width, 0))
+                        .contentShape(Rectangle())
+                        .onHover { isHovering in
+                            if isHovering {
+                                setTimelineHover(markerID: marker.id, phase: item.phase, anchor: phaseAnchor)
+                            } else if hoveredTimelineMarkerID == marker.id, hoveredTimelinePhase == item.phase {
+                                setTimelineHover(markerID: marker.id, phase: nil, anchor: CGPoint(x: width / 2, y: -8))
+                            }
+                        }
+                }
             }
         }
-        .scaleEffect(isHovered ? 1.12 : 1.0)
-        .brightness(isHovered ? 0.08 : 0)
-        .offset(x: min(max(markerX - 4, 0), max(width - 8, 0)))
-        .help(timelineMarkerTooltip(for: marker, markerNumber: markerNumber, isEnabled: isEnabled))
+        .clipShape(Capsule())
         .onHover { isHovering in
-            hoveredTimelineMarkerID = isHovering ? marker.id : (hoveredTimelineMarkerID == marker.id ? nil : hoveredTimelineMarkerID)
+            if !isHovering, hoveredTimelineMarkerID == marker.id, hoveredTimelinePhase != nil {
+                setTimelineHover(markerID: marker.id, phase: nil, anchor: CGPoint(x: width / 2, y: -8))
+            }
         }
+    }
+
+    private func phaseWidth(from start: Double, to end: Double, timelineStart: Double, timelineEnd: Double, totalWidth: CGFloat) -> CGFloat {
+        let totalDuration = max(timelineEnd - timelineStart, 0.001)
+        let clampedStart = min(max(start, timelineStart), timelineEnd)
+        let clampedEnd = min(max(end, clampedStart), timelineEnd)
+        return CGFloat((clampedEnd - clampedStart) / totalDuration) * totalWidth
+    }
+
+    private func phaseX(for time: Double, timeline: (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double), width: CGFloat) -> CGFloat {
+        let totalDuration = max(timeline.endTime - timeline.startTime, 0.001)
+        let clampedTime = min(max(time, timeline.startTime), timeline.endTime)
+        return CGFloat((clampedTime - timeline.startTime) / totalDuration) * width
+    }
+
+    private func phaseDividerTimes(for marker: ZoomPlanItem, timeline: (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double)) -> [Double] {
+        let zoomInStart = max(timeline.peakTime - marker.zoomInDuration, timeline.startTime)
+
+        switch marker.zoomType {
+        case .inOut:
+            return [zoomInStart, timeline.peakTime, timeline.holdUntil]
+        case .inOnly:
+            return [zoomInStart, timeline.peakTime]
+        case .outOnly:
+            return []
+        }
+    }
+
+    private func timelinePhaseBoundsMap(
+        for marker: ZoomPlanItem,
+        timeline: (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double),
+        width: CGFloat
+    ) -> [(phase: MarkerTimingPhase, width: CGFloat)] {
+        var items: [(phase: MarkerTimingPhase, width: CGFloat)] = []
+
+        switch marker.zoomType {
+        case .inOut:
+            items.append((.leadIn, phaseWidth(from: timeline.startTime, to: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+            items.append((.zoomIn, phaseWidth(from: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), to: timeline.peakTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+            items.append((.hold, phaseWidth(from: timeline.peakTime, to: timeline.holdUntil, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+            items.append((.zoomOut, phaseWidth(from: timeline.holdUntil, to: timeline.endTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+        case .inOnly:
+            items.append((.leadIn, phaseWidth(from: timeline.startTime, to: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+            items.append((.zoomIn, phaseWidth(from: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), to: timeline.peakTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+            items.append((.hold, phaseWidth(from: timeline.peakTime, to: timeline.holdUntil, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+        case .outOnly:
+            items.append((.zoomOut, width))
+        }
+
+        return items.map { item in
+            (item.phase, item.width)
+        }
+    }
+
+    private func phaseStartOffset(
+        for phase: MarkerTimingPhase,
+        marker: ZoomPlanItem,
+        timeline: (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double),
+        width: CGFloat
+    ) -> CGFloat {
+        let zoomInStart = max(timeline.peakTime - marker.zoomInDuration, timeline.startTime)
+
+        switch phase {
+        case .leadIn:
+            return phaseX(for: timeline.startTime, timeline: timeline, width: width)
+        case .zoomIn:
+            return phaseX(for: zoomInStart, timeline: timeline, width: width)
+        case .hold:
+            return phaseX(for: timeline.peakTime, timeline: timeline, width: width)
+        case .zoomOut:
+            return phaseX(for: timeline.holdUntil, timeline: timeline, width: width)
+        }
+    }
+
+    private func timelineSegmentLayouts(for markers: [ZoomPlanItem], duration: Double) -> [TimelineSegmentLayout] {
+        let safeDuration = max(duration, 0.001)
+        let maxLaneCount = 3
+        var laneEndRatios = Array(repeating: -Double.infinity, count: maxLaneCount)
+        let sortedMarkers = markers.enumerated().sorted { lhs, rhs in
+            let lhsWindow = timelineSegmentWindow(for: lhs.element)
+            let rhsWindow = timelineSegmentWindow(for: rhs.element)
+
+            if lhsWindow.start != rhsWindow.start {
+                return lhsWindow.start < rhsWindow.start
+            }
+
+            return lhs.element.sourceEventTimestamp < rhs.element.sourceEventTimestamp
+        }
+
+        return sortedMarkers.map { entry in
+            let marker = entry.element
+            let window = timelineSegmentWindow(for: marker)
+            let startRatio = min(max(window.start / safeDuration, 0), 1)
+            let eventRatio = min(max(marker.sourceEventTimestamp / safeDuration, 0), 1)
+            let endRatio = min(max(window.end / safeDuration, eventRatio), 1)
+            let lane = timelineLane(for: startRatio, endRatio: endRatio, laneEndRatios: &laneEndRatios)
+
+            return TimelineSegmentLayout(
+                marker: marker,
+                markerNumber: entry.offset + 1,
+                lane: lane,
+                startRatio: startRatio,
+                eventRatio: eventRatio,
+                endRatio: endRatio
+            )
+        }
+        .sorted { lhs, rhs in
+            if lhs.lane != rhs.lane {
+                return lhs.lane < rhs.lane
+            }
+
+            return lhs.startRatio < rhs.startRatio
+        }
+    }
+
+    private func timelineSegmentWindow(for marker: ZoomPlanItem) -> (start: Double, end: Double) {
+        let timeline = zoomTimeline(for: marker)
+
+        switch marker.zoomType {
+        case .inOut:
+            return (start: max(timeline.startTime, 0), end: max(timeline.endTime, timeline.startTime))
+        case .inOnly:
+            return (start: max(timeline.startTime, 0), end: max(timeline.holdUntil, timeline.startTime))
+        case .outOnly:
+            return (start: max(timeline.startTime, 0), end: max(timeline.endTime, timeline.startTime))
+        }
+    }
+
+    private func timelineLane(for startRatio: Double, endRatio: Double, laneEndRatios: inout [Double]) -> Int {
+        let lanePadding = 0.008
+
+        for index in laneEndRatios.indices {
+            if startRatio >= laneEndRatios[index] + lanePadding {
+                laneEndRatios[index] = endRatio
+                return index
+            }
+        }
+
+        if let bestIndex = laneEndRatios.enumerated().min(by: { $0.element < $1.element })?.offset {
+            laneEndRatios[bestIndex] = endRatio
+            return bestIndex
+        }
+
+        return 0
     }
 
     private func timelineTime(for x: CGFloat, width: CGFloat, duration: Double) -> Double {
         let clampedX = min(max(x, 0), max(width, 1))
         return Double(clampedX / max(width, 1)) * duration
+    }
+
+    private func timelineX(for time: Double, duration: Double, width: CGFloat) -> CGFloat {
+        let safeDuration = max(duration, 0.001)
+        let clampedTime = min(max(time, 0), safeDuration)
+        return CGFloat(clampedTime / safeDuration) * width
     }
 
     private func timelineSnapTarget(
@@ -1237,7 +1673,7 @@ struct ContentView: View {
                                                     }
 
                                                     Label {
-                                                        Text(String(format: "%.2fs", marker.duration))
+                                                        Text(String(format: "%.2fs", marker.totalSegmentDuration))
                                                             .font(.system(size: 11, weight: .regular, design: .monospaced))
                                                     } icon: {
                                                         Image(systemName: "timer")
@@ -1344,21 +1780,71 @@ struct ContentView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Duration")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(String(format: "%.2f s", marker.duration))
-                            .font(.system(size: 12, design: .monospaced))
+                    Text("Timing")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    switch marker.zoomType {
+                    case .inOut:
+                        timingSliderRow(
+                            title: "Lead-In Time",
+                            value: marker.leadInTime,
+                            range: 0...2,
+                            phase: .leadIn,
+                            action: viewModel.setSelectedMarkerLeadInTime
+                        )
+                        timingSliderRow(
+                            title: "Zoom In",
+                            value: marker.zoomInDuration,
+                            range: 0.05...3,
+                            phase: .zoomIn,
+                            action: viewModel.setSelectedMarkerZoomInDuration
+                        )
+                        timingSliderRow(
+                            title: "Hold",
+                            value: marker.holdDuration,
+                            range: 0.05...10,
+                            phase: .hold,
+                            action: viewModel.setSelectedMarkerHoldDuration
+                        )
+                        timingSliderRow(
+                            title: "Zoom Out",
+                            value: marker.zoomOutDuration,
+                            range: 0.05...3,
+                            phase: .zoomOut,
+                            action: viewModel.setSelectedMarkerZoomOutDuration
+                        )
+                    case .inOnly:
+                        timingSliderRow(
+                            title: "Lead-In Time",
+                            value: marker.leadInTime,
+                            range: 0...2,
+                            phase: .leadIn,
+                            action: viewModel.setSelectedMarkerLeadInTime
+                        )
+                        timingSliderRow(
+                            title: "Zoom In",
+                            value: marker.zoomInDuration,
+                            range: 0.05...3,
+                            phase: .zoomIn,
+                            action: viewModel.setSelectedMarkerZoomInDuration
+                        )
+                        timingSliderRow(
+                            title: "Hold",
+                            value: marker.holdDuration,
+                            range: 0.05...10,
+                            phase: .hold,
+                            action: viewModel.setSelectedMarkerHoldDuration
+                        )
+                    case .outOnly:
+                        timingSliderRow(
+                            title: "Zoom Out",
+                            value: marker.zoomOutDuration,
+                            range: 0.05...3,
+                            phase: .zoomOut,
+                            action: viewModel.setSelectedMarkerZoomOutDuration
+                        )
                     }
-                    Slider(
-                        value: Binding(
-                            get: { marker.duration },
-                            set: { viewModel.setSelectedMarkerDuration($0) }
-                        ),
-                        in: 0.5...10.0
-                    )
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -1461,6 +1947,41 @@ struct ContentView: View {
         return index + 1
     }
 
+    private func timingSliderRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                PrecisionTimeField(
+                    value: value,
+                    range: range,
+                    action: action,
+                    onBeginEditing: {
+                        inspectorFocusedTimingPhase = phase
+                    },
+                    onEndEditing: {
+                        if inspectorFocusedTimingPhase == phase {
+                            inspectorFocusedTimingPhase = nil
+                        }
+                    }
+                )
+                    .frame(width: 72, height: 22)
+            }
+            Slider(
+                value: Binding(
+                    get: { value },
+                    set: action
+                ),
+                in: range,
+                onEditingChanged: { isEditing in
+                    inspectorFocusedTimingPhase = isEditing ? phase : (inspectorFocusedTimingPhase == phase ? nil : inspectorFocusedTimingPhase)
+                }
+            )
+        }
+    }
+
     private func markerTypeSymbol(for zoomType: ZoomType) -> String {
         switch zoomType {
         case .inOnly:
@@ -1472,13 +1993,169 @@ struct ContentView: View {
         }
     }
 
+    private func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
+        hoveredTimelineMarkerID = markerID
+        hoveredTimelinePhase = phase
+        hoveredTimelineTooltipAnchor = anchor
+        print("hover enter marker \(markerID)")
+    }
+
+    private func clearTimelineHover() {
+        if let hoveredTimelineMarkerID {
+            print("hover exit marker \(hoveredTimelineMarkerID)")
+        }
+        hoveredTimelineMarkerID = nil
+        hoveredTimelinePhase = nil
+        hoveredTimelineTooltipAnchor = nil
+    }
+
+    private func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
+        guard let hoveredTimelineMarkerID else { return nil }
+        guard let entry = summary.zoomMarkers.enumerated().first(where: { $0.element.id == hoveredTimelineMarkerID }) else {
+            return nil
+        }
+        print("hovered id = \(hoveredTimelineMarkerID)")
+        print("resolved tooltip id = \(entry.element.id)")
+        return (entry.element, entry.offset + 1)
+    }
+
+    private func timelineMarkerTooltipOverlay(markerID: String, markerNumber: Int, marker: ZoomPlanItem, phase: MarkerTimingPhase?, anchor: CGPoint, width: CGFloat) -> some View {
+        let tooltipWidth: CGFloat = 240
+        let tooltipHalfWidth = tooltipWidth / 2
+        let tooltipX = min(max(anchor.x, tooltipHalfWidth), max(width - tooltipHalfWidth, tooltipHalfWidth))
+        let tooltipY: CGFloat = -80
+
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("Marker #\(markerNumber)")
+                .font(.system(size: 11, weight: .semibold))
+            Text(timecodeString(for: marker.sourceEventTimestamp))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+            if let phase {
+                Text(phase.rawValue)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            Text("\(markerTypeSymbol(for: marker.zoomType)) \(marker.zoomType.displayName)")
+                .font(.system(size: 11))
+            Text("Zoom \(String(format: "%.1fx", marker.zoomScale))")
+                .font(.system(size: 11))
+            Text("Duration \(String(format: "%.2fs", marker.totalSegmentDuration))")
+                .font(.system(size: 11))
+            Text(marker.enabled ? "Enabled" : "Disabled")
+                .font(.system(size: 11))
+                .foregroundStyle(marker.enabled ? .primary : .secondary)
+            Divider()
+            Text("hoveredTimelineMarkerID: \(hoveredTimelineMarkerID ?? "nil")")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Text("displayed marker id: \(markerID)")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Text("displayed marker number: \(markerNumber)")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .fixedSize()
+        .frame(width: tooltipWidth, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.97))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
+                )
+        )
+        .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 3)
+        .position(
+            x: tooltipX,
+            y: tooltipY
+        )
+        .allowsHitTesting(false)
+    }
+
+    private func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
+        if viewModel.activePreviewMarkerID == marker.id {
+            return timelinePhase(for: marker, at: viewModel.currentPlaybackTime)
+        }
+
+        if viewModel.selectedZoomMarkerID == marker.id {
+            if hoveredTimelineMarkerID == marker.id, hoveredTimelinePhase != nil {
+                return hoveredTimelinePhase
+            }
+            return inspectorFocusedTimingPhase
+        }
+
+        return nil
+    }
+
+    private func timelinePhase(for marker: ZoomPlanItem, at currentTime: Double) -> MarkerTimingPhase? {
+        let timeline = zoomTimeline(for: marker)
+        guard currentTime >= timeline.startTime, currentTime <= timeline.endTime else {
+            return nil
+        }
+
+        switch marker.zoomType {
+        case .inOut:
+            let zoomInStart = max(timeline.peakTime - marker.zoomInDuration, timeline.startTime)
+            if currentTime < zoomInStart {
+                return .leadIn
+            }
+            if currentTime < timeline.peakTime {
+                return .zoomIn
+            }
+            if currentTime < timeline.holdUntil {
+                return .hold
+            }
+            return .zoomOut
+
+        case .inOnly:
+            let zoomInStart = max(timeline.peakTime - marker.zoomInDuration, timeline.startTime)
+            if currentTime < zoomInStart {
+                return .leadIn
+            }
+            if currentTime < timeline.peakTime {
+                return .zoomIn
+            }
+            return .hold
+
+        case .outOnly:
+            return currentTime <= timeline.endTime ? .zoomOut : nil
+        }
+    }
+
+    private func timelinePhaseCenterX(for marker: ZoomPlanItem, phase: MarkerTimingPhase, width: CGFloat) -> CGFloat {
+        let bounds = timelinePhaseBounds(for: marker, phase: phase)
+        let startX = timelineX(for: bounds.start, duration: max(viewModel.recordingSummary?.duration ?? 0, 0.001), width: width)
+        let endX = timelineX(for: bounds.end, duration: max(viewModel.recordingSummary?.duration ?? 0, 0.001), width: width)
+        return startX + max((endX - startX) / 2, 0)
+    }
+
+    private func timelinePhaseBounds(for marker: ZoomPlanItem, phase: MarkerTimingPhase) -> (start: Double, end: Double) {
+        let timeline = zoomTimeline(for: marker)
+        let zoomInStart = max(timeline.peakTime - marker.zoomInDuration, timeline.startTime)
+
+        switch phase {
+        case .leadIn:
+            return (timeline.startTime, zoomInStart)
+        case .zoomIn:
+            return (zoomInStart, timeline.peakTime)
+        case .hold:
+            return (timeline.peakTime, timeline.holdUntil)
+        case .zoomOut:
+            return (timeline.holdUntil, timeline.endTime)
+        }
+    }
+
     private func timelineMarkerTooltip(for marker: ZoomPlanItem, markerNumber: Int, isEnabled: Bool) -> String {
         [
             "Marker #\(markerNumber)",
             timecodeString(for: marker.sourceEventTimestamp),
             "\(markerTypeSymbol(for: marker.zoomType)) \(marker.zoomType.displayName)",
             "Zoom \(String(format: "%.1fx", marker.zoomScale))",
-            "Duration \(String(format: "%.2fs", marker.duration))",
+            "Duration \(String(format: "%.2fs", marker.totalSegmentDuration))",
             isEnabled ? "Enabled" : "Disabled"
         ].joined(separator: "\n")
     }
@@ -1544,5 +2221,119 @@ private struct PlaybackVideoSurface: NSViewRepresentable {
         }
         nsView.controlsStyle = .none
         nsView.videoGravity = .resizeAspect
+    }
+}
+private struct PrecisionTimeField: NSViewRepresentable {
+    let value: Double
+    let range: ClosedRange<Double>
+    let action: (Double) -> Void
+    let onBeginEditing: () -> Void
+    let onEndEditing: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(value: value, range: range, action: action, onBeginEditing: onBeginEditing, onEndEditing: onEndEditing)
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let textField = NSTextField()
+        textField.isBordered = true
+        textField.isBezeled = true
+        textField.bezelStyle = .roundedBezel
+        textField.alignment = .right
+        textField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        textField.focusRingType = .default
+        textField.delegate = context.coordinator
+        textField.formatter = nil
+        textField.stringValue = context.coordinator.displayString(for: value)
+        return textField
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        context.coordinator.range = range
+        context.coordinator.action = action
+        context.coordinator.onBeginEditing = onBeginEditing
+        context.coordinator.onEndEditing = onEndEditing
+
+        if !context.coordinator.isEditing {
+            nsView.stringValue = context.coordinator.displayString(for: value)
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var originalValue: Double
+        var range: ClosedRange<Double>
+        var action: (Double) -> Void
+        var onBeginEditing: () -> Void
+        var onEndEditing: () -> Void
+        var isEditing = false
+
+        init(
+            value: Double,
+            range: ClosedRange<Double>,
+            action: @escaping (Double) -> Void,
+            onBeginEditing: @escaping () -> Void,
+            onEndEditing: @escaping () -> Void
+        ) {
+            self.originalValue = value
+            self.range = range
+            self.action = action
+            self.onBeginEditing = onBeginEditing
+            self.onEndEditing = onEndEditing
+        }
+
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            isEditing = true
+            onBeginEditing()
+            if let textField = obj.object as? NSTextField {
+                originalValue = parsedValue(from: textField.stringValue) ?? originalValue
+            }
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                commit(from: control)
+                control.window?.makeFirstResponder(nil)
+                return true
+            }
+
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                cancel(on: control)
+                control.window?.makeFirstResponder(nil)
+                return true
+            }
+
+            return false
+        }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            guard let textField = obj.object as? NSTextField else { return }
+            commit(from: textField)
+            isEditing = false
+            onEndEditing()
+        }
+
+        private func commit(from control: NSControl) {
+            guard let textField = control as? NSTextField else { return }
+            let parsed = parsedValue(from: textField.stringValue) ?? originalValue
+            let clamped = min(max(parsed, range.lowerBound), range.upperBound)
+            textField.stringValue = displayString(for: clamped)
+            originalValue = clamped
+            action(clamped)
+        }
+
+        private func cancel(on control: NSControl) {
+            guard let textField = control as? NSTextField else { return }
+            textField.stringValue = displayString(for: originalValue)
+            isEditing = false
+        }
+
+        func displayString(for value: Double) -> String {
+            String(format: "%.2f", value)
+        }
+
+        private func parsedValue(from string: String) -> Double? {
+            let cleaned = string.replacingOccurrences(of: "s", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return Double(cleaned)
+        }
     }
 }
