@@ -7,6 +7,7 @@ struct RenderedMarkerPreview {
     let outputURL: URL
     let sourceStartTime: Double
     let sourceEndTime: Double
+    let deleteWhenFinished: Bool
 }
 
 final class MarkerPreviewRenderService {
@@ -144,7 +145,8 @@ final class MarkerPreviewRenderService {
         return RenderedMarkerPreview(
             outputURL: outputURL,
             sourceStartTime: sourceStartTime,
-            sourceEndTime: sourceEndTime
+            sourceEndTime: sourceEndTime,
+            deleteWhenFinished: true
         )
     }
 

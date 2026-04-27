@@ -38,6 +38,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private var isTimelineScrubbing = false
     private var markerPreviewRenderTask: Task<Void, Never>?
     private var activeRenderedPreviewURL: URL?
+    private var activeRenderedPreviewShouldDelete = false
     private var renderedPreviewSourceStartTime: Double?
     private var renderingPreviewMarkerID: String?
 
@@ -47,6 +48,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private let projectBundleService = ProjectBundleService()
     private let inputEventCaptureService = InputEventCaptureService()
     private let markerPreviewRenderService = MarkerPreviewRenderService()
+    private let markerPreviewCacheService = MarkerPreviewCacheService()
     private lazy var recordingCoordinator = RecordingCoordinator(
         screenCaptureService: screenCaptureService,
         mediaWriterService: mediaWriterService,
@@ -97,6 +99,7 @@ final class CaptureSetupViewModel: ObservableObject {
 
     func load() async {
         hasScreenRecordingPermission = permissionsService.hasScreenRecordingPermission()
+        markerPreviewCacheService.pruneStaleFiles()
         recordingCoordinator.onStateChange?(.loadingTargets, "Loading capture targets…")
 
         do {
@@ -185,8 +188,8 @@ final class CaptureSetupViewModel: ObservableObject {
         cancelPendingMarkerPreviewRender()
         selectedZoomMarkerID = markerID
         renderingPreviewMarkerID = markerID
-        isRenderingMarkerPreview = true
-        markerPreviewStatusMessage = "Rendering preview…"
+        isRenderingMarkerPreview = false
+        markerPreviewStatusMessage = nil
         manualSelectionSuppressionUntil = Date().addingTimeInterval(2.0)
         restorePrimaryPlaybackIfNeeded(seekTo: currentPlaybackTime, autoPlay: false)
 
@@ -194,17 +197,44 @@ final class CaptureSetupViewModel: ObservableObject {
             guard let self else { return }
 
             do {
+                if let cachedPreview = try await markerPreviewCacheService.cachedPreview(
+                    for: summary.recordingURL,
+                    summary: summary,
+                    marker: marker
+                ) {
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        guard self.renderingPreviewMarkerID == markerID else { return }
+                        self.isRenderingMarkerPreview = false
+                        self.markerPreviewStatusMessage = nil
+                        self.playRenderedPreview(cachedPreview, markerID: markerID)
+                    }
+                    return
+                }
+
+                await MainActor.run {
+                    guard self.renderingPreviewMarkerID == markerID else { return }
+                    self.isRenderingMarkerPreview = true
+                    self.markerPreviewStatusMessage = "Rendering preview…"
+                }
+
                 let renderedPreview = try await markerPreviewRenderService.renderPreview(
                     recordingURL: summary.recordingURL,
                     summary: summary,
                     selectedMarker: marker
+                )
+                let cachedPreview = try await markerPreviewCacheService.storePreview(
+                    renderedPreview,
+                    for: summary.recordingURL,
+                    summary: summary,
+                    marker: marker
                 )
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     guard self.renderingPreviewMarkerID == markerID else { return }
                     self.isRenderingMarkerPreview = false
                     self.markerPreviewStatusMessage = nil
-                    self.playRenderedPreview(renderedPreview, markerID: markerID)
+                    self.playRenderedPreview(cachedPreview, markerID: markerID)
                 }
             } catch is CancellationError {
                 await MainActor.run {
@@ -228,6 +258,11 @@ final class CaptureSetupViewModel: ObservableObject {
 
     func togglePlayback() {
         cancelPendingMarkerPreviewRender()
+        if renderedPreviewSourceStartTime != nil {
+            restorePrimaryPlaybackIfNeeded(seekTo: currentPlaybackTime, autoPlay: true)
+            cancelPreviewMode()
+            return
+        }
         cancelPreviewMode()
         guard let player else { return }
         if player.timeControlStatus == .playing {
@@ -615,6 +650,7 @@ final class CaptureSetupViewModel: ObservableObject {
         guard let player else { return }
         cleanupRenderedPreviewFile()
         activeRenderedPreviewURL = renderedPreview.outputURL
+        activeRenderedPreviewShouldDelete = renderedPreview.deleteWhenFinished
         renderedPreviewSourceStartTime = renderedPreview.sourceStartTime
         selectedZoomMarkerID = markerID
         previewMarkerID = markerID
@@ -655,10 +691,11 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     private func cleanupRenderedPreviewFile() {
-        if let activeRenderedPreviewURL {
+        if let activeRenderedPreviewURL, activeRenderedPreviewShouldDelete {
             try? FileManager.default.removeItem(at: activeRenderedPreviewURL)
         }
         activeRenderedPreviewURL = nil
+        activeRenderedPreviewShouldDelete = false
     }
 
     private func installPlaybackObserver() {
@@ -706,7 +743,6 @@ final class CaptureSetupViewModel: ObservableObject {
             if currentTime >= previewEndTime - 0.02 {
                 player.pause()
                 isPlaybackActive = false
-                restorePrimaryPlaybackIfNeeded(seekTo: previewEndTime, autoPlay: false)
                 cancelPreviewMode()
             }
             return
