@@ -25,6 +25,8 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published var selectedZoomMarkerID: String?
     @Published var currentPlaybackTime: Double = 0
     @Published var isPlaybackActive = false
+    @Published var isRenderingMarkerPreview = false
+    @Published var markerPreviewStatusMessage: String?
     
     private var hasRestoredLastRecording = false
     private var activePlaybackScopeURL: URL?
@@ -34,12 +36,17 @@ final class CaptureSetupViewModel: ObservableObject {
     private var previewEndTime: Double?
     private var wasPlayingBeforeTimelineScrub = false
     private var isTimelineScrubbing = false
+    private var markerPreviewRenderTask: Task<Void, Never>?
+    private var activeRenderedPreviewURL: URL?
+    private var renderedPreviewSourceStartTime: Double?
+    private var renderingPreviewMarkerID: String?
 
     private let permissionsService = PermissionsService()
     private let screenCaptureService = ScreenCaptureService()
     private let mediaWriterService = MediaWriterService()
     private let projectBundleService = ProjectBundleService()
     private let inputEventCaptureService = InputEventCaptureService()
+    private let markerPreviewRenderService = MarkerPreviewRenderService()
     private lazy var recordingCoordinator = RecordingCoordinator(
         screenCaptureService: screenCaptureService,
         mediaWriterService: mediaWriterService,
@@ -82,6 +89,10 @@ final class CaptureSetupViewModel: ObservableObject {
 
     var activePreviewMarkerID: String? {
         previewMarkerID
+    }
+
+    var isRenderedPreviewActive: Bool {
+        renderedPreviewSourceStartTime != nil
     }
 
     func load() async {
@@ -165,20 +176,58 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     func startMarkerPreview(_ markerID: String) {
-        guard let marker = recordingSummary?.zoomMarkers.first(where: { $0.id == markerID }) else { return }
-        guard let player else { return }
-        let previewBounds = previewBounds(for: marker)
-        cancelPreviewMode()
+        guard let summary = recordingSummary,
+              let marker = summary.zoomMarkers.first(where: { $0.id == markerID }),
+              player != nil else {
+            return
+        }
+
+        cancelPendingMarkerPreviewRender()
         selectedZoomMarkerID = markerID
-        previewMarkerID = markerID
-        previewEndTime = previewBounds.endTime
-        manualSelectionSuppressionUntil = Date().addingTimeInterval(max(previewBounds.endTime - previewBounds.startTime, 0.35) + 0.15)
-        seekPlayback(to: previewBounds.startTime)
-        player.play()
-        isPlaybackActive = true
+        renderingPreviewMarkerID = markerID
+        isRenderingMarkerPreview = true
+        markerPreviewStatusMessage = "Rendering preview…"
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(2.0)
+        restorePrimaryPlaybackIfNeeded(seekTo: currentPlaybackTime, autoPlay: false)
+
+        markerPreviewRenderTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let renderedPreview = try await markerPreviewRenderService.renderPreview(
+                    recordingURL: summary.recordingURL,
+                    summary: summary,
+                    selectedMarker: marker
+                )
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard self.renderingPreviewMarkerID == markerID else { return }
+                    self.isRenderingMarkerPreview = false
+                    self.markerPreviewStatusMessage = nil
+                    self.playRenderedPreview(renderedPreview, markerID: markerID)
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    if self.renderingPreviewMarkerID == markerID {
+                        self.isRenderingMarkerPreview = false
+                        self.markerPreviewStatusMessage = nil
+                        self.renderingPreviewMarkerID = nil
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    guard self.renderingPreviewMarkerID == markerID else { return }
+                    self.isRenderingMarkerPreview = false
+                    self.markerPreviewStatusMessage = nil
+                    self.statusMessage = "Rendered preview failed. Using live preview."
+                    self.startLiveMarkerPreview(markerID)
+                }
+            }
+        }
     }
 
     func togglePlayback() {
+        cancelPendingMarkerPreviewRender()
         cancelPreviewMode()
         guard let player else { return }
         if player.timeControlStatus == .playing {
@@ -191,21 +240,28 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     func seekPlaybackInteractively(to seconds: Double) {
+        cancelPendingMarkerPreviewRender()
+        restorePrimaryPlaybackIfNeeded(seekTo: currentPlaybackTime, autoPlay: false)
         cancelPreviewMode()
         seekPlayback(to: seconds)
     }
 
     func jumpPlaybackToStart() {
+        cancelPendingMarkerPreviewRender()
+        restorePrimaryPlaybackIfNeeded(seekTo: currentPlaybackTime, autoPlay: false)
         cancelPreviewMode()
         seekPlayback(to: 0)
     }
 
     func cancelPlaybackPreview() {
+        cancelPendingMarkerPreviewRender()
         cancelPreviewMode()
     }
 
     func beginTimelineScrub() {
         guard let player, !isTimelineScrubbing else { return }
+        cancelPendingMarkerPreviewRender()
+        restorePrimaryPlaybackIfNeeded(seekTo: currentPlaybackTime, autoPlay: false)
         cancelPreviewMode()
         wasPlayingBeforeTimelineScrub = player.timeControlStatus == .playing
         player.pause()
@@ -237,6 +293,8 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     func seekTimelineDirectly(to seconds: Double, snappedMarkerID: String?) {
+        cancelPendingMarkerPreviewRender()
+        restorePrimaryPlaybackIfNeeded(seekTo: currentPlaybackTime, autoPlay: false)
         cancelPreviewMode()
         if let snappedMarkerID {
             selectedZoomMarkerID = snappedMarkerID
@@ -409,6 +467,8 @@ final class CaptureSetupViewModel: ObservableObject {
         selectedZoomMarkerID = nil
         currentPlaybackTime = 0
         isPlaybackActive = false
+        isRenderingMarkerPreview = false
+        markerPreviewStatusMessage = nil
         previewMarkerID = nil
         previewEndTime = nil
         installPlaybackObserver()
@@ -416,6 +476,7 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     private func releasePlaybackState() {
+        cancelPendingMarkerPreviewRender()
         removePlaybackObserver()
         player?.pause()
         player = nil
@@ -423,8 +484,11 @@ final class CaptureSetupViewModel: ObservableObject {
         selectedZoomMarkerID = nil
         currentPlaybackTime = 0
         isPlaybackActive = false
+        isRenderingMarkerPreview = false
+        markerPreviewStatusMessage = nil
         previewMarkerID = nil
         previewEndTime = nil
+        cleanupRenderedPreviewFile()
         projectBundleService.endPlaybackAccess(activePlaybackScopeURL)
         activePlaybackScopeURL = nil
     }
@@ -524,6 +588,79 @@ final class CaptureSetupViewModel: ObservableObject {
         previewEndTime = nil
     }
 
+    private func cancelPendingMarkerPreviewRender() {
+        markerPreviewRenderTask?.cancel()
+        markerPreviewRenderTask = nil
+        isRenderingMarkerPreview = false
+        markerPreviewStatusMessage = nil
+        renderingPreviewMarkerID = nil
+    }
+
+    private func startLiveMarkerPreview(_ markerID: String) {
+        guard let marker = recordingSummary?.zoomMarkers.first(where: { $0.id == markerID }) else { return }
+        guard let player else { return }
+        let previewBounds = previewBounds(for: marker)
+        cancelPreviewMode()
+        restorePrimaryPlaybackIfNeeded(seekTo: currentPlaybackTime, autoPlay: false)
+        selectedZoomMarkerID = markerID
+        previewMarkerID = markerID
+        previewEndTime = previewBounds.endTime
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(max(previewBounds.endTime - previewBounds.startTime, 0.35) + 0.15)
+        seekPlayback(to: previewBounds.startTime)
+        player.play()
+        isPlaybackActive = true
+    }
+
+    private func playRenderedPreview(_ renderedPreview: RenderedMarkerPreview, markerID: String) {
+        guard let player else { return }
+        cleanupRenderedPreviewFile()
+        activeRenderedPreviewURL = renderedPreview.outputURL
+        renderedPreviewSourceStartTime = renderedPreview.sourceStartTime
+        selectedZoomMarkerID = markerID
+        previewMarkerID = markerID
+        previewEndTime = renderedPreview.sourceEndTime
+        renderingPreviewMarkerID = nil
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(
+            max(renderedPreview.sourceEndTime - renderedPreview.sourceStartTime, 0.35) + 0.15
+        )
+        player.replaceCurrentItem(with: AVPlayerItem(url: renderedPreview.outputURL))
+        currentPlaybackTime = renderedPreview.sourceStartTime
+        player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.play()
+        isPlaybackActive = true
+    }
+
+    private func restorePrimaryPlaybackIfNeeded(seekTo sourceTime: Double?, autoPlay: Bool) {
+        guard renderedPreviewSourceStartTime != nil,
+              let summary = recordingSummary,
+              let player else {
+            return
+        }
+
+        player.replaceCurrentItem(with: AVPlayerItem(url: summary.recordingURL))
+        renderedPreviewSourceStartTime = nil
+        cleanupRenderedPreviewFile()
+        if let sourceTime {
+            let time = CMTime(seconds: max(sourceTime, 0), preferredTimescale: 600)
+            player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+            currentPlaybackTime = max(sourceTime, 0)
+        }
+        if autoPlay {
+            player.play()
+            isPlaybackActive = true
+        } else {
+            player.pause()
+            isPlaybackActive = false
+        }
+    }
+
+    private func cleanupRenderedPreviewFile() {
+        if let activeRenderedPreviewURL {
+            try? FileManager.default.removeItem(at: activeRenderedPreviewURL)
+        }
+        activeRenderedPreviewURL = nil
+    }
+
     private func installPlaybackObserver() {
         removePlaybackObserver()
         guard let player else { return }
@@ -549,12 +686,18 @@ final class CaptureSetupViewModel: ObservableObject {
             return
         }
 
-        let currentTime = player.currentTime().seconds
-        guard currentTime.isFinite else { return }
+        let playerTime = player.currentTime().seconds
+        guard playerTime.isFinite else { return }
+        let currentTime = (renderedPreviewSourceStartTime ?? 0) + playerTime
         currentPlaybackTime = currentTime
         isPlaybackActive = player.timeControlStatus == .playing
 
         if isTimelineScrubbing {
+            return
+        }
+
+        if isRenderingMarkerPreview, let renderingPreviewMarkerID {
+            selectedZoomMarkerID = renderingPreviewMarkerID
             return
         }
 
@@ -563,6 +706,7 @@ final class CaptureSetupViewModel: ObservableObject {
             if currentTime >= previewEndTime - 0.02 {
                 player.pause()
                 isPlaybackActive = false
+                restorePrimaryPlaybackIfNeeded(seekTo: previewEndTime, autoPlay: false)
                 cancelPreviewMode()
             }
             return

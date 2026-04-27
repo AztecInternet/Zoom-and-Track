@@ -401,7 +401,9 @@ struct ContentView: View {
                                 selectedMarker: viewModel.selectedZoomMarker,
                                 contentCoordinateSize: summary.contentCoordinateSize,
                                 zoomMarkers: summary.zoomMarkers,
-                                currentTime: viewModel.currentPlaybackTime
+                                currentTime: viewModel.currentPlaybackTime,
+                                isRenderedPreviewActive: viewModel.isRenderedPreviewActive,
+                                renderingStatusMessage: viewModel.markerPreviewStatusMessage
                             )
                                 .frame(height: videoHeight)
                                 .layoutPriority(1)
@@ -560,7 +562,9 @@ struct ContentView: View {
         selectedMarker: ZoomPlanItem?,
         contentCoordinateSize: CGSize,
         zoomMarkers: [ZoomPlanItem],
-        currentTime: Double
+        currentTime: Double,
+        isRenderedPreviewActive: Bool,
+        renderingStatusMessage: String?
     ) -> some View {
         let safeAspectRatio = max(aspectRatio, 0.1)
 
@@ -569,11 +573,13 @@ struct ContentView: View {
 
             GeometryReader { geometry in
                 let fittedRect = fittedVideoRect(in: geometry.size, aspectRatio: safeAspectRatio)
-                let previewState = activeZoomPreviewState(
-                    at: currentTime,
-                    zoomMarkers: zoomMarkers,
-                    contentCoordinateSize: contentCoordinateSize
-                )
+                let previewState = isRenderedPreviewActive
+                    ? nil
+                    : activeZoomPreviewState(
+                        at: currentTime,
+                        zoomMarkers: zoomMarkers,
+                        contentCoordinateSize: contentCoordinateSize
+                    )
 
                 ZStack {
                     PlaybackVideoSurface(player: player)
@@ -586,7 +592,8 @@ struct ContentView: View {
                 .clipped()
                 .position(x: fittedRect.midX, y: fittedRect.midY)
 
-                if let mapping = mappedOverlayPoint(
+                if !isRenderedPreviewActive,
+                   let mapping = mappedOverlayPoint(
                     for: selectedMarker,
                     contentCoordinateSize: contentCoordinateSize,
                     in: geometry.size,
@@ -610,6 +617,33 @@ struct ContentView: View {
                     .position(mapping.point)
                     .allowsHitTesting(false)
                 }
+            }
+
+            if let renderingStatusMessage {
+                VStack {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(renderingStatusMessage)
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.black.opacity(0.62))
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+                    .foregroundStyle(.white)
+                    .padding(.top, 18)
+
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -1177,7 +1211,7 @@ struct ContentView: View {
                 }
         }
         .frame(width: localWidth, height: localHeight)
-        .position(x: localCenterX, y: localCenterY + verticalOrigin)
+        .position(x: localCenterX, y: laneY + (localHeight / 2))
         .brightness(isHovered ? 0.06 : 0)
     }
 
