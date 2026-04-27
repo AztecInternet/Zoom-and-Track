@@ -3,6 +3,7 @@
 //  Zoom and Track
 //
 
+import CoreGraphics
 import Foundation
 
 enum CaptureTargetKind: String, Codable {
@@ -18,6 +19,11 @@ struct ShareableCaptureTarget: Identifiable, Equatable {
     let subtitle: String?
     let width: Int
     let height: Int
+    let originX: Double
+    let originY: Double
+    let pointsWidth: Double
+    let pointsHeight: Double
+    let scaleFactor: Double
 
     var displayTitle: String {
         if let subtitle, !subtitle.isEmpty {
@@ -44,6 +50,11 @@ struct CaptureSource: Codable {
     let subtitle: String?
     let width: Int
     let height: Int
+    let originX: Double?
+    let originY: Double?
+    let pointsWidth: Double?
+    let pointsHeight: Double?
+    let scaleFactor: Double?
 }
 
 struct ProjectManifest: Codable {
@@ -94,6 +105,8 @@ struct ZoomPlanItem: Codable, Identifiable {
     let id: String
     let type: String
     let sourceEventTimestamp: Double
+    let rawX: Double?
+    let rawY: Double?
     let centerX: Double
     let centerY: Double
     let zoomScale: Double
@@ -108,6 +121,9 @@ struct RecordingInspectionSummary {
     let bundleName: String
     let recordingURL: URL
     let videoAspectRatio: CGFloat
+    let contentCoordinateSize: CGSize
+    let captureSourceKind: CaptureTargetKind
+    let captureSourceTitle: String
     let totalEventCount: Int
     let cursorMovedCount: Int
     let leftMouseDownCount: Int

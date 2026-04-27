@@ -3,6 +3,7 @@
 //  Zoom and Track
 //
 
+import AVFoundation
 import AVKit
 import SwiftUI
 
@@ -11,6 +12,16 @@ struct ContentView: View {
     @State private var selectedTab: AppTab? = .capture
     @State private var playbackVideoHeightOverride: CGFloat?
     @State private var playbackVideoHeightDragOrigin: CGFloat?
+    @State private var selectedZoomMarkerID: String?
+
+    private struct OverlayMapping {
+        let point: CGPoint
+        let fittedRect: CGRect
+        let sourceSize: CGSize
+        let sourcePoint: CGPoint
+        let rawPoint: CGPoint?
+        let captureSourceLabel: String
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -303,7 +314,12 @@ struct ContentView: View {
                     let videoHeight = min(max(playbackVideoHeightOverride ?? defaultVideoHeight, minVideoHeight), maxVideoHeight)
 
                     VStack(alignment: .leading, spacing: 12) {
-                        playbackVideoCard(player: player, aspectRatio: summary.videoAspectRatio)
+                        playbackVideoCard(
+                            player: player,
+                            aspectRatio: summary.videoAspectRatio,
+                            selectedMarker: selectedZoomMarker(in: summary),
+                            contentCoordinateSize: summary.contentCoordinateSize
+                        )
                             .frame(height: videoHeight)
                             .layoutPriority(1)
 
@@ -325,6 +341,7 @@ struct ContentView: View {
                     .onChange(of: summary.recordingURL) {
                         playbackVideoHeightOverride = nil
                         playbackVideoHeightDragOrigin = nil
+                        selectedZoomMarkerID = nil
                     }
                 }
             } else {
@@ -482,23 +499,35 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
 
                     ForEach(Array(summary.zoomMarkers.enumerated()), id: \.element.id) { index, marker in
-                        HStack(spacing: 12) {
-                            Text("#\(index + 1)")
-                                .font(.system(size: 12, weight: .semibold))
-                                .frame(width: 28, alignment: .leading)
-                            Text(String(format: "%.3f s", marker.sourceEventTimestamp))
-                                .font(.system(size: 12, design: .monospaced))
-                                .frame(width: 72, alignment: .leading)
-                            Text(String(format: "x %.1f", marker.centerX))
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                            Text(String(format: "y %.1f", marker.centerY))
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(String(format: "%.1fx", marker.zoomScale))
-                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        Button {
+                            selectZoomMarker(marker)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text("#\(index + 1)")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .frame(width: 28, alignment: .leading)
+                                Text(String(format: "%.3f s", marker.sourceEventTimestamp))
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .frame(width: 72, alignment: .leading)
+                                Text(String(format: "x %.1f", marker.centerX))
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                Text(String(format: "y %.1f", marker.centerY))
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(String(format: "%.1fx", marker.zoomScale))
+                                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.12) : Color.clear)
+                            )
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -507,7 +536,12 @@ struct ContentView: View {
         .background(cardBackground)
     }
 
-    private func playbackVideoCard(player: AVPlayer, aspectRatio: CGFloat) -> some View {
+    private func playbackVideoCard(
+        player: AVPlayer,
+        aspectRatio: CGFloat,
+        selectedMarker: ZoomPlanItem?,
+        contentCoordinateSize: CGSize
+    ) -> some View {
         let safeAspectRatio = max(aspectRatio, 0.1)
 
         return ZStack {
@@ -518,6 +552,36 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 .blur(radius: playbackVideoHeightDragOrigin == nil ? 0 : 4)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            GeometryReader { geometry in
+                if let mapping = mappedOverlayPoint(
+                    for: selectedMarker,
+                    contentCoordinateSize: contentCoordinateSize,
+                    in: geometry.size,
+                    videoAspectRatio: safeAspectRatio
+                ) {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.accentColor, lineWidth: 3)
+                            .frame(width: 28, height: 28)
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.18))
+                            .frame(width: 16, height: 16)
+                        Rectangle()
+                            .fill(Color.accentColor)
+                            .frame(width: 18, height: 2)
+                        Rectangle()
+                            .fill(Color.accentColor)
+                            .frame(width: 2, height: 18)
+                    }
+                    .position(mapping.point)
+                    .allowsHitTesting(false)
+
+                    overlayDebugText(mapping)
+                        .position(debugOverlayPosition(for: mapping, in: geometry.size))
+                        .allowsHitTesting(false)
+                }
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
@@ -548,6 +612,113 @@ struct ContentView: View {
                     playbackVideoHeightDragOrigin = nil
                 }
         )
+    }
+
+    private func selectedZoomMarker(in summary: RecordingInspectionSummary) -> ZoomPlanItem? {
+        summary.zoomMarkers.first { $0.id == selectedZoomMarkerID }
+    }
+
+    private func selectZoomMarker(_ marker: ZoomPlanItem) {
+        selectedZoomMarkerID = marker.id
+        guard let player = viewModel.player else { return }
+        let time = CMTime(seconds: marker.sourceEventTimestamp, preferredTimescale: 600)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    // Best effort mapping from capture coordinates into the fitted video rect.
+    // Mouse coordinates are captured in a bottom-left origin space, while SwiftUI
+    // overlay positioning uses top-left origin inside the displayed video area.
+    private func mappedOverlayPoint(
+        for marker: ZoomPlanItem?,
+        contentCoordinateSize: CGSize,
+        in containerSize: CGSize,
+        videoAspectRatio: CGFloat
+    ) -> OverlayMapping? {
+        guard let marker,
+              contentCoordinateSize.width > 0,
+              contentCoordinateSize.height > 0,
+              containerSize.width > 0,
+              containerSize.height > 0 else {
+            return nil
+        }
+
+        let fittedRect = fittedVideoRect(in: containerSize, aspectRatio: videoAspectRatio)
+        guard fittedRect.width > 0, fittedRect.height > 0 else {
+            return nil
+        }
+
+        let normalizedX = min(max(marker.centerX / contentCoordinateSize.width, 0), 1)
+        let normalizedY = min(max(marker.centerY / contentCoordinateSize.height, 0), 1)
+
+        let x = fittedRect.minX + (normalizedX * fittedRect.width)
+        let y = fittedRect.minY + (normalizedY * fittedRect.height)
+
+        guard x.isFinite, y.isFinite else { return nil }
+        return OverlayMapping(
+            point: CGPoint(x: x, y: y),
+            fittedRect: fittedRect,
+            sourceSize: contentCoordinateSize,
+            sourcePoint: CGPoint(x: marker.centerX, y: marker.centerY),
+            rawPoint: {
+                guard let rawX = marker.rawX, let rawY = marker.rawY else { return nil }
+                return CGPoint(x: rawX, y: rawY)
+            }(),
+            captureSourceLabel: "\(viewModel.recordingSummary?.captureSourceKind.rawValue ?? "unknown") • \(viewModel.recordingSummary?.captureSourceTitle ?? "unknown")"
+        )
+    }
+
+    private func fittedVideoRect(in containerSize: CGSize, aspectRatio: CGFloat) -> CGRect {
+        let safeAspectRatio = max(aspectRatio, 0.1)
+        let containerAspectRatio = containerSize.width / max(containerSize.height, 1)
+
+        if containerAspectRatio > safeAspectRatio {
+            let height = containerSize.height
+            let width = height * safeAspectRatio
+            let originX = (containerSize.width - width) / 2
+            return CGRect(x: originX, y: 0, width: width, height: height)
+        } else {
+            let width = containerSize.width
+            let height = width / safeAspectRatio
+            let originY = (containerSize.height - height) / 2
+            return CGRect(x: 0, y: originY, width: width, height: height)
+        }
+    }
+
+    private func overlayDebugText(_ mapping: OverlayMapping) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let rawPoint = mapping.rawPoint {
+                Text(String(format: "raw %.1f, %.1f", rawPoint.x, rawPoint.y))
+            }
+            Text(String(format: "norm %.1f, %.1f", mapping.sourcePoint.x, mapping.sourcePoint.y))
+            Text(String(format: "map %.1f, %.1f", mapping.point.x, mapping.point.y))
+            Text(String(format: "vid %.0f x %.0f", mapping.sourceSize.width, mapping.sourceSize.height))
+            Text(
+                String(
+                    format: "rect %.0f,%.0f %.0f x %.0f",
+                    mapping.fittedRect.minX,
+                    mapping.fittedRect.minY,
+                    mapping.fittedRect.width,
+                    mapping.fittedRect.height
+                )
+            )
+            Text(mapping.captureSourceLabel)
+        }
+        .font(.system(size: 10, design: .monospaced))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.black.opacity(0.72))
+        )
+    }
+
+    private func debugOverlayPosition(for mapping: OverlayMapping, in containerSize: CGSize) -> CGPoint {
+        let desiredX = mapping.point.x + 78
+        let desiredY = mapping.point.y - 38
+        let clampedX = min(max(desiredX, 84), max(containerSize.width - 84, 84))
+        let clampedY = min(max(desiredY, 34), max(containerSize.height - 34, 34))
+        return CGPoint(x: clampedX, y: clampedY)
     }
 
     private func settingsCard(title: String, body: AnyView) -> some View {

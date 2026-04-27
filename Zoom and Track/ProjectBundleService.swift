@@ -96,7 +96,7 @@ struct ProjectBundleService {
             let eventsData = try JSONEncoder.eventsEncoder.encode(envelope)
             try eventsData.write(to: workspace.finalProjectURL.appendingPathComponent("events.json"))
 
-            let zoomPlan = generateZoomPlan(from: events)
+            let zoomPlan = generateZoomPlan(from: events, captureSource: manifest.captureSource)
             let zoomPlanData = try JSONEncoder.zoomPlanEncoder.encode(zoomPlan)
             try zoomPlanData.write(to: workspace.finalProjectURL.appendingPathComponent("zoomPlan.json"))
         } catch {
@@ -225,10 +225,11 @@ struct ProjectBundleService {
         let eventsURL = bundleURL.appendingPathComponent(manifest.eventFileName)
         let envelope = loadEventsEnvelope(from: eventsURL)
         let zoomPlanURL = bundleURL.appendingPathComponent("zoomPlan.json")
-        let zoomPlan = try loadOrCreateZoomPlan(from: zoomPlanURL, events: envelope.events)
+        let zoomPlan = try loadOrCreateZoomPlan(from: zoomPlanURL, events: envelope.events, captureSource: manifest.captureSource)
 
         let asset = AVURLAsset(url: recordingURL)
         let durationTime = try await asset.load(.duration)
+        let videoPixelSize = try await loadVideoPixelSize(from: asset)
         let videoAspectRatio = try await loadVideoAspectRatio(from: asset)
         let durationSeconds = CMTimeGetSeconds(durationTime)
         let duration = durationSeconds.isFinite ? durationSeconds : nil
@@ -238,6 +239,9 @@ struct ProjectBundleService {
             bundleName: bundleURL.deletingPathExtension().lastPathComponent,
             recordingURL: recordingURL,
             videoAspectRatio: videoAspectRatio,
+            contentCoordinateSize: videoPixelSize,
+            captureSourceKind: manifest.captureSource.kind,
+            captureSourceTitle: manifest.captureSource.title,
             totalEventCount: envelope.events.count,
             cursorMovedCount: envelope.events.filter { $0.type == .cursorMoved }.count,
             leftMouseDownCount: envelope.events.filter { $0.type == .leftMouseDown }.count,
@@ -338,20 +342,20 @@ struct ProjectBundleService {
         return envelope
     }
 
-    private func loadOrCreateZoomPlan(from url: URL, events: [RecordedEvent]) throws -> ZoomPlanEnvelope {
+    private func loadOrCreateZoomPlan(from url: URL, events: [RecordedEvent], captureSource: CaptureSource) throws -> ZoomPlanEnvelope {
         if fileManager.fileExists(atPath: url.path),
            let data = try? Data(contentsOf: url),
            let zoomPlan = try? JSONDecoder.zoomPlanDecoder.decode(ZoomPlanEnvelope.self, from: data) {
             return zoomPlan
         }
 
-        let zoomPlan = generateZoomPlan(from: events)
+        let zoomPlan = generateZoomPlan(from: events, captureSource: captureSource)
         let data = try JSONEncoder.zoomPlanEncoder.encode(zoomPlan)
         try data.write(to: url)
         return zoomPlan
     }
 
-    private func generateZoomPlan(from events: [RecordedEvent]) -> ZoomPlanEnvelope {
+    private func generateZoomPlan(from events: [RecordedEvent], captureSource: CaptureSource) -> ZoomPlanEnvelope {
         let clickEvents = events.filter { $0.type == .leftMouseDown }.sorted { $0.timestamp < $1.timestamp }
         var zoomItems: [ZoomPlanItem] = []
         var lastIncludedTimestamp: Double?
@@ -362,13 +366,16 @@ struct ProjectBundleService {
             }
 
             let index = zoomItems.count + 1
+            let normalizedPoint = normalizeToVideoCoordinates(event: event, captureSource: captureSource)
             zoomItems.append(
                 ZoomPlanItem(
                     id: String(format: "zoom-%04d", index),
                     type: "zoom",
                     sourceEventTimestamp: event.timestamp,
-                    centerX: event.x,
-                    centerY: event.y,
+                    rawX: event.x,
+                    rawY: event.y,
+                    centerX: normalizedPoint.x,
+                    centerY: normalizedPoint.y,
                     zoomScale: 1.8,
                     startTime: max(0, event.timestamp - 0.35),
                     holdUntil: event.timestamp + 1.15,
@@ -386,10 +393,43 @@ struct ProjectBundleService {
         )
     }
 
+    private func normalizeToVideoCoordinates(event: RecordedEvent, captureSource: CaptureSource) -> CGPoint {
+        guard let originX = captureSource.originX,
+              let originY = captureSource.originY,
+              let pointsWidth = captureSource.pointsWidth,
+              let pointsHeight = captureSource.pointsHeight,
+              let scaleFactor = captureSource.scaleFactor,
+              pointsWidth > 0,
+              pointsHeight > 0,
+              scaleFactor > 0 else {
+            return CGPoint(x: event.x, y: event.y)
+        }
+
+        let localXPoints = event.x - originX
+        let localYPoints = event.y - originY
+
+        let clampedXPoints = min(max(localXPoints, 0), pointsWidth)
+        let clampedYPoints = min(max(localYPoints, 0), pointsHeight)
+
+        let pixelX = clampedXPoints * scaleFactor
+        let pixelY = (pointsHeight - clampedYPoints) * scaleFactor
+
+        return CGPoint(x: pixelX, y: pixelY)
+    }
+
     private func loadVideoAspectRatio(from asset: AVURLAsset) async throws -> CGFloat {
+        let videoPixelSize = try await loadVideoPixelSize(from: asset)
+        guard videoPixelSize.width > 0, videoPixelSize.height > 0 else {
+            return 16.0 / 9.0
+        }
+
+        return videoPixelSize.width / videoPixelSize.height
+    }
+
+    private func loadVideoPixelSize(from asset: AVURLAsset) async throws -> CGSize {
         let tracks = try await asset.loadTracks(withMediaType: .video)
         guard let track = tracks.first else {
-            return 16.0 / 9.0
+            return CGSize(width: 1920, height: 1080)
         }
 
         let naturalSize = try await track.load(.naturalSize)
@@ -399,10 +439,10 @@ struct ProjectBundleService {
         let height = abs(transformedSize.height)
 
         guard width > 0, height > 0 else {
-            return 16.0 / 9.0
+            return CGSize(width: 1920, height: 1080)
         }
 
-        return width / height
+        return CGSize(width: width, height: height)
     }
 
     private func persistOutputDirectory(_ url: URL) -> Bool {

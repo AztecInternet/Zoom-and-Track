@@ -113,7 +113,12 @@ final class RecordingCoordinator {
                 title: currentTarget.title,
                 subtitle: currentTarget.subtitle,
                 width: currentTarget.width,
-                height: currentTarget.height
+                height: currentTarget.height,
+                originX: currentTarget.originX,
+                originY: currentTarget.originY,
+                pointsWidth: currentTarget.pointsWidth,
+                pointsHeight: currentTarget.pointsHeight,
+                scaleFactor: currentTarget.scaleFactor
             ),
             recordingFileName: "recording.mov",
             eventFileName: "events.json"

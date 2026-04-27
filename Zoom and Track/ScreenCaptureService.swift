@@ -27,6 +27,8 @@ final class ScreenCaptureService: NSObject {
             let width = screen.map { Int($0.frame.width * $0.backingScaleFactor) } ?? Int(display.width) * 2
             let height = screen.map { Int($0.frame.height * $0.backingScaleFactor) } ?? Int(display.height) * 2
             let title = screen?.localizedName ?? "Display \(display.displayID)"
+            let frame = screen?.frame ?? .zero
+            let scaleFactor = screen?.backingScaleFactor ?? 2.0
 
             return ShareableCaptureTarget(
                 id: "display-\(display.displayID)",
@@ -35,7 +37,12 @@ final class ScreenCaptureService: NSObject {
                 title: title,
                 subtitle: "\(width)x\(height)",
                 width: width,
-                height: height
+                height: height,
+                originX: frame.origin.x,
+                originY: frame.origin.y,
+                pointsWidth: frame.width,
+                pointsHeight: frame.height,
+                scaleFactor: scaleFactor
             )
         }
         .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
@@ -48,6 +55,7 @@ final class ScreenCaptureService: NSObject {
                 let appName = window.owningApplication?.applicationName
                 let width = max(Int(window.frame.width * 2), 1)
                 let height = max(Int(window.frame.height * 2), 1)
+                let scaleFactor = window.frame.width > 0 ? Double(width) / Double(window.frame.width) : 2.0
 
                 return ShareableCaptureTarget(
                     id: "window-\(window.windowID)",
@@ -56,7 +64,12 @@ final class ScreenCaptureService: NSObject {
                     title: title,
                     subtitle: appName,
                     width: width,
-                    height: height
+                    height: height,
+                    originX: window.frame.origin.x,
+                    originY: window.frame.origin.y,
+                    pointsWidth: window.frame.width,
+                    pointsHeight: window.frame.height,
+                    scaleFactor: scaleFactor
                 )
             }
             .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
