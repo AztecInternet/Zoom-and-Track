@@ -727,7 +727,9 @@ final class CaptureSetupViewModel: ObservableObject {
         stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
         cancelPreviewMode()
         mainPlayer?.pause()
-        isPlaybackActive = false
+        publishOnNextRunLoop { [weak self] in
+            self?.isPlaybackActive = false
+        }
         manualSelectionSuppressionUntil = Date().addingTimeInterval(0.2)
         moveMarker(
             markerID,
@@ -1175,7 +1177,10 @@ final class CaptureSetupViewModel: ObservableObject {
         guard let player = mainPlayer else { return }
         let time = CMTime(seconds: seconds, preferredTimescale: 600)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
-        currentPlaybackTime = max(seconds, 0)
+        let clampedSeconds = max(seconds, 0)
+        publishOnNextRunLoop { [weak self] in
+            self?.currentPlaybackTime = clampedSeconds
+        }
     }
 
     private func updateSelectedMarker(_ mutate: (inout ZoomPlanItem) -> Void) {
@@ -1193,7 +1198,10 @@ final class CaptureSetupViewModel: ObservableObject {
         do {
             let envelope = ZoomPlanEnvelope(schemaVersion: 1, source: "events.json", items: markers)
             try projectBundleService.saveZoomPlan(envelope, in: summary.bundleURL)
-            recordingSummary = summaryWithMarkers(markers, basedOn: summary)
+            let updatedSummary = summaryWithMarkers(markers, basedOn: summary)
+            publishOnNextRunLoop { [weak self] in
+                self?.recordingSummary = updatedSummary
+            }
         } catch {
             statusMessage = "Could not save zoomPlan.json: \(error.localizedDescription)"
         }
@@ -1209,12 +1217,17 @@ final class CaptureSetupViewModel: ObservableObject {
         let maxDuration = max(summary.duration ?? 0, 0)
         markers[index].sourceEventTimestamp = min(max(seconds, 0), maxDuration)
         syncMarkerTiming(&markers[index])
-        selectedZoomMarkerID = markerID
+        publishOnNextRunLoop { [weak self] in
+            self?.selectedZoomMarkerID = markerID
+        }
 
         if persist {
             saveZoomMarkers(markers, basedOn: summary)
         } else {
-            recordingSummary = summaryWithMarkers(markers, basedOn: summary)
+            let updatedSummary = summaryWithMarkers(markers, basedOn: summary)
+            publishOnNextRunLoop { [weak self] in
+                self?.recordingSummary = updatedSummary
+            }
         }
 
         if seekPlaybackHead {
@@ -1309,9 +1322,17 @@ final class CaptureSetupViewModel: ObservableObject {
     private func cancelPendingMarkerPreviewRender() {
         markerPreviewRenderTask?.cancel()
         markerPreviewRenderTask = nil
-        isRenderingMarkerPreview = false
-        markerPreviewStatusMessage = nil
+        publishOnNextRunLoop { [weak self] in
+            self?.isRenderingMarkerPreview = false
+            self?.markerPreviewStatusMessage = nil
+        }
         renderingPreviewMarkerID = nil
+    }
+
+    private func publishOnNextRunLoop(_ action: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            action()
+        }
     }
 
     private func startLiveMarkerPreview(_ markerID: String) {
