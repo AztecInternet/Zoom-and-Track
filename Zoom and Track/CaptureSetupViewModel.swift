@@ -101,6 +101,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private var metadataSaveTask: Task<Void, Never>?
     private var wasPlayingBeforeMarkerTimelineMove = false
     private var activeExportOperationID = UUID()
+    private let timelineMarkerNudgeInterval = 0.1
 
     private let permissionsService = PermissionsService()
     private let screenCaptureService = ScreenCaptureService()
@@ -716,6 +717,26 @@ final class CaptureSetupViewModel: ObservableObject {
         wasPlayingBeforeMarkerTimelineMove = false
     }
 
+    func nudgeSelectedTimelineMarker(by delta: Double) {
+        guard canEditClickFocusMarkers, let markerID = selectedZoomMarkerID else { return }
+        cancelPendingMarkerPreviewRender()
+        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+            playbackTransitionPlateState = .hidden
+            playbackPresentationMode = .normal
+        }
+        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
+        cancelPreviewMode()
+        mainPlayer?.pause()
+        isPlaybackActive = false
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(0.2)
+        moveMarker(
+            markerID,
+            to: selectedMarkerTimestamp(for: markerID) + (delta * timelineMarkerNudgeInterval),
+            persist: true,
+            seekPlaybackHead: true
+        )
+    }
+
     func setSelectedMarkerEnabled(_ enabled: Bool) {
         updateSelectedMarker { marker in
             marker.enabled = enabled
@@ -1183,6 +1204,10 @@ final class CaptureSetupViewModel: ObservableObject {
         } else {
             currentPlaybackTime = markers[index].sourceEventTimestamp
         }
+    }
+
+    private func selectedMarkerTimestamp(for markerID: String) -> Double {
+        recordingSummary?.zoomMarkers.first(where: { $0.id == markerID })?.sourceEventTimestamp ?? currentPlaybackTime
     }
 
     private func summaryWithMarkers(_ markers: [ZoomPlanItem], basedOn summary: RecordingInspectionSummary) -> RecordingInspectionSummary {

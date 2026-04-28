@@ -36,6 +36,7 @@ struct ContentView: View {
     @State private var captureInfoCollectionDraft = ""
     @State private var captureInfoProjectDraft = ""
     @FocusState private var focusedCaptureInfoField: CaptureInfoField?
+    @FocusState private var isTimelineKeyboardFocused: Bool
 
     private struct OverlayMapping {
         let point: CGPoint
@@ -1600,6 +1601,7 @@ struct ContentView: View {
                             isEnabled: layout.marker.enabled,
                             activePhase: displayedPhase,
                             onOptionDragChanged: { translationX in
+                                isTimelineKeyboardFocused = true
                                 if activeTimelineMarkerDragID == nil {
                                     activeTimelineMarkerDragID = layout.marker.id
                                     activeTimelineMarkerDragStartTime = layout.marker.sourceEventTimestamp
@@ -1611,6 +1613,7 @@ struct ContentView: View {
                                 viewModel.previewTimelineMarkerMove(layout.marker.id, to: targetTime)
                             },
                             onOptionDragEnded: { translationX in
+                                isTimelineKeyboardFocused = true
                                 guard activeTimelineMarkerDragID == layout.marker.id else { return }
                                 let startTime = activeTimelineMarkerDragStartTime ?? layout.marker.sourceEventTimestamp
                                 let targetTime = startTime + (Double(translationX / width) * duration)
@@ -1691,6 +1694,7 @@ struct ContentView: View {
                                 viewModel.endTimelineScrub(at: targetTime, snappedMarkerID: snap?.marker.id)
                                 isDraggingTimeline = false
                             } else if let snap {
+                                isTimelineKeyboardFocused = true
                                 suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
                                 viewModel.startMarkerPreview(snap.marker.id)
                             } else {
@@ -1719,9 +1723,25 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("⌥ Click to select a Marker, ⌥ Click + Drag to reposition a Marker")
+                Text("⌥ Click to select a Marker, ⌥ Click + Drag to reposition, ←/→ to nudge 0.1s")
                     .font(.system(size: 10, weight: .light))
                     .foregroundStyle(.secondary)
+            }
+        }
+        .focusable(interactions: .edit)
+        .focusEffectDisabled()
+        .focused($isTimelineKeyboardFocused)
+        .onKeyPress(keys: [.leftArrow, .rightArrow]) { keyPress in
+            guard viewModel.selectedZoomMarkerID != nil else { return .ignored }
+            switch keyPress.key {
+            case .leftArrow:
+                viewModel.nudgeSelectedTimelineMarker(by: -1)
+                return .handled
+            case .rightArrow:
+                viewModel.nudgeSelectedTimelineMarker(by: 1)
+                return .handled
+            default:
+                return .ignored
             }
         }
         .padding(.horizontal, 14)
@@ -1880,6 +1900,7 @@ struct ContentView: View {
                 }
                 .onTapGesture {
                     guard !interactionSuppressed else { return }
+                    isTimelineKeyboardFocused = true
                     suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
                     viewModel.startMarkerPreview(marker.id)
                 }
