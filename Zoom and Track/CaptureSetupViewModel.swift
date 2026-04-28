@@ -99,6 +99,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private var exportTask: Task<Void, Never>?
     private var targetRefreshTask: Task<Void, Never>?
     private var metadataSaveTask: Task<Void, Never>?
+    private var wasPlayingBeforeMarkerTimelineMove = false
     private var activeExportOperationID = UUID()
 
     private let permissionsService = PermissionsService()
@@ -188,6 +189,14 @@ final class CaptureSetupViewModel: ObservableObject {
     var canTriggerMarkerPreview: Bool {
         recordingSummary != nil &&
         mainPlayer != nil &&
+        !exportState.isInProgress &&
+        sessionState != .preparing &&
+        sessionState != .recording &&
+        sessionState != .stopping
+    }
+
+    var canEditClickFocusMarkers: Bool {
+        recordingSummary != nil &&
         !exportState.isInProgress &&
         sessionState != .preparing &&
         sessionState != .recording &&
@@ -679,6 +688,36 @@ final class CaptureSetupViewModel: ObservableObject {
         seekPlayback(to: seconds)
     }
 
+    func beginTimelineMarkerMove(_ markerID: String) {
+        guard canEditClickFocusMarkers, let player = mainPlayer else { return }
+        cancelPendingMarkerPreviewRender()
+        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+            playbackTransitionPlateState = .hidden
+            playbackPresentationMode = .normal
+        }
+        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
+        cancelPreviewMode()
+        wasPlayingBeforeMarkerTimelineMove = player.timeControlStatus == .playing
+        player.pause()
+        isPlaybackActive = false
+        selectedZoomMarkerID = markerID
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(0.5)
+    }
+
+    func previewTimelineMarkerMove(_ markerID: String, to seconds: Double) {
+        moveMarker(markerID, to: seconds, persist: false, seekPlaybackHead: false)
+    }
+
+    func commitTimelineMarkerMove(_ markerID: String, to seconds: Double) {
+        moveMarker(markerID, to: seconds, persist: true, seekPlaybackHead: true)
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(0.2)
+        if wasPlayingBeforeMarkerTimelineMove {
+            mainPlayer?.play()
+            isPlaybackActive = true
+        }
+        wasPlayingBeforeMarkerTimelineMove = false
+    }
+
     func setSelectedMarkerEnabled(_ enabled: Bool) {
         updateSelectedMarker { marker in
             marker.enabled = enabled
@@ -774,6 +813,62 @@ final class CaptureSetupViewModel: ObservableObject {
         markers.append(duplicate)
         selectedZoomMarkerID = duplicate.id
         saveZoomMarkers(markers, basedOn: summary)
+    }
+
+    func addClickFocusMarker(at sourcePoint: CGPoint, timestamp: Double? = nil) {
+        guard let summary = recordingSummary else { return }
+
+        let safeWidth = max(summary.contentCoordinateSize.width, 1)
+        let safeHeight = max(summary.contentCoordinateSize.height, 1)
+        let clampedPoint = CGPoint(
+            x: min(max(sourcePoint.x, 0), safeWidth),
+            y: min(max(sourcePoint.y, 0), safeHeight)
+        )
+        let eventTimestamp = min(max(timestamp ?? currentPlaybackTime, 0), max(summary.duration ?? currentPlaybackTime, currentPlaybackTime))
+        let leadInTime = 0.15
+        let zoomInDuration = 0.30
+        let holdDuration = 1.15
+        let zoomOutDuration = 0.40
+        let startTime = max(0, eventTimestamp - leadInTime - zoomInDuration)
+        let holdUntil = eventTimestamp + holdDuration
+        let endTime = holdUntil + zoomOutDuration
+
+        var markers = summary.zoomMarkers
+        let marker = ZoomPlanItem(
+            id: nextZoomMarkerID(from: markers),
+            type: "zoom",
+            markerKind: .clickFocus,
+            sourceEventTimestamp: eventTimestamp,
+            rawX: nil,
+            rawY: nil,
+            centerX: clampedPoint.x,
+            centerY: clampedPoint.y,
+            zoomScale: 1.8,
+            startTime: startTime,
+            holdUntil: holdUntil,
+            endTime: endTime,
+            leadInTime: leadInTime,
+            zoomInDuration: zoomInDuration,
+            holdDuration: holdDuration,
+            zoomOutDuration: zoomOutDuration,
+            enabled: true,
+            duration: leadInTime + zoomInDuration + holdDuration + zoomOutDuration,
+            easeStyle: .smooth,
+            zoomType: .inOut,
+            bounceAmount: 0.35
+        )
+        markers.append(marker)
+        selectedZoomMarkerID = marker.id
+        saveZoomMarkers(markers, basedOn: summary)
+    }
+
+    func moveSelectedMarker(to sourcePoint: CGPoint) {
+        updateSelectedMarker { marker in
+            marker.rawX = nil
+            marker.rawY = nil
+            marker.centerX = sourcePoint.x
+            marker.centerY = sourcePoint.y
+        }
     }
 
     private func applyOutputDirectoryResolution() {
@@ -1061,35 +1156,64 @@ final class CaptureSetupViewModel: ObservableObject {
         do {
             let envelope = ZoomPlanEnvelope(schemaVersion: 1, source: "events.json", items: markers)
             try projectBundleService.saveZoomPlan(envelope, in: summary.bundleURL)
-            recordingSummary = RecordingInspectionSummary(
-                bundleURL: summary.bundleURL,
-                bundleName: summary.bundleName,
-                captureID: summary.captureID,
-                collectionName: summary.collectionName,
-                projectName: summary.projectName,
-                captureType: summary.captureType,
-                captureTitle: summary.captureTitle,
-                createdAt: summary.createdAt,
-                updatedAt: summary.updatedAt,
-                recordingURL: summary.recordingURL,
-                videoAspectRatio: summary.videoAspectRatio,
-                contentCoordinateSize: summary.contentCoordinateSize,
-                captureSourceKind: summary.captureSourceKind,
-                captureSourceTitle: summary.captureSourceTitle,
-                totalEventCount: summary.totalEventCount,
-                cursorMovedCount: summary.cursorMovedCount,
-                leftMouseDownCount: summary.leftMouseDownCount,
-                leftMouseUpCount: summary.leftMouseUpCount,
-                rightMouseDownCount: summary.rightMouseDownCount,
-                rightMouseUpCount: summary.rightMouseUpCount,
-                firstEventTimestamp: summary.firstEventTimestamp,
-                lastEventTimestamp: summary.lastEventTimestamp,
-                duration: summary.duration,
-                zoomMarkers: markers
-            )
+            recordingSummary = summaryWithMarkers(markers, basedOn: summary)
         } catch {
             statusMessage = "Could not save zoomPlan.json: \(error.localizedDescription)"
         }
+    }
+
+    private func moveMarker(_ markerID: String, to seconds: Double, persist: Bool, seekPlaybackHead: Bool) {
+        guard let summary = recordingSummary,
+              let index = summary.zoomMarkers.firstIndex(where: { $0.id == markerID }) else {
+            return
+        }
+
+        var markers = summary.zoomMarkers
+        let maxDuration = max(summary.duration ?? 0, 0)
+        markers[index].sourceEventTimestamp = min(max(seconds, 0), maxDuration)
+        syncMarkerTiming(&markers[index])
+        selectedZoomMarkerID = markerID
+
+        if persist {
+            saveZoomMarkers(markers, basedOn: summary)
+        } else {
+            recordingSummary = summaryWithMarkers(markers, basedOn: summary)
+        }
+
+        if seekPlaybackHead {
+            seekPlayback(to: markers[index].sourceEventTimestamp)
+        } else {
+            currentPlaybackTime = markers[index].sourceEventTimestamp
+        }
+    }
+
+    private func summaryWithMarkers(_ markers: [ZoomPlanItem], basedOn summary: RecordingInspectionSummary) -> RecordingInspectionSummary {
+        RecordingInspectionSummary(
+            bundleURL: summary.bundleURL,
+            bundleName: summary.bundleName,
+            captureID: summary.captureID,
+            collectionName: summary.collectionName,
+            projectName: summary.projectName,
+            captureType: summary.captureType,
+            captureTitle: summary.captureTitle,
+            createdAt: summary.createdAt,
+            updatedAt: summary.updatedAt,
+            recordingURL: summary.recordingURL,
+            videoAspectRatio: summary.videoAspectRatio,
+            contentCoordinateSize: summary.contentCoordinateSize,
+            captureSourceKind: summary.captureSourceKind,
+            captureSourceTitle: summary.captureSourceTitle,
+            totalEventCount: summary.totalEventCount,
+            cursorMovedCount: summary.cursorMovedCount,
+            leftMouseDownCount: summary.leftMouseDownCount,
+            leftMouseUpCount: summary.leftMouseUpCount,
+            rightMouseDownCount: summary.rightMouseDownCount,
+            rightMouseUpCount: summary.rightMouseUpCount,
+            firstEventTimestamp: summary.firstEventTimestamp,
+            lastEventTimestamp: summary.lastEventTimestamp,
+            duration: summary.duration,
+            zoomMarkers: markers
+        )
     }
 
     private func syncMarkerTiming(_ marker: inout ZoomPlanItem) {

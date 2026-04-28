@@ -23,6 +23,10 @@ struct ContentView: View {
     @State private var hoveredTimelinePhase: MarkerTimingPhase?
     @State private var hoveredTimelineTooltipAnchor: CGPoint?
     @State private var exportShareAnchorView: NSView?
+    @State private var isPlacingClickFocus = false
+    @State private var pendingMarkerDragSourcePoint: CGPoint?
+    @State private var activeTimelineMarkerDragID: String?
+    @State private var activeTimelineMarkerDragStartTime: Double?
     @State private var librarySearchText = ""
     @State private var inspectorMode: EditInspectorMode = .markers
     @State private var selectedLibraryCollectionFilter: String?
@@ -431,6 +435,22 @@ struct ContentView: View {
                 Spacer()
 
                 if viewModel.recordingSummary != nil {
+                    Button(isPlacingClickFocus ? "Cancel Add" : "Add Click Focus") {
+                        if isPlacingClickFocus {
+                            isPlacingClickFocus = false
+                        } else {
+                            viewModel.cancelPlaybackPreview()
+                            inspectorMode = .markers
+                            isPlaybackInspectorVisible = true
+                            pendingMarkerDragSourcePoint = nil
+                            isPlacingClickFocus = true
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!viewModel.canEditClickFocusMarkers && !isPlacingClickFocus)
+                }
+
+                if viewModel.recordingSummary != nil {
                     Button {
                         isPlaybackInfoPresented = true
                     } label: {
@@ -487,7 +507,21 @@ struct ContentView: View {
                                 isRenderedPreviewActive: viewModel.isRenderedPreviewActive,
                                 renderingStatusMessage: viewModel.markerPreviewStatusMessage,
                                 playbackPresentationMode: viewModel.playbackPresentationMode,
-                                playbackTransitionPlateState: viewModel.playbackTransitionPlateState
+                                playbackTransitionPlateState: viewModel.playbackTransitionPlateState,
+                                isPlacingClickFocus: isPlacingClickFocus,
+                                draggedMarkerSourcePoint: pendingMarkerDragSourcePoint,
+                                placeClickFocusAction: { sourcePoint in
+                                    viewModel.addClickFocusMarker(at: sourcePoint)
+                                    pendingMarkerDragSourcePoint = nil
+                                    isPlacingClickFocus = false
+                                },
+                                dragSelectedMarkerAction: { sourcePoint in
+                                    pendingMarkerDragSourcePoint = sourcePoint
+                                },
+                                commitDraggedMarkerAction: { sourcePoint in
+                                    viewModel.moveSelectedMarker(to: sourcePoint)
+                                    pendingMarkerDragSourcePoint = nil
+                                }
                             )
                                 .frame(height: videoHeight)
                                 .layoutPriority(1)
@@ -510,6 +544,8 @@ struct ContentView: View {
                         playbackVideoHeightDragOrigin = nil
                         playbackScrubTime = 0
                         isScrubbingPlayback = false
+                        isPlacingClickFocus = false
+                        pendingMarkerDragSourcePoint = nil
                     }
                     .onChange(of: viewModel.currentPlaybackTime) {
                         guard !isScrubbingPlayback else { return }
@@ -1058,7 +1094,12 @@ struct ContentView: View {
         isRenderedPreviewActive: Bool,
         renderingStatusMessage: String?,
         playbackPresentationMode: CaptureSetupViewModel.PlaybackPresentationMode,
-        playbackTransitionPlateState: CaptureSetupViewModel.PlaybackTransitionPlateState
+        playbackTransitionPlateState: CaptureSetupViewModel.PlaybackTransitionPlateState,
+        isPlacingClickFocus: Bool,
+        draggedMarkerSourcePoint: CGPoint?,
+        placeClickFocusAction: @escaping (CGPoint) -> Void,
+        dragSelectedMarkerAction: @escaping (CGPoint) -> Void,
+        commitDraggedMarkerAction: @escaping (CGPoint) -> Void
     ) -> some View {
         let safeAspectRatio = max(aspectRatio, 0.1)
 
@@ -1092,6 +1133,7 @@ struct ContentView: View {
                 .frame(width: fittedRect.width, height: fittedRect.height)
                 .clipped()
                 .position(x: fittedRect.midX, y: fittedRect.midY)
+                .coordinateSpace(name: "videoOverlay")
 
                 if !isRenderedPreviewActive,
                    let mapping = mappedOverlayPoint(
@@ -1101,6 +1143,14 @@ struct ContentView: View {
                     videoAspectRatio: safeAspectRatio
                 ) {
                     let ringSize = 22 + max((selectedMarker?.zoomScale ?? 1.0) - 1.0, 0) * 10
+                    let handlePoint = draggedMarkerSourcePoint.flatMap {
+                        overlayPoint(
+                            for: $0,
+                            contentCoordinateSize: contentCoordinateSize,
+                            in: geometry.size,
+                            videoAspectRatio: safeAspectRatio
+                        )
+                    } ?? mapping.point
                     ZStack {
                         Circle()
                             .stroke(Color.accentColor, lineWidth: 3)
@@ -1115,8 +1165,69 @@ struct ContentView: View {
                             .fill(Color.accentColor)
                             .frame(width: 2, height: 18)
                     }
-                    .position(mapping.point)
-                    .allowsHitTesting(false)
+                    .position(handlePoint)
+                    .gesture(
+                        DragGesture(minimumDistance: 0, coordinateSpace: .named("videoOverlay"))
+                            .onChanged { value in
+                                guard let sourcePoint = sourcePoint(
+                                    for: value.location,
+                                    contentCoordinateSize: contentCoordinateSize,
+                                    in: geometry.size,
+                                    videoAspectRatio: safeAspectRatio
+                                ) else {
+                                    return
+                                }
+                                dragSelectedMarkerAction(sourcePoint)
+                            }
+                            .onEnded { value in
+                                guard let sourcePoint = sourcePoint(
+                                    for: value.location,
+                                    contentCoordinateSize: contentCoordinateSize,
+                                    in: geometry.size,
+                                    videoAspectRatio: safeAspectRatio
+                                ) else {
+                                    pendingMarkerDragSourcePoint = nil
+                                    return
+                                }
+                                commitDraggedMarkerAction(sourcePoint)
+                            }
+                    )
+                }
+
+                if isPlacingClickFocus {
+                    Rectangle()
+                        .fill(Color.accentColor.opacity(0.08))
+                        .frame(width: fittedRect.width, height: fittedRect.height)
+                        .overlay {
+                            VStack(spacing: 8) {
+                                Image(systemName: "plus.viewfinder")
+                                    .font(.system(size: 18, weight: .semibold))
+                                Text("Click the video to place a Click Focus marker")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(Color.black.opacity(0.62))
+                            )
+                        }
+                        .position(x: fittedRect.midX, y: fittedRect.midY)
+                        .gesture(
+                            DragGesture(minimumDistance: 0, coordinateSpace: .named("videoOverlay"))
+                                .onEnded { value in
+                                    guard let sourcePoint = sourcePoint(
+                                        for: value.location,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ) else {
+                                        return
+                                    }
+                                    placeClickFocusAction(sourcePoint)
+                                }
+                        )
                 }
             }
 
@@ -1448,6 +1559,7 @@ struct ContentView: View {
         let trackCenterY: CGFloat = 34
         let segmentOriginY: CGFloat = 16
         let hoveredTooltipEntry = hoveredTimelineTooltipEntry(in: summary)
+        let timelineInteractionSuppressed = activeTimelineMarkerDragID != nil || NSEvent.modifierFlags.contains(.option)
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -1482,14 +1594,35 @@ struct ContentView: View {
                         timelineSegment(
                             layout: layout,
                             width: width,
+                            duration: duration,
                             verticalOrigin: segmentOriginY,
                             isSelected: viewModel.selectedZoomMarkerID == layout.marker.id,
                             isEnabled: layout.marker.enabled,
-                            activePhase: displayedPhase
+                            activePhase: displayedPhase,
+                            onOptionDragChanged: { translationX in
+                                if activeTimelineMarkerDragID == nil {
+                                    activeTimelineMarkerDragID = layout.marker.id
+                                    activeTimelineMarkerDragStartTime = layout.marker.sourceEventTimestamp
+                                    viewModel.beginTimelineMarkerMove(layout.marker.id)
+                                }
+                                guard activeTimelineMarkerDragID == layout.marker.id else { return }
+                                let startTime = activeTimelineMarkerDragStartTime ?? layout.marker.sourceEventTimestamp
+                                let targetTime = startTime + (Double(translationX / width) * duration)
+                                viewModel.previewTimelineMarkerMove(layout.marker.id, to: targetTime)
+                            },
+                            onOptionDragEnded: { translationX in
+                                guard activeTimelineMarkerDragID == layout.marker.id else { return }
+                                let startTime = activeTimelineMarkerDragStartTime ?? layout.marker.sourceEventTimestamp
+                                let targetTime = startTime + (Double(translationX / width) * duration)
+                                viewModel.commitTimelineMarkerMove(layout.marker.id, to: targetTime)
+                                activeTimelineMarkerDragID = nil
+                                activeTimelineMarkerDragStartTime = nil
+                            }
                         )
                     }
 
-                    if let hoveredTooltipEntry,
+                    if !timelineInteractionSuppressed,
+                       let hoveredTooltipEntry,
                        let hoveredAnchor = hoveredTimelineTooltipAnchor {
                         timelineMarkerTooltipOverlay(
                             markerID: hoveredTooltipEntry.marker.id,
@@ -1531,6 +1664,7 @@ struct ContentView: View {
                 .highPriorityGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
+                            guard activeTimelineMarkerDragID == nil else { return }
                             let currentX = min(max(value.location.x, 0), width)
                             let hasMovedEnough = abs(value.translation.width) > 3
 
@@ -1548,6 +1682,7 @@ struct ContentView: View {
                             }
                         }
                         .onEnded { value in
+                            guard activeTimelineMarkerDragID == nil else { return }
                             let endX = min(max(value.location.x, 0), width)
                             let snap = timelineSnapTarget(at: endX, width: width, duration: duration, markers: summary.zoomMarkers)
                             let targetTime = snap?.time ?? timelineTime(for: endX, width: width, duration: duration)
@@ -1566,20 +1701,26 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .animation(.easeInOut(duration: 0.12), value: isDraggingTimeline)
                 .onHover { isHovering in
-                    if !isHovering {
+                    if !isHovering || timelineInteractionSuppressed {
                         clearTimelineHover()
                     }
                 }
             }
             .frame(height: 60)
 
-            HStack {
-                Text("0")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(timecodeString(for: duration))
-                    .font(.system(size: 10, design: .monospaced))
+            ZStack {
+                HStack {
+                    Text("0")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(timecodeString(for: duration))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("⌥ Click to select a Marker, ⌥ Click + Drag to reposition a Marker")
+                    .font(.system(size: 10, weight: .light))
                     .foregroundStyle(.secondary)
             }
         }
@@ -1591,13 +1732,17 @@ struct ContentView: View {
     private func timelineSegment(
         layout: TimelineSegmentLayout,
         width: CGFloat,
+        duration: Double,
         verticalOrigin: CGFloat,
         isSelected: Bool,
         isEnabled: Bool,
-        activePhase: MarkerTimingPhase?
+        activePhase: MarkerTimingPhase?,
+        onOptionDragChanged: @escaping (CGFloat) -> Void,
+        onOptionDragEnded: @escaping (CGFloat) -> Void
     ) -> some View {
         let marker = layout.marker
-        let isHovered = hoveredTimelineMarkerID == marker.id
+        let interactionSuppressed = activeTimelineMarkerDragID != nil || NSEvent.modifierFlags.contains(.option)
+        let isHovered = !interactionSuppressed && hoveredTimelineMarkerID == marker.id
         let baseColor: Color = isSelected ? .accentColor : (isEnabled ? Color.primary.opacity(0.72) : Color.secondary.opacity(0.35))
         let laneHeight: CGFloat = 9
         let laneSpacing: CGFloat = 4
@@ -1630,6 +1775,20 @@ struct ContentView: View {
             max(localBarCenterX, highlightedBarWidth / 2),
             max(localWidth - (highlightedBarWidth / 2), highlightedBarWidth / 2)
         )
+        let optionDragGesture = DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard activeTimelineMarkerDragID == marker.id || NSEvent.modifierFlags.contains(.option) else {
+                    return
+                }
+                clearTimelineHover()
+                onOptionDragChanged(value.translation.width)
+            }
+            .onEnded { value in
+                guard activeTimelineMarkerDragID == marker.id || NSEvent.modifierFlags.contains(.option) else {
+                    return
+                }
+                onOptionDragEnded(value.translation.width)
+            }
 
         return ZStack {
             timelineSegmentBar(
@@ -1709,16 +1868,26 @@ struct ContentView: View {
                 )
                 .contentShape(Rectangle())
                 .onHover { isHovering in
+                    guard !interactionSuppressed else {
+                        clearTimelineHover()
+                        return
+                    }
                     if isHovering {
                         setTimelineHover(markerID: marker.id, phase: nil, anchor: hoverAnchor)
                     } else if hoveredTimelineMarkerID == marker.id {
                         clearTimelineHover()
                     }
                 }
+                .onTapGesture {
+                    guard !interactionSuppressed else { return }
+                    suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
+                    viewModel.startMarkerPreview(marker.id)
+                }
         }
         .frame(width: localWidth, height: localHeight)
         .position(x: localCenterX, y: laneY + (localHeight / 2))
         .brightness(isHovered ? 0.06 : 0)
+        .simultaneousGesture(optionDragGesture)
     }
 
     @ViewBuilder
@@ -2176,6 +2345,58 @@ struct ContentView: View {
                 return CGPoint(x: rawX, y: rawY)
             }(),
             captureSourceLabel: "\(viewModel.recordingSummary?.captureSourceKind.rawValue ?? "unknown") • \(viewModel.recordingSummary?.captureSourceTitle ?? "unknown")"
+        )
+    }
+
+    private func overlayPoint(
+        for sourcePoint: CGPoint,
+        contentCoordinateSize: CGSize,
+        in containerSize: CGSize,
+        videoAspectRatio: CGFloat
+    ) -> CGPoint? {
+        guard contentCoordinateSize.width > 0,
+              contentCoordinateSize.height > 0,
+              containerSize.width > 0,
+              containerSize.height > 0 else {
+            return nil
+        }
+
+        let fittedRect = fittedVideoRect(in: containerSize, aspectRatio: videoAspectRatio)
+        guard fittedRect.width > 0, fittedRect.height > 0 else {
+            return nil
+        }
+
+        let normalizedX = min(max(sourcePoint.x / contentCoordinateSize.width, 0), 1)
+        let normalizedY = min(max(sourcePoint.y / contentCoordinateSize.height, 0), 1)
+        let x = fittedRect.minX + (normalizedX * fittedRect.width)
+        let y = fittedRect.minY + (normalizedY * fittedRect.height)
+        guard x.isFinite, y.isFinite else { return nil }
+        return CGPoint(x: x, y: y)
+    }
+
+    private func sourcePoint(
+        for overlayPoint: CGPoint,
+        contentCoordinateSize: CGSize,
+        in containerSize: CGSize,
+        videoAspectRatio: CGFloat
+    ) -> CGPoint? {
+        guard contentCoordinateSize.width > 0,
+              contentCoordinateSize.height > 0 else {
+            return nil
+        }
+
+        let fittedRect = fittedVideoRect(in: containerSize, aspectRatio: videoAspectRatio)
+        guard fittedRect.contains(overlayPoint),
+              fittedRect.width > 0,
+              fittedRect.height > 0 else {
+            return nil
+        }
+
+        let normalizedX = (overlayPoint.x - fittedRect.minX) / fittedRect.width
+        let normalizedY = (overlayPoint.y - fittedRect.minY) / fittedRect.height
+        return CGPoint(
+            x: min(max(normalizedX, 0), 1) * contentCoordinateSize.width,
+            y: min(max(normalizedY, 0), 1) * contentCoordinateSize.height
         )
     }
 
@@ -2638,6 +2859,12 @@ struct ContentView: View {
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
+
+                Button("Delete Marker") {
+                    viewModel.deleteSelectedMarker()
+                }
+                .buttonStyle(.bordered)
+                .foregroundStyle(.red)
 
                 Toggle("Enabled", isOn: Binding(
                     get: { marker.enabled },

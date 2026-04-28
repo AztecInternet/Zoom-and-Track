@@ -401,9 +401,14 @@ enum ZoomType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum ZoomMarkerKind: String, Codable {
+    case clickFocus
+}
+
 struct ZoomPlanItem: Codable, Identifiable {
     var id: String
     var type: String
+    var markerKind: ZoomMarkerKind
     var sourceEventTimestamp: Double
     var rawX: Double?
     var rawY: Double?
@@ -426,6 +431,7 @@ struct ZoomPlanItem: Codable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id
         case type
+        case markerKind
         case sourceEventTimestamp
         case rawX
         case rawY
@@ -449,6 +455,7 @@ struct ZoomPlanItem: Codable, Identifiable {
     init(
         id: String,
         type: String,
+        markerKind: ZoomMarkerKind = .clickFocus,
         sourceEventTimestamp: Double,
         rawX: Double?,
         rawY: Double?,
@@ -470,6 +477,7 @@ struct ZoomPlanItem: Codable, Identifiable {
     ) {
         self.id = id
         self.type = type
+        self.markerKind = markerKind
         self.sourceEventTimestamp = sourceEventTimestamp
         self.rawX = rawX
         self.rawY = rawY
@@ -494,6 +502,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         type = try container.decode(String.self, forKey: .type)
+        markerKind = try container.decodeIfPresent(ZoomMarkerKind.self, forKey: .markerKind) ?? .clickFocus
         sourceEventTimestamp = try container.decode(Double.self, forKey: .sourceEventTimestamp)
         rawX = try container.decodeIfPresent(Double.self, forKey: .rawX)
         rawY = try container.decodeIfPresent(Double.self, forKey: .rawY)
@@ -534,6 +543,10 @@ struct ZoomPlanItem: Codable, Identifiable {
         case .outOnly:
             return max(zoomOutDuration, 0.25)
         }
+    }
+
+    var isClickFocus: Bool {
+        markerKind == .clickFocus
     }
 
     static func legacyPhaseTiming(totalDuration: Double) -> (leadInTime: Double, zoomInDuration: Double, holdDuration: Double, zoomOutDuration: Double) {
