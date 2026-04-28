@@ -13,6 +13,7 @@ struct ProjectBundleService {
     private let selectedOutputFolderBookmarkKey = "SelectedOutputFolderBookmark"
     private let lastRecordingBundleBookmarkKey = "LastRecordingBundleBookmark"
     private let lastRecordingBundlePathKey = "LastRecordingBundlePath"
+    private let libraryIndexFileName = "library-index.json"
 
     enum OutputDirectoryResolution {
         case none
@@ -26,9 +27,9 @@ struct ProjectBundleService {
         case invalid(String)
     }
 
-    func createWorkspace(outputDirectory: URL? = nil) throws -> RecordingWorkspace {
-        let timestamp = Self.projectTimestampFormatter.string(from: Date())
-        let projectName = "Recording \(timestamp)"
+    func createWorkspace(outputDirectory: URL? = nil, captureMetadata: CaptureMetadata) throws -> RecordingWorkspace {
+        let timestamp = Self.bundleTimestampFormatter.string(from: Date())
+        let bundleName = "cap_\(timestamp)_\(UUID().uuidString.prefix(6).lowercased())"
         let tempRoot = fileManager.temporaryDirectory
             .appendingPathComponent("TutorialCapture", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -49,21 +50,31 @@ struct ProjectBundleService {
             requiresSecurityScopedAccess = true
             securityScopedOutputDirectoryURL = outputDirectory
         } else {
-            finalBase = try moviesDirectory()
-                .appendingPathComponent("FlowTrack Capture", isDirectory: true)
+            finalBase = try defaultLibraryRootURL()
             requiresSecurityScopedAccess = false
             securityScopedOutputDirectoryURL = nil
         }
 
         do {
-            try fileManager.createDirectory(at: finalBase, withIntermediateDirectories: true)
-            _ = uniqueProjectURL(baseDirectory: finalBase, projectName: projectName)
+            let capturesDirectory = try libraryCapturesDirectory(
+                libraryRoot: finalBase,
+                collectionName: captureMetadata.resolvedCollectionName,
+                projectName: captureMetadata.resolvedProjectName
+            )
+            let exportsDirectory = capturesDirectory.deletingLastPathComponent().appendingPathComponent("Exports", isDirectory: true)
+            try fileManager.createDirectory(at: exportsDirectory, withIntermediateDirectories: true)
+            _ = uniqueProjectURL(baseDirectory: capturesDirectory, projectName: bundleName)
         } catch {
             stopScopedAccess(for: securityScopedOutputDirectoryURL)
             throw error
         }
 
-        let finalProjectURL = uniqueProjectURL(baseDirectory: finalBase, projectName: projectName)
+        let capturesDirectory = try libraryCapturesDirectory(
+            libraryRoot: finalBase,
+            collectionName: captureMetadata.resolvedCollectionName,
+            projectName: captureMetadata.resolvedProjectName
+        )
+        let finalProjectURL = uniqueProjectURL(baseDirectory: capturesDirectory, projectName: bundleName)
 
         return RecordingWorkspace(
             temporaryDirectory: tempRoot,
@@ -237,6 +248,13 @@ struct ProjectBundleService {
         return RecordingInspectionSummary(
             bundleURL: bundleURL,
             bundleName: bundleURL.deletingPathExtension().lastPathComponent,
+            captureID: manifest.captureID,
+            collectionName: manifest.collectionName,
+            projectName: manifest.projectName,
+            captureType: manifest.captureType,
+            captureTitle: manifest.captureTitle,
+            createdAt: manifest.createdAt,
+            updatedAt: manifest.updatedAt,
             recordingURL: recordingURL,
             videoAspectRatio: videoAspectRatio,
             contentCoordinateSize: videoPixelSize,
@@ -320,11 +338,83 @@ struct ProjectBundleService {
         try data.write(to: zoomPlanURL)
     }
 
+    func libraryRootURL() throws -> URL {
+        if let selectedOutputDirectory = resolvedSelectedOutputDirectory() {
+            return selectedOutputDirectory
+        }
+        return try defaultLibraryRootURL()
+    }
+
+    func loadLibraryItems() async throws -> [CaptureLibraryItem] {
+        let libraryRoot = try libraryRootURL()
+        let accessURL = libraryRoot.startAccessingSecurityScopedResource() ? libraryRoot : nil
+        defer {
+            accessURL?.stopAccessingSecurityScopedResource()
+        }
+
+        let indexURL = libraryRoot.appendingPathComponent(libraryIndexFileName)
+        if let data = try? Data(contentsOf: indexURL),
+           let index = try? JSONDecoder.manifestDecoder.decode(CaptureLibraryIndex.self, from: data) {
+            let filtered = index.items.filter {
+                fileManager.fileExists(atPath: libraryRoot.appendingPathComponent($0.bundleRelativePath).path)
+            }
+            return filtered.sorted { $0.createdAt > $1.createdAt }
+        }
+
+        let scannedItems = try await scanLibraryItems(libraryRoot: libraryRoot)
+        try persistLibraryIndex(scannedItems, libraryRoot: libraryRoot)
+        return scannedItems.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    func registerCaptureInLibrary(_ summary: RecordingInspectionSummary) throws {
+        let libraryRoot = try libraryRootURL()
+        let accessURL = libraryRoot.startAccessingSecurityScopedResource() ? libraryRoot : nil
+        defer {
+            accessURL?.stopAccessingSecurityScopedResource()
+        }
+
+        let relativePath = relativeBundlePath(for: summary.bundleURL, libraryRoot: libraryRoot)
+        let newItem = CaptureLibraryItem(
+            captureID: summary.captureID,
+            title: summary.displayTitle,
+            captureType: summary.captureType,
+            collectionName: summary.collectionName,
+            projectName: summary.projectName,
+            createdAt: summary.createdAt,
+            updatedAt: summary.updatedAt,
+            duration: summary.duration,
+            bundleRelativePath: relativePath
+        )
+
+        let indexURL = libraryRoot.appendingPathComponent(libraryIndexFileName)
+        var items: [CaptureLibraryItem] = []
+        if let data = try? Data(contentsOf: indexURL),
+           let index = try? JSONDecoder.manifestDecoder.decode(CaptureLibraryIndex.self, from: data) {
+            items = index.items.filter { $0.captureID != newItem.captureID }
+        }
+        items.append(newItem)
+        try persistLibraryIndex(items, libraryRoot: libraryRoot)
+    }
+
     private func moviesDirectory() throws -> URL {
         guard let directory = fileManager.urls(for: .moviesDirectory, in: .userDomainMask).first else {
             throw NSError(domain: "ProjectBundleService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Movies directory is unavailable."])
         }
         return directory
+    }
+
+    private func defaultLibraryRootURL() throws -> URL {
+        try moviesDirectory().appendingPathComponent("FlowTrack Capture Library", isDirectory: true)
+    }
+
+    private func libraryCapturesDirectory(libraryRoot: URL, collectionName: String, projectName: String) throws -> URL {
+        let collectionsDirectory = libraryRoot
+            .appendingPathComponent("Collections", isDirectory: true)
+            .appendingPathComponent(sanitizedProjectName(from: collectionName), isDirectory: true)
+            .appendingPathComponent(sanitizedProjectName(from: projectName), isDirectory: true)
+            .appendingPathComponent("Captures", isDirectory: true)
+        try fileManager.createDirectory(at: collectionsDirectory, withIntermediateDirectories: true)
+        return collectionsDirectory
     }
 
     private func uniqueProjectURL(baseDirectory: URL, projectName: String) -> URL {
@@ -337,6 +427,82 @@ struct ProjectBundleService {
         }
 
         return candidate
+    }
+
+    private func sanitizedProjectName(from title: String) -> String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback = trimmed.isEmpty ? "Capture" : trimmed
+        let invalidCharacters = CharacterSet(charactersIn: "/:\\?%*|\"<>")
+        let cleaned = fallback.components(separatedBy: invalidCharacters).joined(separator: " ")
+        let collapsedWhitespace = cleaned
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return collapsedWhitespace.isEmpty ? "Capture" : collapsedWhitespace
+    }
+
+    private func relativeBundlePath(for bundleURL: URL, libraryRoot: URL) -> String {
+        let rootPath = libraryRoot.standardizedFileURL.path + "/"
+        let bundlePath = bundleURL.standardizedFileURL.path
+        if bundlePath.hasPrefix(rootPath) {
+            return String(bundlePath.dropFirst(rootPath.count))
+        }
+        return bundleURL.lastPathComponent
+    }
+
+    private func persistLibraryIndex(_ items: [CaptureLibraryItem], libraryRoot: URL) throws {
+        try fileManager.createDirectory(at: libraryRoot, withIntermediateDirectories: true)
+        let index = CaptureLibraryIndex(updatedAt: Date(), items: items.sorted { $0.createdAt > $1.createdAt })
+        let data = try JSONEncoder.manifestEncoder.encode(index)
+        try data.write(to: libraryRoot.appendingPathComponent(libraryIndexFileName))
+    }
+
+    private func scanLibraryItems(libraryRoot: URL) async throws -> [CaptureLibraryItem] {
+        let collectionsDirectory = libraryRoot.appendingPathComponent("Collections", isDirectory: true)
+        guard fileManager.fileExists(atPath: collectionsDirectory.path) else {
+            return []
+        }
+
+        let enumerator = fileManager.enumerator(
+            at: collectionsDirectory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )
+
+        var items: [CaptureLibraryItem] = []
+        while let url = enumerator?.nextObject() as? URL {
+            guard url.pathExtension == "captureproj" else { continue }
+            guard let manifest = try? loadManifest(from: url) else { continue }
+            let duration = try? await loadRecordingDuration(for: url, recordingFileName: manifest.recordingFileName)
+            items.append(
+                CaptureLibraryItem(
+                    captureID: manifest.captureID,
+                    title: manifest.captureTitle,
+                    captureType: manifest.captureType,
+                    collectionName: manifest.collectionName,
+                    projectName: manifest.projectName,
+                    createdAt: manifest.createdAt,
+                    updatedAt: manifest.updatedAt,
+                    duration: duration,
+                    bundleRelativePath: relativeBundlePath(for: url, libraryRoot: libraryRoot)
+                )
+            )
+            enumerator?.skipDescendants()
+        }
+        return items
+    }
+
+    private func loadManifest(from bundleURL: URL) throws -> ProjectManifest {
+        let manifestURL = bundleURL.appendingPathComponent("project.json")
+        let manifestData = try Data(contentsOf: manifestURL)
+        return try JSONDecoder.manifestDecoder.decode(ProjectManifest.self, from: manifestData)
+    }
+
+    private func loadRecordingDuration(for bundleURL: URL, recordingFileName: String) async throws -> Double? {
+        let asset = AVURLAsset(url: bundleURL.appendingPathComponent(recordingFileName))
+        let duration = try await asset.load(.duration)
+        let seconds = duration.seconds
+        return seconds.isFinite ? seconds : nil
     }
 
     private func removeIfExists(_ url: URL) throws {
@@ -515,7 +681,7 @@ struct ProjectBundleService {
     }
 
     private func defaultOutputDirectorySuggestion() -> URL? {
-        try? moviesDirectory().appendingPathComponent("FlowTrack Capture", isDirectory: true)
+        try? defaultLibraryRootURL()
     }
 
     private func stopScopedAccess(for url: URL?) {
@@ -538,6 +704,12 @@ struct ProjectBundleService {
     private static let projectTimestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH-mm-ss"
+        return formatter
+    }()
+
+    private static let bundleTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
         return formatter
     }()
 }

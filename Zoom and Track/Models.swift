@@ -16,6 +16,9 @@ struct ShareableCaptureTarget: Identifiable, Equatable {
     let kind: CaptureTargetKind
     let sourceID: UInt32
     let title: String
+    let ownerName: String?
+    let ownerBundleIdentifier: String?
+    let ownerProcessID: Int32?
     let subtitle: String?
     let width: Int
     let height: Int
@@ -26,6 +29,9 @@ struct ShareableCaptureTarget: Identifiable, Equatable {
     let scaleFactor: Double
 
     var displayTitle: String {
+        if let ownerName, !ownerName.isEmpty {
+            return "\(title) (\(ownerName))"
+        }
         if let subtitle, !subtitle.isEmpty {
             return "\(title) (\(subtitle))"
         }
@@ -58,12 +64,161 @@ struct CaptureSource: Codable {
 }
 
 struct ProjectManifest: Codable {
-    let id: UUID
+    let captureID: UUID
     let name: String
+    let collectionName: String
+    let projectName: String
+    let captureType: CaptureType
+    let captureTitle: String
     let createdAt: Date
+    let updatedAt: Date
     let captureSource: CaptureSource
     let recordingFileName: String
     let eventFileName: String
+
+    private enum CodingKeys: String, CodingKey {
+        case captureID
+        case id
+        case name
+        case collectionName
+        case projectName
+        case captureType
+        case captureTitle
+        case createdAt
+        case updatedAt
+        case captureSource
+        case recordingFileName
+        case eventFileName
+    }
+
+    init(
+        captureID: UUID,
+        name: String,
+        collectionName: String,
+        projectName: String,
+        captureType: CaptureType,
+        captureTitle: String,
+        createdAt: Date,
+        updatedAt: Date,
+        captureSource: CaptureSource,
+        recordingFileName: String,
+        eventFileName: String
+    ) {
+        self.captureID = captureID
+        self.name = name
+        self.collectionName = collectionName
+        self.projectName = projectName
+        self.captureType = captureType
+        self.captureTitle = captureTitle
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.captureSource = captureSource
+        self.recordingFileName = recordingFileName
+        self.eventFileName = eventFileName
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        captureID = try container.decodeIfPresent(UUID.self, forKey: .captureID)
+            ?? container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        collectionName = try container.decodeIfPresent(String.self, forKey: .collectionName) ?? "Default Collection"
+        projectName = try container.decodeIfPresent(String.self, forKey: .projectName) ?? "General Project"
+        captureType = try container.decodeIfPresent(CaptureType.self, forKey: .captureType) ?? .other
+        captureTitle = try container.decodeIfPresent(String.self, forKey: .captureTitle) ?? name
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
+        captureSource = try container.decode(CaptureSource.self, forKey: .captureSource)
+        recordingFileName = try container.decode(String.self, forKey: .recordingFileName)
+        eventFileName = try container.decode(String.self, forKey: .eventFileName)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(captureID, forKey: .captureID)
+        try container.encode(name, forKey: .name)
+        try container.encode(collectionName, forKey: .collectionName)
+        try container.encode(projectName, forKey: .projectName)
+        try container.encode(captureType, forKey: .captureType)
+        try container.encode(captureTitle, forKey: .captureTitle)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(captureSource, forKey: .captureSource)
+        try container.encode(recordingFileName, forKey: .recordingFileName)
+        try container.encode(eventFileName, forKey: .eventFileName)
+    }
+}
+
+struct CaptureMetadata: Equatable {
+    var collectionName: String
+    var projectName: String
+    var captureType: CaptureType
+    var captureTitle: String
+
+    var resolvedCollectionName: String {
+        let trimmed = collectionName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Default Collection" : trimmed
+    }
+
+    var resolvedProjectName: String {
+        let trimmed = projectName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "General Project" : trimmed
+    }
+
+    var resolvedCaptureTitle: String {
+        let trimmed = captureTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Untitled Capture" : trimmed
+    }
+}
+
+enum CaptureType: String, Codable, CaseIterable, Identifiable {
+    case demo
+    case tutorial
+    case support
+    case marketing
+    case training
+    case bugReport
+    case other
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .demo:
+            return "Demo"
+        case .tutorial:
+            return "Tutorial"
+        case .support:
+            return "Support"
+        case .marketing:
+            return "Marketing"
+        case .training:
+            return "Training"
+        case .bugReport:
+            return "Bug Report"
+        case .other:
+            return "Other"
+        }
+    }
+}
+
+struct CaptureLibraryItem: Codable, Identifiable, Equatable {
+    let captureID: UUID
+    let title: String
+    let captureType: CaptureType
+    let collectionName: String
+    let projectName: String
+    let createdAt: Date
+    let updatedAt: Date
+    let duration: Double?
+    let bundleRelativePath: String
+
+    var id: UUID { captureID }
+}
+
+struct CaptureLibraryIndex: Codable {
+    let updatedAt: Date
+    let items: [CaptureLibraryItem]
 }
 
 struct RecordingWorkspace {
@@ -315,6 +470,13 @@ struct ZoomPlanItem: Codable, Identifiable {
 struct RecordingInspectionSummary {
     let bundleURL: URL
     let bundleName: String
+    let captureID: UUID
+    let collectionName: String
+    let projectName: String
+    let captureType: CaptureType
+    let captureTitle: String
+    let createdAt: Date
+    let updatedAt: Date
     let recordingURL: URL
     let videoAspectRatio: CGFloat
     let contentCoordinateSize: CGSize
@@ -330,6 +492,14 @@ struct RecordingInspectionSummary {
     let lastEventTimestamp: Double?
     let duration: Double?
     let zoomMarkers: [ZoomPlanItem]
+
+    var displayTitle: String {
+        captureTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? bundleName : captureTitle
+    }
+
+    var displaySubtitle: String {
+        "\(collectionName) • \(projectName) • \(captureType.displayName)"
+    }
 }
 
 enum SharedMotionEngine {

@@ -22,6 +22,8 @@ struct ContentView: View {
     @State private var inspectorFocusedTimingPhase: MarkerTimingPhase?
     @State private var hoveredTimelinePhase: MarkerTimingPhase?
     @State private var hoveredTimelineTooltipAnchor: CGPoint?
+    @State private var exportShareAnchorView: NSView?
+    @State private var librarySearchText = ""
 
     private struct OverlayMapping {
         let point: CGPoint
@@ -89,6 +91,11 @@ struct ContentView: View {
         .task {
             await viewModel.load()
         }
+        .onChange(of: viewModel.sessionState) {
+            if case .finished = viewModel.sessionState {
+                selectedTab = .review
+            }
+        }
     }
 
     private var sidebar: some View {
@@ -150,6 +157,8 @@ struct ContentView: View {
             switch selectedTab ?? .capture {
             case .capture:
                 captureView
+            case .library:
+                libraryView
             case .review:
                 reviewView
             case .settings:
@@ -163,8 +172,8 @@ struct ContentView: View {
     private var captureView: some View {
         VStack(alignment: .leading, spacing: 20) {
             sectionHeader(
-                title: "Create Recording",
-                subtitle: viewModel.selectedOutputFolderPath ?? "Choose an output folder",
+                title: "Capture",
+                subtitle: viewModel.selectedOutputFolderPath ?? "Choose a library root",
                 accentWidth: 132
             )
 
@@ -230,6 +239,44 @@ struct ContentView: View {
             Text("Recording Setup")
                 .font(.system(size: 16, weight: .semibold))
 
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Collection")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Default Collection", text: $viewModel.collectionName)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Project")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("General Project", text: $viewModel.projectName)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Type")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Picker("Type", selection: $viewModel.captureType) {
+                        ForEach(CaptureType.allCases) { type in
+                            Text(type.displayName).tag(type)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Short Description of Clip")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Describe this capture", text: $viewModel.captureTitle)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+
             infoRow(
                 title: "Permission",
                 value: viewModel.hasScreenRecordingPermission ? "Screen Recording Enabled" : "Screen Recording Required"
@@ -242,7 +289,7 @@ struct ContentView: View {
 
             infoRow(
                 title: "Output Folder",
-                value: viewModel.selectedOutputFolderPath ?? "Movies/FlowTrack Capture"
+                value: viewModel.selectedOutputFolderPath ?? "Movies/FlowTrack Capture Library"
             )
 
             ViewThatFits {
@@ -342,11 +389,14 @@ struct ContentView: View {
     }
 
     private var reviewView: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        let reviewTitle = viewModel.recordingSummary?.displayTitle ?? "Edit"
+        let reviewSubtitle = viewModel.recordingSummary.map { "\($0.displaySubtitle) • \($0.bundleName)" } ?? "Review your latest capture"
+
+        return VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
                 sectionHeader(
-                    title: "Playback",
-                    subtitle: "Review your latest capture",
+                    title: reviewTitle,
+                    subtitle: reviewSubtitle,
                     accentWidth: 132
                 )
 
@@ -373,10 +423,6 @@ struct ContentView: View {
                     Image(systemName: isPlaybackInspectorVisible ? "sidebar.right" : "sidebar.right")
                 }
                 .help(isPlaybackInspectorVisible ? "Hide Inspector" : "Show Inspector")
-
-                Button("Open Recording…") {
-                    viewModel.openRecording()
-                }
 
                 if viewModel.recordingSummary != nil {
                     Button("Export…") {
@@ -446,7 +492,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("No recording loaded")
                         .font(.headline)
-                    Text("Open a `.captureproj` bundle or finish a recording to review it here.")
+                    Text("Open a `.captureproj` bundle or finish a capture to edit it here.")
                         .foregroundStyle(.secondary)
                 }
                 .padding(20)
@@ -475,14 +521,14 @@ struct ContentView: View {
             )
 
             settingsCard(
-                title: "Output Folder",
+                title: "Library Root",
                 body: AnyView(
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(viewModel.selectedOutputFolderPath ?? "Movies/FlowTrack Capture")
+                        Text(viewModel.selectedOutputFolderPath ?? "Movies/FlowTrack Capture Library")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
-                        Button("Choose Output Folder") {
+                        Button("Choose Library Root") {
                             viewModel.chooseOutputFolder()
                         }
                     }
@@ -510,13 +556,95 @@ struct ContentView: View {
             settingsCard(
                 title: "Capture Defaults",
                 body: AnyView(
-                    Text("Current recordings save into the selected output folder as `.captureproj` bundles.")
+                    Text("New captures are saved into the selected library root using Collection and Project folders.")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 )
             )
 
             Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var libraryView: some View {
+        let filteredItems = viewModel.libraryItems.filter { item in
+            let query = librarySearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !query.isEmpty else { return true }
+            let haystack = [
+                item.title,
+                item.collectionName,
+                item.projectName,
+                item.captureType.displayName
+            ].joined(separator: " ").localizedLowercase
+            return haystack.contains(query.localizedLowercase)
+        }
+
+        return VStack(alignment: .leading, spacing: 20) {
+            sectionHeader(
+                title: "Library",
+                subtitle: viewModel.selectedOutputFolderPath ?? "Managed captures by Collection and Project",
+                accentWidth: 132
+            )
+
+            HStack(spacing: 12) {
+                TextField("Search captures", text: $librarySearchText)
+                    .textFieldStyle(.roundedBorder)
+
+                Button("Refresh") {
+                    Task { await viewModel.refreshLibrary() }
+                }
+            }
+
+            if filteredItems.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("No captures in library")
+                        .font(.headline)
+                    Text("Create a capture or adjust the library root in Settings.")
+                        .foregroundStyle(.secondary)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(cardBackground)
+            } else {
+                List(filteredItems) { item in
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title)
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("\(item.collectionName) • \(item.projectName)")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 10) {
+                                Text(item.captureType.displayName)
+                                Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                if let duration = item.duration {
+                                    Text(String(format: "%.2fs", duration))
+                                }
+                            }
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer(minLength: 12)
+
+                        VStack(alignment: .trailing, spacing: 8) {
+                            Button("Edit") {
+                                viewModel.openLibraryCapture(item)
+                                selectedTab = .review
+                            }
+                            .buttonStyle(.borderedProminent)
+
+                            Button("Reveal") {
+                                viewModel.revealLibraryCapture(item)
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+                .listStyle(.inset)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -549,9 +677,15 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(target.title)
                         .font(.system(size: 14, weight: .semibold))
-                    Text(target.subtitle ?? (target.kind == .display ? "Display" : "Window"))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                    if let ownerName = target.ownerName, !ownerName.isEmpty {
+                        Text(ownerName)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(target.kind == .display ? "Display" : "Window")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
                     Text("\(target.width)x\(target.height)")
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(.secondary)
@@ -573,6 +707,11 @@ struct ContentView: View {
             )
         }
         .buttonStyle(.plain)
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                viewModel.activateCaptureTarget(target)
+            }
+        )
     }
 
     private func playbackVideoCard(
@@ -1590,6 +1729,16 @@ struct ContentView: View {
                     Button("Reveal in Finder") {
                         viewModel.revealExportInFinder()
                     }
+
+                    Button("Share…") {
+                        presentExportSharePicker()
+                    }
+                    .background(
+                        SharingAnchorView { view in
+                            exportShareAnchorView = view
+                        }
+                        .frame(width: 0, height: 0)
+                    )
                 }
 
                 Spacer()
@@ -1637,6 +1786,20 @@ struct ContentView: View {
         default:
             return max(progress, 0.02)
         }
+    }
+
+    private func presentExportSharePicker() {
+        guard let exportedRecordingURL = viewModel.exportedRecordingURL,
+              let exportShareAnchorView else {
+            return
+        }
+
+        let picker = NSSharingServicePicker(items: [exportedRecordingURL])
+        picker.show(
+            relativeTo: exportShareAnchorView.bounds,
+            of: exportShareAnchorView,
+            preferredEdge: .maxY
+        )
     }
 
     // Best effort mapping from capture coordinates into the fitted video rect.
@@ -2331,13 +2494,32 @@ struct ContentView: View {
     }
 }
 
+private struct SharingAnchorView: NSViewRepresentable {
+    let onResolve: (NSView) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            onResolve(view)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            onResolve(nsView)
+        }
+    }
+}
+
 #Preview {
     ContentView()
 }
 
 private enum AppTab: String, CaseIterable, Identifiable {
     case capture = "Capture"
-    case review = "Playback"
+    case library = "Library"
+    case review = "Edit"
     case settings = "Settings"
 
     var id: String { rawValue }
@@ -2346,6 +2528,8 @@ private enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .capture:
             return "record.circle"
+        case .library:
+            return "books.vertical"
         case .review:
             return "play.rectangle"
         case .settings:

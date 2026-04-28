@@ -8,6 +8,14 @@ import CoreMedia
 import ScreenCaptureKit
 
 final class ScreenCaptureService: NSObject {
+    private let minimumWindowTargetDimension = 300.0
+    private let ignoredDisplayTitlePatterns: [String] = [
+        "backstop"
+    ]
+    private let ignoredWindowTitlePatterns: [String] = [
+        "backstop",
+        "offscreen wallpaper window"
+    ]
     private let sampleQueue = DispatchQueue(label: "TutorialCapture.ScreenCapture")
     private var stream: SCStream?
     private var onSampleBuffer: ((CMSampleBuffer) -> Void)?
@@ -22,11 +30,15 @@ final class ScreenCaptureService: NSObject {
             return (number.uint32Value, screen)
         })
 
-        let displays = content.displays.map { display -> ShareableCaptureTarget in
+        let displays = content.displays.compactMap { display -> ShareableCaptureTarget? in
             let screen = screensByID[display.displayID]
             let width = screen.map { Int($0.frame.width * $0.backingScaleFactor) } ?? Int(display.width) * 2
             let height = screen.map { Int($0.frame.height * $0.backingScaleFactor) } ?? Int(display.height) * 2
             let title = screen?.localizedName ?? "Display \(display.displayID)"
+            let normalizedTitle = normalizedTargetName(title)
+            let shouldInclude = shouldIncludeDisplayTarget(named: title)
+            NSLog("FlowTrack Capture target scan display id=%u title='%@' normalized='%@' include=%@", display.displayID, title, normalizedTitle, shouldInclude.description)
+            guard shouldInclude else { return nil }
             let frame = screen?.frame ?? .zero
             let scaleFactor = screen?.backingScaleFactor ?? 2.0
 
@@ -35,6 +47,9 @@ final class ScreenCaptureService: NSObject {
                 kind: .display,
                 sourceID: display.displayID,
                 title: title,
+                ownerName: "Display",
+                ownerBundleIdentifier: nil,
+                ownerProcessID: nil,
                 subtitle: "\(width)x\(height)",
                 width: width,
                 height: height,
@@ -48,11 +63,21 @@ final class ScreenCaptureService: NSObject {
         .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
         let windows = content.windows
-            .filter { !$0.frame.isEmpty }
-            .map { window -> ShareableCaptureTarget in
+            .filter {
+                !$0.frame.isEmpty &&
+                $0.frame.width >= minimumWindowTargetDimension &&
+                $0.frame.height >= minimumWindowTargetDimension
+            }
+            .compactMap { window -> ShareableCaptureTarget? in
                 let rawTitle = window.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let title = rawTitle.isEmpty ? "Untitled Window" : rawTitle
-                let appName = window.owningApplication?.applicationName
+                let ownerName = window.owningApplication?.applicationName
+                let normalizedTitle = normalizedTargetName(title)
+                let shouldInclude = shouldIncludeWindowTarget(named: title, ownerName: ownerName)
+                NSLog("FlowTrack Capture target scan window id=%u title='%@' normalized='%@' owner='%@' include=%@", window.windowID, title, normalizedTitle, ownerName ?? "", shouldInclude.description)
+                guard shouldInclude else { return nil }
+                let owningApplication = window.owningApplication
+                let appName = owningApplication?.applicationName
                 let width = max(Int(window.frame.width * 2), 1)
                 let height = max(Int(window.frame.height * 2), 1)
                 let scaleFactor = window.frame.width > 0 ? Double(width) / Double(window.frame.width) : 2.0
@@ -62,7 +87,10 @@ final class ScreenCaptureService: NSObject {
                     kind: .window,
                     sourceID: window.windowID,
                     title: title,
-                    subtitle: appName,
+                    ownerName: appName,
+                    ownerBundleIdentifier: owningApplication?.bundleIdentifier,
+                    ownerProcessID: owningApplication?.processID,
+                    subtitle: "\(width)x\(height)",
                     width: width,
                     height: height,
                     originX: window.frame.origin.x,
@@ -124,6 +152,30 @@ final class ScreenCaptureService: NSObject {
             }
             return SCContentFilter(desktopIndependentWindow: window)
         }
+    }
+
+    private func shouldIncludeDisplayTarget(named title: String) -> Bool {
+        let normalizedTitle = normalizedTargetName(title)
+        return !ignoredDisplayTitlePatterns.contains { normalizedTitle.contains($0) }
+    }
+
+    private func shouldIncludeWindowTarget(named title: String, ownerName: String?) -> Bool {
+        let normalizedTitle = normalizedTargetName(title)
+        let normalizedOwnerName = normalizedTargetName(ownerName ?? "")
+        guard !ignoredWindowTitlePatterns.contains(where: { normalizedTitle.contains($0) }) else {
+            return false
+        }
+        if normalizedOwnerName == "dock", normalizedTitle.contains("wallpaper") {
+            return false
+        }
+        if normalizedOwnerName == "finder", normalizedTitle == "untitled window" {
+            return false
+        }
+        return true
+    }
+
+    private func normalizedTargetName(_ title: String) -> String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }
 

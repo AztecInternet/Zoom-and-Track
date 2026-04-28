@@ -18,6 +18,7 @@ final class RecordingCoordinator {
 
     private var workspace: RecordingWorkspace?
     private var currentTarget: ShareableCaptureTarget?
+    private var currentCaptureMetadata: CaptureMetadata?
     private var isStopping = false
 
     init(
@@ -32,12 +33,15 @@ final class RecordingCoordinator {
         self.inputEventCaptureService = inputEventCaptureService
     }
 
-    func startRecording(target: ShareableCaptureTarget, outputDirectory: URL?) async {
+    func startRecording(target: ShareableCaptureTarget, outputDirectory: URL?, captureMetadata: CaptureMetadata) async {
         guard workspace == nil else { return }
 
         do {
             update(.preparing, message: "Preparing recording…")
-            let workspace = try projectBundleService.createWorkspace(outputDirectory: outputDirectory)
+            let workspace = try projectBundleService.createWorkspace(
+                outputDirectory: outputDirectory,
+                captureMetadata: captureMetadata
+            )
             try mediaWriterService.startWriting(to: workspace.temporaryRecordingURL, width: target.width, height: target.height)
             mediaWriterService.onSessionStart = { [weak self] timestamp, uptime in
                 Task { @MainActor in
@@ -47,6 +51,7 @@ final class RecordingCoordinator {
 
             self.workspace = workspace
             currentTarget = target
+            currentCaptureMetadata = captureMetadata
             isStopping = false
 
             inputEventCaptureService.start()
@@ -99,14 +104,21 @@ final class RecordingCoordinator {
     }
 
     private func finalizeProject() async throws -> URL {
-        guard let workspace, let currentTarget else {
+        guard let workspace, let currentTarget, let currentCaptureMetadata else {
             throw NSError(domain: "RecordingCoordinator", code: 2, userInfo: [NSLocalizedDescriptionKey: "Recording state is incomplete."])
         }
 
+        let now = Date()
+
         let manifest = ProjectManifest(
-            id: UUID(),
+            captureID: UUID(),
             name: workspace.finalProjectURL.deletingPathExtension().lastPathComponent,
-            createdAt: Date(),
+            collectionName: currentCaptureMetadata.resolvedCollectionName,
+            projectName: currentCaptureMetadata.resolvedProjectName,
+            captureType: currentCaptureMetadata.captureType,
+            captureTitle: currentCaptureMetadata.resolvedCaptureTitle,
+            createdAt: now,
+            updatedAt: now,
             captureSource: CaptureSource(
                 kind: currentTarget.kind,
                 sourceID: currentTarget.sourceID,
@@ -167,6 +179,7 @@ final class RecordingCoordinator {
     private func reset() {
         workspace = nil
         currentTarget = nil
+        currentCaptureMetadata = nil
         isStopping = false
         mediaWriterService.onSessionStart = nil
     }

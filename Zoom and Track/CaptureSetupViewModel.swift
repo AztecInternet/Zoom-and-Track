@@ -46,6 +46,17 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published var displays: [ShareableCaptureTarget] = []
     @Published var windows: [ShareableCaptureTarget] = []
     @Published var selectedTargetID: String?
+    @Published var collectionName: String = "Default Collection" {
+        didSet { persistLastUsedCaptureMetadata() }
+    }
+    @Published var projectName: String = "General Project" {
+        didSet { persistLastUsedCaptureMetadata() }
+    }
+    @Published var captureType: CaptureType = .tutorial {
+        didSet { persistLastUsedCaptureMetadata() }
+    }
+    @Published var captureTitle: String = ""
+    @Published private(set) var libraryItems: [CaptureLibraryItem] = []
     @Published var sessionState: RecordingSessionState = .idle
     @Published var statusMessage = "Choose one display or one window."
     @Published var hasScreenRecordingPermission = false
@@ -85,6 +96,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private var renderedPreviewSourceStartTime: Double?
     private var renderingPreviewMarkerID: String?
     private var exportTask: Task<Void, Never>?
+    private var targetRefreshTask: Task<Void, Never>?
 
     private let permissionsService = PermissionsService()
     private let screenCaptureService = ScreenCaptureService()
@@ -97,6 +109,9 @@ final class CaptureSetupViewModel: ObservableObject {
     private let previewTransitionFadeInDuration: TimeInterval = 0.12
     private let previewTransitionHoldDuration: TimeInterval = 0.28
     private let previewTransitionFadeOutDuration: TimeInterval = 0.16
+    private let lastCollectionNameKey = "LastCollectionName"
+    private let lastProjectNameKey = "LastProjectName"
+    private let lastCaptureTypeKey = "LastCaptureType"
     private lazy var recordingCoordinator = RecordingCoordinator(
         screenCaptureService: screenCaptureService,
         mediaWriterService: mediaWriterService,
@@ -105,6 +120,7 @@ final class CaptureSetupViewModel: ObservableObject {
     )
 
     init() {
+        restoreLastUsedCaptureMetadata()
         recordingCoordinator.onStateChange = { [weak self] state, message in
             guard let self else { return }
             sessionState = state
@@ -119,6 +135,11 @@ final class CaptureSetupViewModel: ObservableObject {
             self?.statusMessage = message
         }
         applyOutputDirectoryResolution()
+        startAutomaticTargetRefresh()
+    }
+
+    deinit {
+        targetRefreshTask?.cancel()
     }
 
     var selectedTarget: ShareableCaptureTarget? {
@@ -159,13 +180,7 @@ final class CaptureSetupViewModel: ObservableObject {
         recordingCoordinator.onStateChange?(.loadingTargets, "Loading capture targets…")
 
         do {
-            let targets = try await screenCaptureService.fetchTargets()
-            displays = targets.displays
-            windows = targets.windows
-
-            if let selectedTargetID, (displays + windows).contains(where: { $0.id == selectedTargetID }) == false {
-                self.selectedTargetID = nil
-            }
+            try await refreshCaptureTargets(silent: false)
 
             sessionState = .idle
             statusMessage = hasScreenRecordingPermission
@@ -174,10 +189,29 @@ final class CaptureSetupViewModel: ObservableObject {
             isBusy = false
             applyOutputDirectoryResolutionIfNeeded()
             await restoreLastRecordingIfNeeded()
+            await refreshLibrary()
         } catch {
             sessionState = .failed(error.localizedDescription)
             statusMessage = error.localizedDescription
             isBusy = false
+        }
+    }
+
+    func activateCaptureTarget(_ target: ShareableCaptureTarget) {
+        guard target.kind == .window else { return }
+
+        if let ownerProcessID = target.ownerProcessID,
+           let app = NSRunningApplication(processIdentifier: ownerProcessID) {
+            app.activate(options: [.activateAllWindows])
+            return
+        }
+
+        if let ownerBundleIdentifier = target.ownerBundleIdentifier {
+            let matchingApps = NSRunningApplication.runningApplications(withBundleIdentifier: ownerBundleIdentifier)
+            if let app = matchingApps.first {
+                app.activate(options: [.activateAllWindows])
+                return
+            }
         }
     }
 
@@ -196,7 +230,8 @@ final class CaptureSetupViewModel: ObservableObject {
         recordingStartedAt = Date()
         await recordingCoordinator.startRecording(
             target: selectedTarget,
-            outputDirectory: projectBundleService.resolvedSelectedOutputDirectory()
+            outputDirectory: projectBundleService.resolvedSelectedOutputDirectory(),
+            captureMetadata: currentCaptureMetadata
         )
     }
 
@@ -218,20 +253,7 @@ final class CaptureSetupViewModel: ObservableObject {
 
     func openRecording() {
         guard let bundleURL = projectBundleService.openRecordingBundle() else { return }
-
-        Task {
-            do {
-                let summary = try await projectBundleService.loadRecordingInspection(from: bundleURL)
-                _ = projectBundleService.persistLastRecordingBundle(bundleURL)
-                try loadPlayback(summary)
-                activeRecordingTargetName = nil
-                recordingStartedAt = nil
-                statusMessage = "Loaded \(summary.bundleName)"
-            } catch {
-                releasePlaybackState()
-                statusMessage = "Playback could not load \(bundleURL.path): \(error.localizedDescription)"
-            }
-        }
+        openCapture(at: bundleURL)
     }
 
     func exportRecording() {
@@ -302,9 +324,63 @@ final class CaptureSetupViewModel: ObservableObject {
         exportedRecordingURL = nil
     }
 
+    private func refreshCaptureTargets(silent: Bool) async throws {
+        let targets = try await screenCaptureService.fetchTargets()
+        displays = targets.displays
+        windows = targets.windows
+
+        if let selectedTargetID, (displays + windows).contains(where: { $0.id == selectedTargetID }) == false {
+            self.selectedTargetID = nil
+        }
+
+        if !silent {
+            statusMessage = hasScreenRecordingPermission
+                ? "Choose one display or one window."
+                : "Screen Recording permission is required."
+        }
+    }
+
+    private func startAutomaticTargetRefresh() {
+        targetRefreshTask?.cancel()
+        targetRefreshTask = Task { [weak self] in
+            guard let self else { return }
+
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { break }
+                guard sessionState == .idle else { continue }
+                do {
+                    try await refreshCaptureTargets(silent: true)
+                } catch {
+                    continue
+                }
+            }
+        }
+    }
+
     func revealExportInFinder() {
         guard let exportedRecordingURL else { return }
         NSWorkspace.shared.activateFileViewerSelecting([exportedRecordingURL])
+    }
+
+    func openLibraryCapture(_ item: CaptureLibraryItem) {
+        do {
+            let libraryRoot = try projectBundleService.libraryRootURL()
+            let bundleURL = libraryRoot.appendingPathComponent(item.bundleRelativePath, isDirectory: true)
+            openCapture(at: bundleURL)
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func revealLibraryCapture(_ item: CaptureLibraryItem) {
+        do {
+            let libraryRoot = try projectBundleService.libraryRootURL()
+            let bundleURL = libraryRoot.appendingPathComponent(item.bundleRelativePath, isDirectory: true)
+            NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
+        } catch {
+            statusMessage = error.localizedDescription
+        }
     }
 
     func startMarkerPreview(_ markerID: String) {
@@ -602,6 +678,56 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    private var currentCaptureMetadata: CaptureMetadata {
+        CaptureMetadata(
+            collectionName: collectionName,
+            projectName: projectName,
+            captureType: captureType,
+            captureTitle: captureTitle
+        )
+    }
+
+    private func restoreLastUsedCaptureMetadata() {
+        let defaults = UserDefaults.standard
+        collectionName = defaults.string(forKey: lastCollectionNameKey) ?? "Default Collection"
+        projectName = defaults.string(forKey: lastProjectNameKey) ?? "General Project"
+        if let rawValue = defaults.string(forKey: lastCaptureTypeKey),
+           let restoredType = CaptureType(rawValue: rawValue) {
+            captureType = restoredType
+        }
+    }
+
+    private func persistLastUsedCaptureMetadata() {
+        let defaults = UserDefaults.standard
+        defaults.set(currentCaptureMetadata.resolvedCollectionName, forKey: lastCollectionNameKey)
+        defaults.set(currentCaptureMetadata.resolvedProjectName, forKey: lastProjectNameKey)
+        defaults.set(captureType.rawValue, forKey: lastCaptureTypeKey)
+    }
+
+    private func openCapture(at bundleURL: URL) {
+        Task {
+            do {
+                let summary = try await projectBundleService.loadRecordingInspection(from: bundleURL)
+                _ = projectBundleService.persistLastRecordingBundle(bundleURL)
+                try loadPlayback(summary)
+                activeRecordingTargetName = nil
+                recordingStartedAt = nil
+                statusMessage = "Loaded \(summary.displayTitle)"
+            } catch {
+                releasePlaybackState()
+                statusMessage = "Playback could not load \(bundleURL.path): \(error.localizedDescription)"
+            }
+        }
+    }
+
+    func refreshLibrary() async {
+        do {
+            libraryItems = try await projectBundleService.loadLibraryItems()
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
     private func applyOutputDirectoryResolutionIfNeeded() {
         switch projectBundleService.resolveSelectedOutputDirectory() {
         case .none:
@@ -642,7 +768,11 @@ final class CaptureSetupViewModel: ObservableObject {
 
     private func applyPlaybackSummary(_ summary: RecordingInspectionSummary) {
         do {
+            try projectBundleService.registerCaptureInLibrary(summary)
             try loadPlayback(summary)
+            Task {
+                await refreshLibrary()
+            }
         } catch {
             releasePlaybackState()
             statusMessage = "Playback could not load \(summary.recordingURL.path): \(error.localizedDescription)"
@@ -675,6 +805,10 @@ final class CaptureSetupViewModel: ObservableObject {
         recordingSummary = summary
         mainPlayer = AVPlayer(playerItem: AVPlayerItem(url: summary.recordingURL))
         previewPlayer = nil
+        collectionName = summary.collectionName
+        projectName = summary.projectName
+        captureType = summary.captureType
+        captureTitle = summary.captureTitle
         selectedZoomMarkerID = nil
         currentPlaybackTime = 0
         isPlaybackActive = false
@@ -751,6 +885,13 @@ final class CaptureSetupViewModel: ObservableObject {
             recordingSummary = RecordingInspectionSummary(
                 bundleURL: summary.bundleURL,
                 bundleName: summary.bundleName,
+                captureID: summary.captureID,
+                collectionName: summary.collectionName,
+                projectName: summary.projectName,
+                captureType: summary.captureType,
+                captureTitle: summary.captureTitle,
+                createdAt: summary.createdAt,
+                updatedAt: summary.updatedAt,
                 recordingURL: summary.recordingURL,
                 videoAspectRatio: summary.videoAspectRatio,
                 contentCoordinateSize: summary.contentCoordinateSize,
