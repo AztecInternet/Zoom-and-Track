@@ -3,7 +3,7 @@
 //  Zoom and Track
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 import CoreMedia
 import ScreenCaptureKit
 
@@ -78,15 +78,10 @@ final class MediaWriterService {
     func finishWriting() async throws {
         guard let writer, let writerInput else { return }
         writerInput.markAsFinished()
+        await writer.finishWriting()
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            writer.finishWriting {
-                if let error = writer.error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: ())
-                }
-            }
+        if writer.status == .failed {
+            throw writer.error ?? NSError(domain: "MediaWriterService", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to finish writing video."])
         }
     }
 

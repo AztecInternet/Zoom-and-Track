@@ -346,22 +346,20 @@ final class CaptureSetupViewModel: ObservableObject {
                     recordingURL: summary.recordingURL,
                     summary: summary,
                     outputURL: outputURL
-                ) { phase, progress in
-                    Task { @MainActor [weak self] in
-                        guard let self else { return }
-                        guard self.activeExportOperationID == exportOperationID else { return }
-                        self.exportProgress = max(0, min(progress, 1))
-                        switch phase {
-                        case .preparing:
-                            self.exportState = .preparing
-                            self.exportStatusMessage = "Preparing export…"
-                        case .exporting:
-                            self.exportState = .exporting
-                            self.exportStatusMessage = "Exporting video…"
-                        case .finalizing:
-                            self.exportState = .finalizing
-                            self.exportStatusMessage = "Finalizing movie…"
-                        }
+                ) { [weak self] phase, progress in
+                    guard let self else { return }
+                    guard self.activeExportOperationID == exportOperationID else { return }
+                    self.exportProgress = max(0, min(progress, 1))
+                    switch phase {
+                    case .preparing:
+                        self.exportState = .preparing
+                        self.exportStatusMessage = "Preparing export…"
+                    case .exporting:
+                        self.exportState = .exporting
+                        self.exportStatusMessage = "Exporting video…"
+                    case .finalizing:
+                        self.exportState = .finalizing
+                        self.exportStatusMessage = "Finalizing movie…"
                     }
                 }
                 guard activeExportOperationID == exportOperationID else { return }

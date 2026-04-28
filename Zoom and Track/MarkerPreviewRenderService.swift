@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import CoreGraphics
 import CoreImage
 import Foundation
@@ -94,7 +94,7 @@ final class MarkerPreviewRenderService {
             renderSize: outputSize
         )
 
-        let videoComposition = AVMutableVideoComposition(asset: composition) { [weak self] request in
+        let videoComposition = try await AVVideoComposition.videoComposition(with: composition) { [weak self] request in
             guard let self else {
                 request.finish(with: NSError(domain: "MarkerPreviewRenderService", code: 4))
                 return
@@ -120,8 +120,7 @@ final class MarkerPreviewRenderService {
             let croppedImage = image.cropped(to: outputRect)
             request.finish(with: croppedImage, context: self.ciContext)
         }
-        videoComposition.renderSize = outputSize
-        videoComposition.frameDuration = frameDuration
+        configureVideoComposition(videoComposition, renderSize: outputSize, frameDuration: frameDuration)
 
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("marker-preview-\(UUID().uuidString)")
@@ -143,7 +142,7 @@ final class MarkerPreviewRenderService {
         exportSession.timeRange = CMTimeRange(start: .zero, duration: sourceTimeRange.duration)
 
         do {
-            try await export(exportSession)
+            try await export(exportSession, to: outputURL, fileType: .mov)
         } catch {
             try? FileManager.default.removeItem(at: outputURL)
             throw error
@@ -157,25 +156,12 @@ final class MarkerPreviewRenderService {
         )
     }
 
-    private func export(_ session: AVAssetExportSession) async throws {
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                session.exportAsynchronously {
-                    switch session.status {
-                    case .completed:
-                        continuation.resume()
-                    case .failed:
-                        continuation.resume(throwing: session.error ?? NSError(domain: "MarkerPreviewRenderService", code: 6))
-                    case .cancelled:
-                        continuation.resume(throwing: CancellationError())
-                    default:
-                        continuation.resume(throwing: NSError(domain: "MarkerPreviewRenderService", code: 7))
-                    }
-                }
-            }
-        } onCancel: {
-            session.cancelExport()
-        }
+    private func export(
+        _ session: AVAssetExportSession,
+        to outputURL: URL,
+        fileType: AVFileType
+    ) async throws {
+        try await session.export(to: outputURL, as: fileType)
     }
 
     private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
@@ -497,9 +483,9 @@ final class ExportRenderService {
         recordingURL: URL,
         summary: RecordingInspectionSummary,
         outputURL: URL,
-        progressHandler: @escaping @Sendable (ExportRenderPhase, Double) -> Void
+        progressHandler: @escaping @MainActor @Sendable (ExportRenderPhase, Double) async -> Void
     ) async throws -> ExportRenderResult {
-        progressHandler(.preparing, 0.02)
+        await progressHandler(.preparing, 0.02)
 
         let asset = AVURLAsset(url: recordingURL)
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
@@ -567,7 +553,7 @@ final class ExportRenderService {
         let outputRect = CGRect(origin: .zero, size: outputSize)
         let baseScale = outputSize.width / orientedSize.width
 
-        let videoComposition = AVMutableVideoComposition(asset: composition) { [weak self] request in
+        let videoComposition = try await AVVideoComposition.videoComposition(with: composition) { [weak self] request in
             guard let self else {
                 request.finish(with: NSError(domain: "ExportRenderService", code: 4))
                 return
@@ -592,8 +578,7 @@ final class ExportRenderService {
 
             request.finish(with: image.cropped(to: outputRect), context: self.ciContext)
         }
-        videoComposition.renderSize = outputSize
-        videoComposition.frameDuration = frameDuration
+        configureVideoComposition(videoComposition, renderSize: outputSize, frameDuration: frameDuration)
 
         try? FileManager.default.removeItem(at: outputURL)
         guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
@@ -610,11 +595,16 @@ final class ExportRenderService {
         exportSession.shouldOptimizeForNetworkUse = false
         exportSession.videoComposition = videoComposition
 
-        progressHandler(.exporting, 0.05)
+        await progressHandler(.exporting, 0.05)
 
         do {
-            try await export(exportSession: exportSession, progressHandler: progressHandler)
-            progressHandler(.finalizing, 1.0)
+            try await export(
+                exportSession: exportSession,
+                to: outputURL,
+                fileType: .mov,
+                progressHandler: progressHandler
+            )
+            await progressHandler(.finalizing, 1.0)
             activeExportSession = nil
             return ExportRenderResult(outputURL: outputURL, renderSize: outputSize)
         } catch {
@@ -628,12 +618,16 @@ final class ExportRenderService {
 
     private func export(
         exportSession: AVAssetExportSession,
-        progressHandler: @escaping @Sendable (ExportRenderPhase, Double) -> Void
+        to outputURL: URL,
+        fileType: AVFileType,
+        progressHandler: @escaping @MainActor @Sendable (ExportRenderPhase, Double) async -> Void
     ) async throws {
         let progressTask = Task {
-            while !Task.isCancelled {
-                progressHandler(.exporting, Double(exportSession.progress))
-                try? await Task.sleep(for: .milliseconds(120))
+            for await state in exportSession.states(updateInterval: 0.12) {
+                guard !Task.isCancelled else { break }
+                if case .exporting(let progress) = state {
+                    await progressHandler(.exporting, progress.fractionCompleted)
+                }
             }
         }
 
@@ -641,24 +635,7 @@ final class ExportRenderService {
             progressTask.cancel()
         }
 
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                exportSession.exportAsynchronously {
-                    switch exportSession.status {
-                    case .completed:
-                        continuation.resume()
-                    case .failed:
-                        continuation.resume(throwing: exportSession.error ?? NSError(domain: "ExportRenderService", code: 6))
-                    case .cancelled:
-                        continuation.resume(throwing: CancellationError())
-                    default:
-                        continuation.resume(throwing: NSError(domain: "ExportRenderService", code: 7))
-                    }
-                }
-            }
-        } onCancel: {
-            exportSession.cancelExport()
-        }
+        try await exportSession.export(to: outputURL, as: fileType)
     }
 
     private func stabilizedRenderSize(for sourceSize: CGSize) -> CGSize {
@@ -701,4 +678,14 @@ private enum MotionTuning {
     static let bounceMaxOvershoot = 0.18
     static let bounceOscillationCount = 4.0
     static let panBounceInfluence = 0.18
+}
+
+private func configureVideoComposition(
+    _ videoComposition: AVVideoComposition,
+    renderSize: CGSize,
+    frameDuration: CMTime
+) {
+    // Preserve the existing output sizing while using the non-deprecated composition factory.
+    videoComposition.setValue(NSValue(size: renderSize), forKey: #keyPath(AVVideoComposition.renderSize))
+    videoComposition.setValue(NSValue(time: frameDuration), forKey: #keyPath(AVVideoComposition.frameDuration))
 }
