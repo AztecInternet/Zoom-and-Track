@@ -212,13 +212,114 @@ struct CaptureLibraryItem: Codable, Identifiable, Equatable {
     let updatedAt: Date
     let duration: Double?
     let bundleRelativePath: String
+    let status: CaptureLibraryItemStatus
+    let statusMessage: String?
+
+    init(
+        captureID: UUID,
+        title: String,
+        captureType: CaptureType,
+        collectionName: String,
+        projectName: String,
+        createdAt: Date,
+        updatedAt: Date,
+        duration: Double?,
+        bundleRelativePath: String,
+        status: CaptureLibraryItemStatus = .available,
+        statusMessage: String? = nil
+    ) {
+        self.captureID = captureID
+        self.title = title
+        self.captureType = captureType
+        self.collectionName = collectionName
+        self.projectName = projectName
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.duration = duration
+        self.bundleRelativePath = bundleRelativePath
+        self.status = status
+        self.statusMessage = statusMessage
+    }
 
     var id: UUID { captureID }
+
+    var isAvailable: Bool {
+        status == .available
+    }
+
+    var canOpenInEditor: Bool {
+        switch status {
+        case .available, .missingEvents, .missingZoomPlan:
+            return true
+        case .missingBundle, .missingManifest, .missingRecording:
+            return false
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case captureID
+        case title
+        case captureType
+        case collectionName
+        case projectName
+        case createdAt
+        case updatedAt
+        case duration
+        case bundleRelativePath
+        case status
+        case statusMessage
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        captureID = try container.decode(UUID.self, forKey: .captureID)
+        title = try container.decode(String.self, forKey: .title)
+        captureType = try container.decode(CaptureType.self, forKey: .captureType)
+        collectionName = try container.decode(String.self, forKey: .collectionName)
+        projectName = try container.decode(String.self, forKey: .projectName)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        duration = try container.decodeIfPresent(Double.self, forKey: .duration)
+        bundleRelativePath = try container.decode(String.self, forKey: .bundleRelativePath)
+        status = try container.decodeIfPresent(CaptureLibraryItemStatus.self, forKey: .status) ?? .available
+        statusMessage = try container.decodeIfPresent(String.self, forKey: .statusMessage)
+    }
+}
+
+enum CaptureLibraryItemStatus: String, Codable {
+    case available
+    case missingBundle
+    case missingManifest
+    case missingRecording
+    case missingEvents
+    case missingZoomPlan
+
+    var displayName: String {
+        switch self {
+        case .available:
+            return "Available"
+        case .missingBundle:
+            return "Missing Bundle"
+        case .missingManifest:
+            return "Missing Manifest"
+        case .missingRecording:
+            return "Missing Recording"
+        case .missingEvents:
+            return "Missing Events"
+        case .missingZoomPlan:
+            return "Missing Zoom Plan"
+        }
+    }
 }
 
 struct CaptureLibraryIndex: Codable {
     let updatedAt: Date
     let items: [CaptureLibraryItem]
+}
+
+struct CaptureLibrarySnapshot {
+    let items: [CaptureLibraryItem]
+    let statusMessage: String?
 }
 
 struct RecordingWorkspace {

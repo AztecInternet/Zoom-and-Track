@@ -14,6 +14,7 @@ struct ProjectBundleService {
     private let lastRecordingBundleBookmarkKey = "LastRecordingBundleBookmark"
     private let lastRecordingBundlePathKey = "LastRecordingBundlePath"
     private let libraryIndexFileName = "library-index.json"
+    private let manifestFileNames = ["manifest.json", "project.json"]
 
     enum OutputDirectoryResolution {
         case none
@@ -97,7 +98,8 @@ struct ProjectBundleService {
             try fileManager.moveItem(at: workspace.temporaryRecordingURL, to: finalRecordingURL)
 
             let projectData = try JSONEncoder.manifestEncoder.encode(manifest)
-            try projectData.write(to: workspace.finalProjectURL.appendingPathComponent("project.json"))
+            try projectData.write(to: workspace.finalProjectURL.appendingPathComponent("project.json"), options: .atomic)
+            try projectData.write(to: workspace.finalProjectURL.appendingPathComponent("manifest.json"), options: .atomic)
 
             let envelope = RecordedEventEnvelope(
                 schemaVersion: 1,
@@ -105,11 +107,11 @@ struct ProjectBundleService {
                 events: events
             )
             let eventsData = try JSONEncoder.eventsEncoder.encode(envelope)
-            try eventsData.write(to: workspace.finalProjectURL.appendingPathComponent("events.json"))
+            try eventsData.write(to: workspace.finalProjectURL.appendingPathComponent("events.json"), options: .atomic)
 
             let zoomPlan = generateZoomPlan(from: events, captureSource: manifest.captureSource)
             let zoomPlanData = try JSONEncoder.zoomPlanEncoder.encode(zoomPlan)
-            try zoomPlanData.write(to: workspace.finalProjectURL.appendingPathComponent("zoomPlan.json"))
+            try zoomPlanData.write(to: workspace.finalProjectURL.appendingPathComponent("zoomPlan.json"), options: .atomic)
         } catch {
             throw error
         }
@@ -220,9 +222,9 @@ struct ProjectBundleService {
             throw NSError(domain: "ProjectBundleService", code: 2, userInfo: [NSLocalizedDescriptionKey: "Selected item is not a .captureproj bundle."])
         }
 
-        let manifestURL = bundleURL.appendingPathComponent("project.json")
+        let manifestURL = try resolveManifestURL(in: bundleURL)
         guard fileManager.fileExists(atPath: manifestURL.path) else {
-            throw NSError(domain: "ProjectBundleService", code: 3, userInfo: [NSLocalizedDescriptionKey: "project.json is missing from the bundle."])
+            throw NSError(domain: "ProjectBundleService", code: 3, userInfo: [NSLocalizedDescriptionKey: "This capture is missing its manifest file."])
         }
 
         let manifestData = try Data(contentsOf: manifestURL)
@@ -335,7 +337,43 @@ struct ProjectBundleService {
 
         let zoomPlanURL = bundleURL.appendingPathComponent("zoomPlan.json")
         let data = try JSONEncoder.zoomPlanEncoder.encode(zoomPlan)
-        try data.write(to: zoomPlanURL)
+        try data.write(to: zoomPlanURL, options: .atomic)
+    }
+
+    func updateCaptureMetadata(
+        in bundleURL: URL,
+        captureMetadata: CaptureMetadata,
+        updatedAt: Date = Date()
+    ) throws -> ProjectManifest {
+        let accessURL = try beginPlaybackAccess(for: bundleURL)
+        defer {
+            endPlaybackAccess(accessURL)
+        }
+
+        let existingManifest = try loadManifest(from: bundleURL)
+        let updatedManifest = ProjectManifest(
+            captureID: existingManifest.captureID,
+            name: existingManifest.name,
+            collectionName: captureMetadata.resolvedCollectionName,
+            projectName: captureMetadata.resolvedProjectName,
+            captureType: captureMetadata.captureType,
+            captureTitle: captureMetadata.resolvedCaptureTitle,
+            createdAt: existingManifest.createdAt,
+            updatedAt: updatedAt,
+            captureSource: existingManifest.captureSource,
+            recordingFileName: existingManifest.recordingFileName,
+            eventFileName: existingManifest.eventFileName
+        )
+
+        let projectData = try JSONEncoder.manifestEncoder.encode(updatedManifest)
+        for fileName in manifestFileNames {
+            try projectData.write(
+                to: bundleURL.appendingPathComponent(fileName),
+                options: .atomic
+            )
+        }
+
+        return updatedManifest
     }
 
     func libraryRootURL() throws -> URL {
@@ -345,7 +383,7 @@ struct ProjectBundleService {
         return try defaultLibraryRootURL()
     }
 
-    func loadLibraryItems() async throws -> [CaptureLibraryItem] {
+    func loadLibrarySnapshot() async throws -> CaptureLibrarySnapshot {
         let libraryRoot = try libraryRootURL()
         let accessURL = libraryRoot.startAccessingSecurityScopedResource() ? libraryRoot : nil
         defer {
@@ -353,17 +391,28 @@ struct ProjectBundleService {
         }
 
         let indexURL = libraryRoot.appendingPathComponent(libraryIndexFileName)
+        var notices: [String] = []
         if let data = try? Data(contentsOf: indexURL),
            let index = try? JSONDecoder.manifestDecoder.decode(CaptureLibraryIndex.self, from: data) {
-            let filtered = index.items.filter {
-                fileManager.fileExists(atPath: libraryRoot.appendingPathComponent($0.bundleRelativePath).path)
-            }
-            return filtered.sorted { $0.createdAt > $1.createdAt }
+            let validated = try await validateIndexedItems(index.items, libraryRoot: libraryRoot, notices: &notices)
+            let scannedItems = try await scanLibraryItems(libraryRoot: libraryRoot)
+            let mergedItems = mergeLibraryItems(indexItems: validated, scannedItems: scannedItems, notices: &notices)
+            try persistLibraryIndex(mergedItems, libraryRoot: libraryRoot)
+            return CaptureLibrarySnapshot(
+                items: mergedItems.sorted { $0.createdAt > $1.createdAt },
+                statusMessage: notices.isEmpty ? nil : notices.joined(separator: " ")
+            )
         }
 
+        if fileManager.fileExists(atPath: indexURL.path) {
+            notices.append("Library index was unreadable and has been rebuilt.")
+        }
         let scannedItems = try await scanLibraryItems(libraryRoot: libraryRoot)
         try persistLibraryIndex(scannedItems, libraryRoot: libraryRoot)
-        return scannedItems.sorted { $0.createdAt > $1.createdAt }
+        return CaptureLibrarySnapshot(
+            items: scannedItems.sorted { $0.createdAt > $1.createdAt },
+            statusMessage: notices.isEmpty ? nil : notices.joined(separator: " ")
+        )
     }
 
     func registerCaptureInLibrary(_ summary: RecordingInspectionSummary) throws {
@@ -383,7 +432,9 @@ struct ProjectBundleService {
             createdAt: summary.createdAt,
             updatedAt: summary.updatedAt,
             duration: summary.duration,
-            bundleRelativePath: relativePath
+            bundleRelativePath: relativePath,
+            status: .available,
+            statusMessage: nil
         )
 
         let indexURL = libraryRoot.appendingPathComponent(libraryIndexFileName)
@@ -454,7 +505,56 @@ struct ProjectBundleService {
         try fileManager.createDirectory(at: libraryRoot, withIntermediateDirectories: true)
         let index = CaptureLibraryIndex(updatedAt: Date(), items: items.sorted { $0.createdAt > $1.createdAt })
         let data = try JSONEncoder.manifestEncoder.encode(index)
-        try data.write(to: libraryRoot.appendingPathComponent(libraryIndexFileName))
+        try data.write(to: libraryRoot.appendingPathComponent(libraryIndexFileName), options: .atomic)
+    }
+
+    private func validateIndexedItems(
+        _ items: [CaptureLibraryItem],
+        libraryRoot: URL,
+        notices: inout [String]
+    ) async throws -> [CaptureLibraryItem] {
+        var validatedItems: [CaptureLibraryItem] = []
+        var removedCount = 0
+
+        for item in items {
+            let bundleURL = libraryRoot.appendingPathComponent(item.bundleRelativePath, isDirectory: true)
+            guard fileManager.fileExists(atPath: bundleURL.path) else {
+                removedCount += 1
+                continue
+            }
+
+            validatedItems.append(try await validatedLibraryItem(at: bundleURL, libraryRoot: libraryRoot, fallbackItem: item))
+        }
+
+        if removedCount > 0 {
+            let noun = removedCount == 1 ? "entry" : "entries"
+            notices.append("Removed \(removedCount) stale library \(noun).")
+        }
+
+        return validatedItems
+    }
+
+    private func mergeLibraryItems(
+        indexItems: [CaptureLibraryItem],
+        scannedItems: [CaptureLibraryItem],
+        notices: inout [String]
+    ) -> [CaptureLibraryItem] {
+        var mergedByPath = Dictionary(uniqueKeysWithValues: indexItems.map { ($0.bundleRelativePath, $0) })
+        var restoredCount = 0
+
+        for item in scannedItems {
+            if mergedByPath[item.bundleRelativePath] == nil {
+                restoredCount += 1
+            }
+            mergedByPath[item.bundleRelativePath] = item
+        }
+
+        if restoredCount > 0 {
+            let noun = restoredCount == 1 ? "capture" : "captures"
+            notices.append("Restored \(restoredCount) rediscovered \(noun) to the library.")
+        }
+
+        return Array(mergedByPath.values)
     }
 
     private func scanLibraryItems(libraryRoot: URL) async throws -> [CaptureLibraryItem] {
@@ -472,30 +572,165 @@ struct ProjectBundleService {
         var items: [CaptureLibraryItem] = []
         while let url = enumerator?.nextObject() as? URL {
             guard url.pathExtension == "captureproj" else { continue }
-            guard let manifest = try? loadManifest(from: url) else { continue }
-            let duration = try? await loadRecordingDuration(for: url, recordingFileName: manifest.recordingFileName)
-            items.append(
-                CaptureLibraryItem(
-                    captureID: manifest.captureID,
-                    title: manifest.captureTitle,
-                    captureType: manifest.captureType,
-                    collectionName: manifest.collectionName,
-                    projectName: manifest.projectName,
-                    createdAt: manifest.createdAt,
-                    updatedAt: manifest.updatedAt,
-                    duration: duration,
-                    bundleRelativePath: relativeBundlePath(for: url, libraryRoot: libraryRoot)
-                )
-            )
+            items.append(try await validatedLibraryItem(at: url, libraryRoot: libraryRoot, fallbackItem: nil))
             enumerator?.skipDescendants()
         }
         return items
     }
 
     private func loadManifest(from bundleURL: URL) throws -> ProjectManifest {
-        let manifestURL = bundleURL.appendingPathComponent("project.json")
+        let manifestURL = try resolveManifestURL(in: bundleURL)
         let manifestData = try Data(contentsOf: manifestURL)
         return try JSONDecoder.manifestDecoder.decode(ProjectManifest.self, from: manifestData)
+    }
+
+    private func resolveManifestURL(in bundleURL: URL) throws -> URL {
+        for fileName in manifestFileNames {
+            let candidate = bundleURL.appendingPathComponent(fileName)
+            if fileManager.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        throw NSError(
+            domain: "ProjectBundleService",
+            code: 8,
+            userInfo: [NSLocalizedDescriptionKey: "This capture is missing its manifest file."]
+        )
+    }
+
+    private func validatedLibraryItem(
+        at bundleURL: URL,
+        libraryRoot: URL,
+        fallbackItem: CaptureLibraryItem?
+    ) async throws -> CaptureLibraryItem {
+        let relativePath = relativeBundlePath(for: bundleURL, libraryRoot: libraryRoot)
+
+        guard fileManager.fileExists(atPath: bundleURL.path) else {
+            return fallbackLibraryItem(
+                fallbackItem,
+                relativePath: relativePath,
+                status: .missingBundle,
+                statusMessage: "Capture bundle could not be found."
+            )
+        }
+
+        let manifest: ProjectManifest
+        do {
+            manifest = try loadManifest(from: bundleURL)
+        } catch {
+            return fallbackLibraryItem(
+                fallbackItem,
+                relativePath: relativePath,
+                status: .missingManifest,
+                statusMessage: "Capture is missing its manifest file."
+            )
+        }
+
+        let recordingURL = bundleURL.appendingPathComponent(manifest.recordingFileName)
+        guard fileManager.fileExists(atPath: recordingURL.path) else {
+            return libraryItem(
+                from: manifest,
+                bundleURL: bundleURL,
+                libraryRoot: libraryRoot,
+                duration: nil,
+                status: .missingRecording,
+                statusMessage: "Capture is missing recording.mov."
+            )
+        }
+
+        let eventsURL = bundleURL.appendingPathComponent(manifest.eventFileName)
+        guard fileManager.fileExists(atPath: eventsURL.path) else {
+            return libraryItem(
+                from: manifest,
+                bundleURL: bundleURL,
+                libraryRoot: libraryRoot,
+                duration: nil,
+                status: .missingEvents,
+                statusMessage: "Capture is missing events.json. Edit will recreate derived timeline data if possible."
+            )
+        }
+
+        let zoomPlanURL = bundleURL.appendingPathComponent("zoomPlan.json")
+        guard fileManager.fileExists(atPath: zoomPlanURL.path) else {
+            return libraryItem(
+                from: manifest,
+                bundleURL: bundleURL,
+                libraryRoot: libraryRoot,
+                duration: nil,
+                status: .missingZoomPlan,
+                statusMessage: "Capture is missing zoomPlan.json. Edit will regenerate it from events when opened."
+            )
+        }
+
+        let duration = try? await loadRecordingDuration(for: bundleURL, recordingFileName: manifest.recordingFileName)
+        return libraryItem(
+            from: manifest,
+            bundleURL: bundleURL,
+            libraryRoot: libraryRoot,
+            duration: duration,
+            status: .available,
+            statusMessage: nil
+        )
+    }
+
+    private func libraryItem(
+        from manifest: ProjectManifest,
+        bundleURL: URL,
+        libraryRoot: URL,
+        duration: Double?,
+        status: CaptureLibraryItemStatus,
+        statusMessage: String?
+    ) -> CaptureLibraryItem {
+        CaptureLibraryItem(
+            captureID: manifest.captureID,
+            title: manifest.captureTitle,
+            captureType: manifest.captureType,
+            collectionName: manifest.collectionName,
+            projectName: manifest.projectName,
+            createdAt: manifest.createdAt,
+            updatedAt: manifest.updatedAt,
+            duration: duration,
+            bundleRelativePath: relativeBundlePath(for: bundleURL, libraryRoot: libraryRoot),
+            status: status,
+            statusMessage: statusMessage
+        )
+    }
+
+    private func fallbackLibraryItem(
+        _ fallbackItem: CaptureLibraryItem?,
+        relativePath: String,
+        status: CaptureLibraryItemStatus,
+        statusMessage: String
+    ) -> CaptureLibraryItem {
+        if let fallbackItem {
+            return CaptureLibraryItem(
+                captureID: fallbackItem.captureID,
+                title: fallbackItem.title,
+                captureType: fallbackItem.captureType,
+                collectionName: fallbackItem.collectionName,
+                projectName: fallbackItem.projectName,
+                createdAt: fallbackItem.createdAt,
+                updatedAt: fallbackItem.updatedAt,
+                duration: fallbackItem.duration,
+                bundleRelativePath: relativePath,
+                status: status,
+                statusMessage: statusMessage
+            )
+        }
+
+        return CaptureLibraryItem(
+            captureID: UUID(),
+            title: URL(fileURLWithPath: relativePath).deletingPathExtension().lastPathComponent,
+            captureType: .other,
+            collectionName: "Unknown Collection",
+            projectName: "Unknown Project",
+            createdAt: Date.distantPast,
+            updatedAt: Date.distantPast,
+            duration: nil,
+            bundleRelativePath: relativePath,
+            status: status,
+            statusMessage: statusMessage
+        )
     }
 
     private func loadRecordingDuration(for bundleURL: URL, recordingFileName: String) async throws -> Double? {
@@ -528,7 +763,7 @@ struct ProjectBundleService {
 
         let zoomPlan = generateZoomPlan(from: events, captureSource: captureSource)
         let data = try JSONEncoder.zoomPlanEncoder.encode(zoomPlan)
-        try data.write(to: url)
+        try data.write(to: url, options: .atomic)
         return zoomPlan
     }
 

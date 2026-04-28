@@ -24,6 +24,14 @@ struct ContentView: View {
     @State private var hoveredTimelineTooltipAnchor: CGPoint?
     @State private var exportShareAnchorView: NSView?
     @State private var librarySearchText = ""
+    @State private var inspectorMode: EditInspectorMode = .markers
+    @State private var selectedLibraryCollectionFilter: String?
+    @State private var selectedLibraryProjectFilter: String?
+    @State private var selectedLibraryTypeFilter: CaptureType?
+    @State private var captureInfoTitleDraft = ""
+    @State private var captureInfoCollectionDraft = ""
+    @State private var captureInfoProjectDraft = ""
+    @FocusState private var focusedCaptureInfoField: CaptureInfoField?
 
     private struct OverlayMapping {
         let point: CGPoint
@@ -73,12 +81,32 @@ struct ContentView: View {
         case zoomOut = "Zoom Out"
     }
 
+    private enum EditInspectorMode: String, CaseIterable, Identifiable {
+        case captureInfo = "Capture Info"
+        case markers = "Markers"
+
+        var id: String { rawValue }
+    }
+
+    private enum CaptureInfoField: Hashable {
+        case title
+        case collection
+        case project
+    }
+
     private enum MotionTuning {
         static let bounceApproachFraction = 0.82
         static let bounceMaxOvershoot = 0.14
         static let bounceMinOvershoot = 0.04
         static let bounceOscillationCount = 2.6
         static let panBounceInfluence = 0.35
+    }
+
+    private struct LibraryFilterOption: Identifiable {
+        let label: String
+        let count: Int
+
+        var id: String { label }
     }
 
     var body: some View {
@@ -568,17 +596,8 @@ struct ContentView: View {
     }
 
     private var libraryView: some View {
-        let filteredItems = viewModel.libraryItems.filter { item in
-            let query = librarySearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !query.isEmpty else { return true }
-            let haystack = [
-                item.title,
-                item.collectionName,
-                item.projectName,
-                item.captureType.displayName
-            ].joined(separator: " ").localizedLowercase
-            return haystack.contains(query.localizedLowercase)
-        }
+        let filteredItems = filteredLibraryItems
+        let resultSummary = "\(filteredItems.count) capture" + (filteredItems.count == 1 ? "" : "s")
 
         return VStack(alignment: .leading, spacing: 20) {
             sectionHeader(
@@ -596,57 +615,371 @@ struct ContentView: View {
                 }
             }
 
-            if filteredItems.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("No captures in library")
-                        .font(.headline)
-                    Text("Create a capture or adjust the library root in Settings.")
-                        .foregroundStyle(.secondary)
-                }
-                .padding(20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .background(cardBackground)
-            } else {
-                List(filteredItems) { item in
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.title)
-                                .font(.system(size: 14, weight: .semibold))
-                            Text("\(item.collectionName) • \(item.projectName)")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                            HStack(spacing: 10) {
-                                Text(item.captureType.displayName)
-                                Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                if let duration = item.duration {
-                                    Text(String(format: "%.2fs", duration))
-                                }
-                            }
-                            .font(.system(size: 11))
+            if let libraryStatusMessage = viewModel.libraryStatusMessage, !libraryStatusMessage.isEmpty {
+                Text(libraryStatusMessage)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(alignment: .top, spacing: 20) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 8) {
+                        Text(resultSummary)
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        }
 
-                        Spacer(minLength: 12)
-
-                        VStack(alignment: .trailing, spacing: 8) {
-                            Button("Edit") {
-                                viewModel.openLibraryCapture(item)
-                                selectedTab = .review
-                            }
-                            .buttonStyle(.borderedProminent)
-
-                            Button("Reveal") {
-                                viewModel.revealLibraryCapture(item)
+                        if hasActiveLibraryFilters {
+                            Button("Reset Filters") {
+                                clearLibraryFilters()
                             }
                             .buttonStyle(.borderless)
+                            .font(.system(size: 12, weight: .medium))
                         }
                     }
-                    .padding(.vertical, 6)
+
+                    if hasActiveLibraryFilters {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                if let selectedLibraryCollectionFilter {
+                                    activeLibraryFilterChip(title: selectedLibraryCollectionFilter) {
+                                        self.selectedLibraryCollectionFilter = nil
+                                    }
+                                }
+                                if let selectedLibraryProjectFilter {
+                                    activeLibraryFilterChip(title: selectedLibraryProjectFilter) {
+                                        self.selectedLibraryProjectFilter = nil
+                                    }
+                                }
+                                if let selectedLibraryTypeFilter {
+                                    activeLibraryFilterChip(title: selectedLibraryTypeFilter.displayName) {
+                                        self.selectedLibraryTypeFilter = nil
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if filteredItems.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("No captures match current filters")
+                                .font(.headline)
+                            Text(hasActiveLibraryFilters ? "Try clearing one or more filters." : "Create a capture or adjust the library root in Settings.")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(20)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .background(cardBackground)
+                    } else {
+                        List(filteredItems) { item in
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.title)
+                                        .font(.system(size: 14, weight: .semibold))
+                                    Text("\(item.collectionName) • \(item.projectName)")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                    HStack(spacing: 10) {
+                                        Text(item.captureType.displayName)
+                                        Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                        if let duration = item.duration {
+                                            Text(String(format: "%.2fs", duration))
+                                        }
+                                    }
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    if !item.isAvailable, let statusMessage = item.statusMessage {
+                                        Text("\(item.status.displayName) • \(statusMessage)")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundStyle(.orange)
+                                    }
+                                }
+
+                                Spacer(minLength: 12)
+
+                                VStack(alignment: .trailing, spacing: 8) {
+                                    Button("Edit") {
+                                        viewModel.openLibraryCapture(item)
+                                        selectedTab = .review
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(!item.canOpenInEditor)
+
+                                    Button("Reveal") {
+                                        viewModel.revealLibraryCapture(item)
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                            }
+                            .padding(.vertical, 6)
+                        }
+                        .listStyle(.inset)
+                    }
                 }
-                .listStyle(.inset)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                libraryFilterRail
+                    .frame(width: 260)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var filteredLibraryItems: [CaptureLibraryItem] {
+        viewModel.libraryItems.filter { item in
+            matchesLibrarySearch(item)
+            && matchesLibraryCollectionFilter(item)
+            && matchesLibraryProjectFilter(item)
+            && matchesLibraryTypeFilter(item)
+        }
+    }
+
+    private var hasActiveLibraryFilters: Bool {
+        selectedLibraryCollectionFilter != nil || selectedLibraryProjectFilter != nil || selectedLibraryTypeFilter != nil
+    }
+
+    private func matchesLibrarySearch(_ item: CaptureLibraryItem) -> Bool {
+        let query = librarySearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return true }
+        let haystack = [
+            item.title,
+            item.collectionName,
+            item.projectName,
+            item.captureType.displayName
+        ].joined(separator: " ").localizedLowercase
+        return haystack.contains(query.localizedLowercase)
+    }
+
+    private func matchesLibraryCollectionFilter(_ item: CaptureLibraryItem) -> Bool {
+        guard let selectedLibraryCollectionFilter else { return true }
+        return item.collectionName == selectedLibraryCollectionFilter
+    }
+
+    private func matchesLibraryProjectFilter(_ item: CaptureLibraryItem) -> Bool {
+        guard let selectedLibraryProjectFilter else { return true }
+        return item.projectName == selectedLibraryProjectFilter
+    }
+
+    private func matchesLibraryTypeFilter(_ item: CaptureLibraryItem) -> Bool {
+        guard let selectedLibraryTypeFilter else { return true }
+        return item.captureType == selectedLibraryTypeFilter
+    }
+
+    private var libraryFilterRail: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("Drill Down")
+                        .font(.system(size: 16, weight: .semibold))
+                    Spacer()
+                    if hasActiveLibraryFilters {
+                        Button("Reset") {
+                            clearLibraryFilters()
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.system(size: 12, weight: .medium))
+                    }
+                }
+
+                libraryFilterSection(
+                    title: "Collections",
+                    options: libraryCollectionOptions,
+                    selectedValue: selectedLibraryCollectionFilter,
+                    action: toggleLibraryCollectionFilter
+                )
+
+                libraryFilterSection(
+                    title: "Projects",
+                    options: libraryProjectOptions,
+                    selectedValue: selectedLibraryProjectFilter,
+                    action: toggleLibraryProjectFilter
+                )
+
+                libraryTypeSection
+            }
+            .padding(18)
+        }
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(cardBackground)
+    }
+
+    private var libraryCollectionOptions: [LibraryFilterOption] {
+        buildLibraryFilterOptions(
+            from: viewModel.libraryItems.filter { item in
+                matchesLibrarySearch(item)
+                && matchesLibraryProjectFilter(item)
+                && matchesLibraryTypeFilter(item)
+            },
+            value: \.collectionName
+        )
+    }
+
+    private var libraryProjectOptions: [LibraryFilterOption] {
+        buildLibraryFilterOptions(
+            from: viewModel.libraryItems.filter { item in
+                matchesLibrarySearch(item)
+                && matchesLibraryCollectionFilter(item)
+                && matchesLibraryTypeFilter(item)
+            },
+            value: \.projectName
+        )
+    }
+
+    private var libraryTypeOptions: [CaptureType: Int] {
+        let items = viewModel.libraryItems.filter { item in
+            matchesLibrarySearch(item)
+            && matchesLibraryCollectionFilter(item)
+            && matchesLibraryProjectFilter(item)
+        }
+        return Dictionary(items.map { ($0.captureType, 1) }, uniquingKeysWith: +)
+    }
+
+    private func buildLibraryFilterOptions(
+        from items: [CaptureLibraryItem],
+        value: KeyPath<CaptureLibraryItem, String>
+    ) -> [LibraryFilterOption] {
+        let counts = Dictionary(items.map { ($0[keyPath: value], 1) }, uniquingKeysWith: +)
+        return counts.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.map { key in
+            LibraryFilterOption(label: key, count: counts[key] ?? 0)
+        }
+    }
+
+    private func libraryFilterSection(
+        title: String,
+        options: [LibraryFilterOption],
+        selectedValue: String?,
+        action: @escaping (String) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            if options.isEmpty {
+                Text("No matches")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(options) { option in
+                        Button {
+                            action(option.label)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Text(option.label)
+                                    .lineLimit(1)
+                                Spacer(minLength: 8)
+                                Text("\(option.count)")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.system(size: 12, weight: selectedValue == option.label ? .semibold : .medium))
+                            .foregroundStyle(selectedValue == option.label ? Color.accentColor : Color.primary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(selectedValue == option.label ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(selectedValue == option.label ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.08), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private var libraryTypeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Types")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], alignment: .leading, spacing: 8) {
+                ForEach(CaptureType.allCases) { type in
+                    if let count = libraryTypeOptions[type], count > 0 {
+                        Button {
+                            toggleLibraryTypeFilter(type)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(type.displayName)
+                                    .lineLimit(1)
+                                Text("\(count)")
+                                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            }
+                            .font(.system(size: 12, weight: selectedLibraryTypeFilter == type ? .semibold : .medium))
+                            .foregroundStyle(selectedLibraryTypeFilter == type ? Color.white : Color.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(selectedLibraryTypeFilter == type ? Color.accentColor : Color.secondary.opacity(0.12))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func activeLibraryFilterChip(title: String, removeAction: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .lineLimit(1)
+            Button(action: removeAction) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+        }
+        .font(.system(size: 12, weight: .medium))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.accentColor.opacity(0.12))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(Color.accentColor.opacity(0.28), lineWidth: 1)
+        )
+    }
+
+    private func toggleLibraryCollectionFilter(_ collectionName: String) {
+        if selectedLibraryCollectionFilter == collectionName {
+            selectedLibraryCollectionFilter = nil
+        } else {
+            selectedLibraryCollectionFilter = collectionName
+            if let currentProjectFilter = selectedLibraryProjectFilter,
+               !viewModel.libraryItems.contains(where: { $0.collectionName == collectionName && $0.projectName == currentProjectFilter }) {
+                selectedLibraryProjectFilter = nil
+            }
+        }
+    }
+
+    private func toggleLibraryProjectFilter(_ projectName: String) {
+        if selectedLibraryProjectFilter == projectName {
+            selectedLibraryProjectFilter = nil
+        } else {
+            selectedLibraryProjectFilter = projectName
+        }
+    }
+
+    private func toggleLibraryTypeFilter(_ type: CaptureType) {
+        selectedLibraryTypeFilter = selectedLibraryTypeFilter == type ? nil : type
+    }
+
+    private func clearLibraryFilters() {
+        selectedLibraryCollectionFilter = nil
+        selectedLibraryProjectFilter = nil
+        selectedLibraryTypeFilter = nil
     }
 
     private func targetSection(title: String, targets: [ShareableCaptureTarget]) -> some View {
@@ -1088,6 +1421,7 @@ struct ContentView: View {
                     Image(systemName: "backward.end.fill")
                 }
                 .buttonStyle(.plain)
+                .disabled(!viewModel.canUsePlaybackTransport && !viewModel.isRenderedPreviewActive)
 
                 Button {
                     viewModel.togglePlayback()
@@ -1095,6 +1429,7 @@ struct ContentView: View {
                     Image(systemName: viewModel.isPlaybackActive ? "pause.fill" : "play.fill")
                 }
                 .buttonStyle(.plain)
+                .disabled(!viewModel.canUsePlaybackTransport && !viewModel.isRenderedPreviewActive && viewModel.playbackPresentationMode != .previewCompletedSlate)
 
                 Text(timecodeString(for: viewModel.currentPlaybackTime))
                     .font(.system(size: 12, design: .monospaced))
@@ -1925,106 +2260,371 @@ struct ContentView: View {
             Text("Inspector")
                 .font(.system(size: 16, weight: .semibold))
 
-            ScrollViewReader { proxy in
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Markers")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 8) {
-                                if summary.zoomMarkers.isEmpty {
-                                    Text("No markers")
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(.secondary)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                } else {
-                                    ForEach(Array(summary.zoomMarkers.enumerated()), id: \.element.id) { index, marker in
-                                        Button {
-                                            suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
-                                            viewModel.startMarkerPreview(marker.id)
-                                        } label: {
-                                            VStack(alignment: .leading, spacing: 6) {
-                                                HStack(spacing: 10) {
-                                                    Text("#\(index + 1)")
-                                                        .font(.system(size: 11, weight: .semibold))
-                                                        .frame(width: 26, alignment: .leading)
-                                                    Text(timecodeString(for: marker.sourceEventTimestamp))
-                                                        .font(.system(size: 11, design: .monospaced))
-                                                        .frame(width: 88, alignment: .leading)
-                                                    Image(systemName: markerTypeSymbol(for: marker.zoomType))
-                                                        .font(.system(size: 12))
-                                                        .foregroundStyle(.secondary)
-                                                    Spacer(minLength: 0)
-                                                    HStack(spacing: 4) {
-                                                        Image(systemName: marker.enabled ? "checkmark.circle.fill" : "circle")
-                                                        Text(marker.enabled ? "On" : "Off")
-                                                    }
-                                                    .font(.system(size: 11, weight: .medium))
-                                                    .foregroundStyle(marker.enabled ? Color.accentColor : Color.secondary)
-                                                }
-
-                                                HStack(spacing: 12) {
-                                                    Label {
-                                                        Text(String(format: "%.1fx", marker.zoomScale))
-                                                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                                    } icon: {
-                                                        Image(systemName: "viewfinder.rectangular")
-                                                    }
-
-                                                    Label {
-                                                        Text(String(format: "%.2fs", marker.totalSegmentDuration))
-                                                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                                    } icon: {
-                                                        Image(systemName: "timer")
-                                                    }
-                                                }
-                                                .font(.system(size: 11))
-                                                .foregroundStyle(.secondary)
-                                            }
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 8)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                    .fill(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.12) : Color.clear)
-                                            )
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                    .stroke(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.08), lineWidth: 1)
-                                            )
-                                            .opacity(marker.enabled ? 1.0 : 0.5)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .id(marker.id)
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                    Divider()
-
-                    markerEditorSection
-                        .frame(maxWidth: .infinity, alignment: .bottomLeading)
+            Picker("Inspector Mode", selection: $inspectorMode) {
+                ForEach(EditInspectorMode.allCases) { mode in
+                    Text(mode.rawValue).tag(mode)
                 }
-                .onChange(of: viewModel.selectedZoomMarkerID) {
-                    guard let selectedZoomMarkerID = viewModel.selectedZoomMarkerID else { return }
-                    if let suppressUntil = suppressMarkerListAutoScrollUntil, Date() < suppressUntil {
-                        return
-                    }
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        proxy.scrollTo(selectedZoomMarkerID, anchor: .center)
-                    }
+            }
+            .pickerStyle(.segmented)
+
+            Group {
+                switch inspectorMode {
+                case .captureInfo:
+                    captureInfoInspector(summary)
+                case .markers:
+                    markersInspector(summary)
                 }
             }
         }
         .padding(20)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(cardBackground)
+    }
+
+    private func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
+        ScrollViewReader { proxy in
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Markers")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if summary.zoomMarkers.isEmpty {
+                                Text("No markers")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                ForEach(Array(summary.zoomMarkers.enumerated()), id: \.element.id) { index, marker in
+                                    Button {
+                                        suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
+                                        viewModel.startMarkerPreview(marker.id)
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            HStack(spacing: 10) {
+                                                Text("#\(index + 1)")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .frame(width: 26, alignment: .leading)
+                                                Text(timecodeString(for: marker.sourceEventTimestamp))
+                                                    .font(.system(size: 11, design: .monospaced))
+                                                    .frame(width: 88, alignment: .leading)
+                                                Image(systemName: markerTypeSymbol(for: marker.zoomType))
+                                                    .font(.system(size: 12))
+                                                    .foregroundStyle(.secondary)
+                                                Spacer(minLength: 0)
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: marker.enabled ? "checkmark.circle.fill" : "circle")
+                                                    Text(marker.enabled ? "On" : "Off")
+                                                }
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(marker.enabled ? Color.accentColor : Color.secondary)
+                                            }
+
+                                            HStack(spacing: 12) {
+                                                Label {
+                                                    Text(String(format: "%.1fx", marker.zoomScale))
+                                                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                                } icon: {
+                                                    Image(systemName: "viewfinder.rectangular")
+                                                }
+
+                                                Label {
+                                                    Text(String(format: "%.2fs", marker.totalSegmentDuration))
+                                                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                                } icon: {
+                                                    Image(systemName: "timer")
+                                                }
+                                            }
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 8)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .fill(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.12) : Color.clear)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .stroke(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.08), lineWidth: 1)
+                                        )
+                                        .opacity(marker.enabled ? 1.0 : 0.5)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .id(marker.id)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                Divider()
+
+                markerEditorSection
+                    .frame(maxWidth: .infinity, alignment: .bottomLeading)
+            }
+            .onChange(of: viewModel.selectedZoomMarkerID) {
+                guard let selectedZoomMarkerID = viewModel.selectedZoomMarkerID else { return }
+                if let suppressUntil = suppressMarkerListAutoScrollUntil, Date() < suppressUntil {
+                    return
+                }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    proxy.scrollTo(selectedZoomMarkerID, anchor: .center)
+                }
+            }
+        }
+    }
+
+    private func captureInfoInspector(_ summary: RecordingInspectionSummary) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Title / Short Description")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Untitled Capture", text: $captureInfoTitleDraft)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($focusedCaptureInfoField, equals: .title)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Collection")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Default Collection", text: $captureInfoCollectionDraft)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($focusedCaptureInfoField, equals: .collection)
+                        .overlay(alignment: .topLeading) {
+                            if focusedCaptureInfoField == .collection,
+                               !collectionAutocompleteSuggestions.isEmpty {
+                                autocompleteSuggestionPanel(
+                                    suggestions: collectionAutocompleteSuggestions,
+                                    selectionAction: selectCollectionSuggestion
+                                )
+                                .offset(y: 34)
+                            }
+                        }
+                }
+                .zIndex(focusedCaptureInfoField == .collection ? 2 : 0)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Project")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("General Project", text: $captureInfoProjectDraft)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($focusedCaptureInfoField, equals: .project)
+                        .overlay(alignment: .topLeading) {
+                            if focusedCaptureInfoField == .project,
+                               !projectAutocompleteSuggestions.isEmpty {
+                                autocompleteSuggestionPanel(
+                                    suggestions: projectAutocompleteSuggestions,
+                                    selectionAction: selectProjectSuggestion
+                                )
+                                .offset(y: 34)
+                            }
+                        }
+                }
+                .zIndex(focusedCaptureInfoField == .project ? 2 : 0)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Type")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    captureTypeChips(selectedType: viewModel.captureType)
+                }
+
+                Divider()
+
+                metadataItem("Created", summary.createdAt.formatted(date: .abbreviated, time: .shortened))
+
+                if let duration = summary.duration {
+                    metadataItem("Duration", String(format: "%.2fs", duration))
+                }
+
+                metadataItem("Bundle Path", summary.bundleURL.path, multiline: true)
+
+                Button("Reveal in Finder") {
+                    viewModel.revealInFinder()
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onAppear {
+            syncCaptureInfoDrafts(from: summary, force: true)
+        }
+        .onChange(of: summary.captureID) {
+            syncCaptureInfoDrafts(from: summary, force: true)
+        }
+        .onChange(of: summary.updatedAt) {
+            syncCaptureInfoDrafts(from: summary)
+        }
+        .onChange(of: focusedCaptureInfoField) {
+            guard focusedCaptureInfoField == nil else { return }
+            syncCaptureInfoDrafts(from: summary, force: true)
+        }
+        .onChange(of: captureInfoTitleDraft) {
+            viewModel.setCurrentCaptureTitle(captureInfoTitleDraft)
+        }
+        .onChange(of: captureInfoCollectionDraft) {
+            viewModel.setCurrentCaptureCollectionName(captureInfoCollectionDraft)
+        }
+        .onChange(of: captureInfoProjectDraft) {
+            viewModel.setCurrentCaptureProjectName(captureInfoProjectDraft)
+        }
+    }
+
+    private func syncCaptureInfoDrafts(from summary: RecordingInspectionSummary, force: Bool = false) {
+        if force || focusedCaptureInfoField != .title {
+            captureInfoTitleDraft = viewModel.captureTitle
+        }
+        if force || focusedCaptureInfoField != .collection {
+            captureInfoCollectionDraft = viewModel.collectionName
+        }
+        if force || focusedCaptureInfoField != .project {
+            captureInfoProjectDraft = viewModel.projectName
+        }
+    }
+
+    private var collectionAutocompleteSuggestions: [String] {
+        autocompleteSuggestions(
+            from: viewModel.libraryItems
+                .map(\.collectionName)
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
+            matching: captureInfoCollectionDraft
+        )
+    }
+
+    private var projectAutocompleteSuggestions: [String] {
+        let query = captureInfoProjectDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let preferredCollection = captureInfoCollectionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let items = viewModel.libraryItems
+
+        let preferredProjects = autocompleteSuggestions(
+            from: items
+                .filter { preferredCollection.isEmpty ? false : $0.collectionName.compare(preferredCollection, options: .caseInsensitive) == .orderedSame }
+                .map(\.projectName)
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
+            matching: query
+        )
+
+        if preferredProjects.count >= 6 {
+            return Array(preferredProjects.prefix(6))
+        }
+
+        let allProjects = autocompleteSuggestions(
+            from: items
+                .map(\.projectName)
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
+            matching: query
+        )
+
+        var combined = preferredProjects
+        for project in allProjects where !combined.contains(where: { $0.compare(project, options: .caseInsensitive) == .orderedSame }) {
+            combined.append(project)
+            if combined.count == 6 {
+                break
+            }
+        }
+        return combined
+    }
+
+    private func autocompleteSuggestions(from values: [String], matching query: String) -> [String] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let uniqueValues = Array(Set(values)).sorted {
+            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        }
+
+        return uniqueValues
+            .filter { value in
+                let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedValue.isEmpty else { return false }
+                if trimmedQuery.isEmpty {
+                    return true
+                }
+                guard trimmedValue.compare(trimmedQuery, options: .caseInsensitive) != .orderedSame else { return false }
+                return trimmedValue.localizedCaseInsensitiveContains(trimmedQuery)
+            }
+            .prefix(6)
+            .map { $0 }
+    }
+
+    private func selectCollectionSuggestion(_ suggestion: String) {
+        captureInfoCollectionDraft = suggestion
+        viewModel.setCurrentCaptureCollectionName(suggestion)
+        focusedCaptureInfoField = nil
+    }
+
+    private func selectProjectSuggestion(_ suggestion: String) {
+        captureInfoProjectDraft = suggestion
+        viewModel.setCurrentCaptureProjectName(suggestion)
+        focusedCaptureInfoField = nil
+    }
+
+    private func autocompleteSuggestionPanel(
+        suggestions: [String],
+        selectionAction: @escaping (String) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
+                Button {
+                    selectionAction(suggestion)
+                } label: {
+                    Text(suggestion)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if index < suggestions.count - 1 {
+                    Divider()
+                        .opacity(0.35)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.94))
+                .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
+        )
+    }
+
+    private func captureTypeChips(selectedType: CaptureType) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], alignment: .leading, spacing: 8) {
+            ForEach(CaptureType.allCases) { type in
+                Button {
+                    viewModel.setCurrentCaptureType(type)
+                } label: {
+                    Text(type.displayName)
+                        .font(.system(size: 12, weight: selectedType == type ? .semibold : .medium))
+                        .foregroundStyle(selectedType == type ? Color.white : Color.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(selectedType == type ? Color.accentColor : Color.secondary.opacity(0.12))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     @ViewBuilder
