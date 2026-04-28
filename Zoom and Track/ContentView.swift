@@ -1109,7 +1109,10 @@ struct ContentView: View {
 
             GeometryReader { geometry in
                 let fittedRect = fittedVideoRect(in: geometry.size, aspectRatio: safeAspectRatio)
+                let isMarkerDragActive = draggedMarkerSourcePoint != nil
                 let previewState = isRenderedPreviewActive
+                    ? nil
+                    : isMarkerDragActive
                     ? nil
                     : activeZoomPreviewState(
                         at: currentTime,
@@ -1144,7 +1147,7 @@ struct ContentView: View {
                     videoAspectRatio: safeAspectRatio
                 ) {
                     let ringSize = 22 + max((selectedMarker?.zoomScale ?? 1.0) - 1.0, 0) * 10
-                    let handlePoint = draggedMarkerSourcePoint.flatMap {
+                    let baseHandlePoint = draggedMarkerSourcePoint.flatMap {
                         overlayPoint(
                             for: $0,
                             contentCoordinateSize: contentCoordinateSize,
@@ -1152,6 +1155,11 @@ struct ContentView: View {
                             videoAspectRatio: safeAspectRatio
                         )
                     } ?? mapping.point
+                    let handlePoint = transformedOverlayPoint(
+                        baseHandlePoint,
+                        in: fittedRect,
+                        previewState: previewState
+                    )
                     ZStack {
                         Circle()
                             .stroke(Color.accentColor, lineWidth: 3)
@@ -2438,6 +2446,21 @@ struct ContentView: View {
         }
     }
 
+    private func transformedOverlayPoint(
+        _ point: CGPoint,
+        in fittedRect: CGRect,
+        previewState: ZoomPreviewState?
+    ) -> CGPoint {
+        guard let previewState else { return point }
+        let localX = point.x - fittedRect.minX
+        let localY = point.y - fittedRect.minY
+        let offset = zoomPreviewOffset(for: previewState, in: fittedRect)
+        return CGPoint(
+            x: fittedRect.minX + (localX * previewState.scale) + offset.width,
+            y: fittedRect.minY + (localY * previewState.scale) + offset.height
+        )
+    }
+
     private func settingsCard(title: String, body: AnyView) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
@@ -2891,6 +2914,33 @@ struct ContentView: View {
                     get: { marker.enabled },
                     set: { viewModel.setSelectedMarkerEnabled($0) }
                 ))
+
+                if marker.isClickFocus {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle("Show Click Pulse", isOn: Binding(
+                            get: { marker.isClickPulseEnabled },
+                            set: { viewModel.setSelectedMarkerClickPulseEnabled($0) }
+                        ))
+
+                        if let clickPulse = marker.clickPulse {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Click Pulse Style")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Picker("Click Pulse Style", selection: Binding(
+                                    get: { clickPulse.preset },
+                                    set: { viewModel.setSelectedMarkerClickPulsePreset($0) }
+                                )) {
+                                    ForEach(ClickPulsePreset.allCases) { preset in
+                                        Text(preset.displayName).tag(preset)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                            }
+                        }
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Zoom Type")

@@ -405,6 +405,52 @@ enum ZoomMarkerKind: String, Codable {
     case clickFocus
 }
 
+enum ClickPulsePreset: String, Codable, CaseIterable, Identifiable {
+    case subtleRing
+    case doubleRing
+    case softGlow
+    case radarPing
+    case expandingDot
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .subtleRing:
+            return "Subtle Ring"
+        case .doubleRing:
+            return "Double Ring"
+        case .softGlow:
+            return "Soft Glow"
+        case .radarPing:
+            return "Radar Ping"
+        case .expandingDot:
+            return "Expanding Dot"
+        }
+    }
+}
+
+struct ClickPulseConfiguration: Codable, Equatable {
+    var preset: ClickPulsePreset
+
+    static let defaultConfiguration = ClickPulseConfiguration(preset: .subtleRing)
+
+    var duration: Double {
+        switch preset {
+        case .subtleRing:
+            return 0.55
+        case .doubleRing:
+            return 0.7
+        case .softGlow:
+            return 0.5
+        case .radarPing:
+            return 0.85
+        case .expandingDot:
+            return 0.45
+        }
+    }
+}
+
 struct ZoomPlanItem: Codable, Identifiable {
     var id: String
     var type: String
@@ -427,6 +473,7 @@ struct ZoomPlanItem: Codable, Identifiable {
     var easeStyle: ZoomEaseStyle
     var zoomType: ZoomType
     var bounceAmount: Double
+    var clickPulse: ClickPulseConfiguration?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -450,6 +497,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         case easeStyle
         case zoomType
         case bounceAmount
+        case clickPulse
     }
 
     init(
@@ -473,7 +521,8 @@ struct ZoomPlanItem: Codable, Identifiable {
         duration: Double,
         easeStyle: ZoomEaseStyle,
         zoomType: ZoomType,
-        bounceAmount: Double
+        bounceAmount: Double,
+        clickPulse: ClickPulseConfiguration? = nil
     ) {
         self.id = id
         self.type = type
@@ -496,6 +545,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         self.easeStyle = easeStyle
         self.zoomType = zoomType
         self.bounceAmount = bounceAmount
+        self.clickPulse = clickPulse
     }
 
     init(from decoder: Decoder) throws {
@@ -516,6 +566,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         easeStyle = try container.decodeIfPresent(ZoomEaseStyle.self, forKey: .easeStyle) ?? .smooth
         zoomType = try container.decodeIfPresent(ZoomType.self, forKey: .zoomType) ?? .inOut
         bounceAmount = try container.decodeIfPresent(Double.self, forKey: .bounceAmount) ?? 0.35
+        clickPulse = try container.decodeIfPresent(ClickPulseConfiguration.self, forKey: .clickPulse)
 
         let legacyDuration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? max(endTime - startTime, 0.5)
         let legacyPhases = ZoomPlanItem.legacyPhaseTiming(totalDuration: legacyDuration)
@@ -547,6 +598,10 @@ struct ZoomPlanItem: Codable, Identifiable {
 
     var isClickFocus: Bool {
         markerKind == .clickFocus
+    }
+
+    var isClickPulseEnabled: Bool {
+        clickPulse != nil
     }
 
     static func legacyPhaseTiming(totalDuration: Double) -> (leadInTime: Double, zoomInDuration: Double, holdDuration: Double, zoomOutDuration: Double) {
@@ -627,6 +682,17 @@ enum SharedMotionEngine {
         let normalizedPoint: CGPoint
     }
 
+    struct ClickPulseRenderState {
+        let preset: ClickPulsePreset
+        let progress: Double
+    }
+
+    struct OverlayGeometryResolution {
+        let point: CGPoint
+        let isVisible: Bool
+        let clipped: Bool
+    }
+
     struct Timeline {
         let startTime: Double
         let peakTime: Double
@@ -654,11 +720,12 @@ enum SharedMotionEngine {
 
     static func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
         let startTime = max(0, marker.startTime)
+        let pulseEndTime = marker.sourceEventTimestamp + (marker.clickPulse?.duration ?? 0)
         switch marker.zoomType {
         case .inOut, .outOnly:
-            return (startTime, max(marker.endTime, marker.sourceEventTimestamp))
+            return (startTime, max(marker.endTime, pulseEndTime))
         case .inOnly:
-            return (startTime, max(marker.holdUntil, marker.sourceEventTimestamp))
+            return (startTime, max(marker.holdUntil, pulseEndTime))
         }
     }
 
@@ -766,6 +833,79 @@ enum SharedMotionEngine {
         return CGSize(
             width: min(max(desiredX, minX), 0),
             height: min(max(desiredY, minY), 0)
+        )
+    }
+
+    static func resolveOverlayPoint(
+        contentPoint: CGPoint,
+        contentCoordinateSize: CGSize,
+        orientedVideoSize: CGSize,
+        outputSize: CGSize,
+        previewState: PreviewState?,
+    ) -> OverlayGeometryResolution {
+        guard contentCoordinateSize.width > 0,
+              contentCoordinateSize.height > 0,
+              orientedVideoSize.width > 0,
+              orientedVideoSize.height > 0,
+              outputSize.width > 0,
+              outputSize.height > 0 else {
+            return OverlayGeometryResolution(point: .zero, isVisible: false, clipped: true)
+        }
+
+        let normalizedX = contentPoint.x / contentCoordinateSize.width
+        let normalizedY = contentPoint.y / contentCoordinateSize.height
+        let scale = outputSize.width / orientedVideoSize.width
+        let baseVisibleRect = CGRect(
+            origin: .zero,
+            size: CGSize(width: orientedVideoSize.width * scale, height: orientedVideoSize.height * scale)
+        )
+
+        let basePoint = CGPoint(
+            x: baseVisibleRect.minX + (normalizedX * baseVisibleRect.width),
+            y: baseVisibleRect.minY + (normalizedY * baseVisibleRect.height)
+        )
+        var point = basePoint
+
+        if let previewState {
+            let offset = previewOffset(for: previewState, outputSize: outputSize)
+            let basePointBottomLeft = CGPoint(
+                x: basePoint.x,
+                y: outputSize.height - basePoint.y
+            )
+            let transformedBottomLeft = CGPoint(
+                x: basePointBottomLeft.x * previewState.scale + offset.width,
+                y: basePointBottomLeft.y * previewState.scale + offset.height
+            )
+            point = CGPoint(
+                x: transformedBottomLeft.x,
+                y: outputSize.height - transformedBottomLeft.y
+            )
+        }
+
+        let outputRect = CGRect(origin: .zero, size: outputSize)
+        let isVisible = outputRect.contains(point)
+        let clipped = !isVisible || normalizedX < 0 || normalizedX > 1 || normalizedY < 0 || normalizedY > 1 || !baseVisibleRect.contains(basePoint)
+        return OverlayGeometryResolution(
+            point: point,
+            isVisible: isVisible,
+            clipped: clipped
+        )
+    }
+
+    static func clickPulseRenderState(
+        at currentTime: Double,
+        marker: ZoomPlanItem
+    ) -> ClickPulseRenderState? {
+        guard marker.enabled, let clickPulse = marker.clickPulse, marker.isClickFocus else { return nil }
+        let pulseProgress = normalizedProgress(
+            currentTime,
+            start: marker.sourceEventTimestamp,
+            end: marker.sourceEventTimestamp + clickPulse.duration
+        )
+        guard pulseProgress > 0, pulseProgress < 1 else { return nil }
+        return ClickPulseRenderState(
+            preset: clickPulse.preset,
+            progress: pulseProgress
         )
     }
 

@@ -796,6 +796,24 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    func setSelectedMarkerClickPulseEnabled(_ enabled: Bool) {
+        let markerID = selectedZoomMarkerID
+        updateSelectedMarker { marker in
+            guard marker.isClickFocus else { return }
+            marker.clickPulse = enabled ? (marker.clickPulse ?? .defaultConfiguration) : nil
+        }
+        if enabled, let markerID {
+            startMarkerPreview(markerID)
+        }
+    }
+
+    func setSelectedMarkerClickPulsePreset(_ preset: ClickPulsePreset) {
+        updateSelectedMarker { marker in
+            guard marker.isClickFocus else { return }
+            marker.clickPulse = ClickPulseConfiguration(preset: preset)
+        }
+    }
+
     func setCurrentCaptureTitle(_ title: String) {
         captureTitle = title
         scheduleMetadataSave()
@@ -1341,8 +1359,11 @@ final class CaptureSetupViewModel: ObservableObject {
         playbackPresentationMode = .playingRenderedPreview
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         isPlaybackActive = false
+        let previewStartDelay: TimeInterval = recordingSummary?.zoomMarkers.first(where: { $0.id == markerID })?.clickPulse == nil
+            ? previewTransitionHoldDuration
+            : 0
         playbackTransitionTask = Task { [weak self, weak player] in
-            try? await Task.sleep(for: .seconds(self?.previewTransitionHoldDuration ?? 0.28))
+            try? await Task.sleep(for: .seconds(previewStartDelay))
             await MainActor.run {
                 guard let self, let player else { return }
                 if self.playbackTransitionPlateState != .hidden {

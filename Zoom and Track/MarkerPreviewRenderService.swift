@@ -111,14 +111,26 @@ final class MarkerPreviewRenderService {
             var image = request.sourceImage.transformed(by: baseOrientationTransform)
             image = image.transformed(by: CGAffineTransform(scaleX: baseScale, y: baseScale))
 
+            let pulseImage = makeClickPulseOverlay(
+                at: sourceTime,
+                markers: markers,
+                contentCoordinateSize: contentCoordinateSize,
+                orientedVideoSize: orientedSize,
+                outputSize: outputSize,
+                previewState: previewState
+            )
+
             if let previewState {
                 let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
                 image = image.transformed(by: CGAffineTransform(scaleX: previewState.scale, y: previewState.scale))
                 image = image.transformed(by: CGAffineTransform(translationX: offset.width, y: offset.height))
             }
 
-            let croppedImage = image.cropped(to: outputRect)
-            request.finish(with: croppedImage, context: self.ciContext)
+            var outputImage = image.cropped(to: outputRect)
+            if let pulseImage {
+                outputImage = pulseImage.cropped(to: outputRect).composited(over: outputImage)
+            }
+            request.finish(with: outputImage, context: self.ciContext)
         }
         configureVideoComposition(videoComposition, renderSize: outputSize, frameDuration: frameDuration)
 
@@ -570,13 +582,27 @@ final class ExportRenderService {
             var image = request.sourceImage.transformed(by: baseOrientationTransform)
             image = image.transformed(by: CGAffineTransform(scaleX: baseScale, y: baseScale))
 
+            let pulseImage = makeClickPulseOverlay(
+                at: sourceTime,
+                markers: markers,
+                contentCoordinateSize: summary.contentCoordinateSize,
+                orientedVideoSize: orientedSize,
+                outputSize: outputSize,
+                previewState: previewState
+            )
+
             if let previewState {
                 let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
                 image = image.transformed(by: CGAffineTransform(scaleX: previewState.scale, y: previewState.scale))
                 image = image.transformed(by: CGAffineTransform(translationX: offset.width, y: offset.height))
             }
 
-            request.finish(with: image.cropped(to: outputRect), context: self.ciContext)
+            var outputImage = image.cropped(to: outputRect)
+            if let pulseImage {
+                outputImage = pulseImage.cropped(to: outputRect).composited(over: outputImage)
+            }
+
+            request.finish(with: outputImage, context: self.ciContext)
         }
         configureVideoComposition(videoComposition, renderSize: outputSize, frameDuration: frameDuration)
 
@@ -678,6 +704,175 @@ private enum MotionTuning {
     static let bounceMaxOvershoot = 0.18
     static let bounceOscillationCount = 4.0
     static let panBounceInfluence = 0.18
+}
+
+private func makeClickPulseOverlay(
+    at currentTime: Double,
+    markers: [ZoomPlanItem],
+    contentCoordinateSize: CGSize,
+    orientedVideoSize: CGSize,
+    outputSize: CGSize,
+    previewState: SharedMotionEngine.PreviewState?
+) -> CIImage? {
+    let activePulses = markers.compactMap { marker -> (SharedMotionEngine.ClickPulseRenderState, CGPoint)? in
+        guard let pulseState = SharedMotionEngine.clickPulseRenderState(at: currentTime, marker: marker) else {
+            return nil
+        }
+        let resolution = SharedMotionEngine.resolveOverlayPoint(
+            contentPoint: CGPoint(x: marker.centerX, y: marker.centerY),
+            contentCoordinateSize: contentCoordinateSize,
+            orientedVideoSize: orientedVideoSize,
+            outputSize: outputSize,
+            previewState: previewState,
+        )
+        guard resolution.isVisible else { return nil }
+        return (pulseState, resolution.point)
+    }
+    guard !activePulses.isEmpty else { return nil }
+
+    let width = max(Int(outputSize.width.rounded(.up)), 1)
+    let height = max(Int(outputSize.height.rounded(.up)), 1)
+    guard let context = CGContext(
+        data: nil,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else {
+        return nil
+    }
+
+    context.setAllowsAntialiasing(true)
+    context.setShouldAntialias(true)
+    context.translateBy(x: 0, y: outputSize.height)
+    context.scaleBy(x: 1, y: -1)
+
+    for (pulse, center) in activePulses {
+        drawClickPulse(
+            center: center,
+            time: pulse.progress,
+            preset: pulse.preset,
+            in: context,
+            outputSize: outputSize
+        )
+    }
+
+    guard let cgImage = context.makeImage() else { return nil }
+    return CIImage(cgImage: cgImage)
+}
+
+private func drawClickPulse(
+    center: CGPoint,
+    time: Double,
+    preset: ClickPulsePreset,
+    in context: CGContext,
+    outputSize: CGSize
+) {
+    let baseRadius = max(min(outputSize.width, outputSize.height) * 0.035, 18)
+    let p = CGFloat(time)
+    let white = CGColor(red: 1, green: 1, blue: 1, alpha: 1)
+    let icy = CGColor(red: 0.82, green: 0.94, blue: 1.0, alpha: 1)
+
+    switch preset {
+    case .subtleRing:
+        strokeCircle(
+            in: context,
+            center: center,
+            radius: baseRadius + (baseRadius * 1.6 * p),
+            lineWidth: max(1.5, baseRadius * 0.12 * (1 - (p * 0.4))),
+            color: icy,
+            alpha: 0.32 * (1 - p)
+        )
+    case .doubleRing:
+        strokeCircle(
+            in: context,
+            center: center,
+            radius: baseRadius + (baseRadius * 1.3 * p),
+            lineWidth: max(1.4, baseRadius * 0.11),
+            color: white,
+            alpha: 0.34 * (1 - p)
+        )
+        let delayed = max((p - 0.22) / 0.78, 0)
+        if delayed > 0 {
+            strokeCircle(
+                in: context,
+                center: center,
+                radius: baseRadius * 0.85 + (baseRadius * 1.9 * delayed),
+                lineWidth: max(1.2, baseRadius * 0.1),
+                color: icy,
+                alpha: 0.24 * (1 - delayed)
+            )
+        }
+    case .softGlow:
+        fillCircle(
+            in: context,
+            center: center,
+            radius: baseRadius * (0.6 + (0.9 * p)),
+            color: icy,
+            alpha: 0.18 * (1 - p)
+        )
+        fillCircle(
+            in: context,
+            center: center,
+            radius: baseRadius * (1.0 + (1.6 * p)),
+            color: white,
+            alpha: 0.08 * (1 - p)
+        )
+    case .radarPing:
+        strokeCircle(
+            in: context,
+            center: center,
+            radius: baseRadius * 0.8 + (baseRadius * 2.6 * p),
+            lineWidth: max(1.2, baseRadius * 0.1 * (1 - (p * 0.25))),
+            color: icy,
+            alpha: 0.3 * (1 - p)
+        )
+        fillCircle(
+            in: context,
+            center: center,
+            radius: baseRadius * 0.22,
+            color: white,
+            alpha: 0.18 * (1 - (p * 0.6))
+        )
+    case .expandingDot:
+        fillCircle(
+            in: context,
+            center: center,
+            radius: baseRadius * (0.24 + (0.8 * p)),
+            color: white,
+            alpha: 0.24 * (1 - p)
+        )
+    }
+}
+
+private func strokeCircle(
+    in context: CGContext,
+    center: CGPoint,
+    radius: CGFloat,
+    lineWidth: CGFloat,
+    color: CGColor,
+    alpha: CGFloat
+) {
+    guard alpha > 0.001 else { return }
+    let rect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+    context.setStrokeColor(color.copy(alpha: alpha) ?? color)
+    context.setLineWidth(lineWidth)
+    context.strokeEllipse(in: rect)
+}
+
+private func fillCircle(
+    in context: CGContext,
+    center: CGPoint,
+    radius: CGFloat,
+    color: CGColor,
+    alpha: CGFloat
+) {
+    guard alpha > 0.001 else { return }
+    let rect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+    context.setFillColor(color.copy(alpha: alpha) ?? color)
+    context.fillEllipse(in: rect)
 }
 
 private func configureVideoComposition(
