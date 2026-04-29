@@ -648,12 +648,7 @@ struct ContentView: View {
             )
 
             HStack(spacing: 12) {
-                TextField("Search captures", text: $librarySearchText)
-                    .textFieldStyle(.roundedBorder)
-
-                Button("Refresh") {
-                    Task { await viewModel.refreshLibrary() }
-                }
+                librarySearchField
             }
 
             if let libraryStatusMessage = viewModel.libraryStatusMessage, !libraryStatusMessage.isEmpty {
@@ -750,6 +745,20 @@ struct ContentView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
 
+                Button {
+                    viewModel.revealLibraryCapture(item)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.forward.folder.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Reveal in Finder")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help("Reveal in Finder")
+
                 HStack(spacing: 10) {
                     libraryMetadataPill(text: item.captureType.displayName, systemName: "tag")
                     libraryMetadataPill(
@@ -762,14 +771,6 @@ struct ContentView: View {
                             systemName: "timer"
                         )
                     }
-
-                    Button {
-                        viewModel.revealLibraryCapture(item)
-                    } label: {
-                        libraryMetadataPillIcon(systemName: "arrow.folder.forward.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .help("Reveal in Finder")
                 }
 
                 if !item.isAvailable, let statusMessage = item.statusMessage {
@@ -782,14 +783,26 @@ struct ContentView: View {
             Spacer(minLength: 12)
 
             VStack(alignment: .trailing, spacing: 8) {
-                Button("Edit") {
+                Spacer(minLength: 0)
+                Button {
                     viewModel.openLibraryCapture(item)
                     selectedTab = .review
+                } label: {
+                    Label("Edit Screen Capture", systemImage: "play.rectangle")
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .foregroundStyle(Color.white)
+                        .background(
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .fill(Color.accentColor)
+                        )
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(.plain)
+                .opacity(item.canOpenInEditor ? 1 : 0.45)
                 .disabled(!item.canOpenInEditor)
             }
+            .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -804,23 +817,46 @@ struct ContentView: View {
         )
     }
 
+    private var librarySearchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            TextField("Search captures", text: $librarySearchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+
+            if !librarySearchText.isEmpty {
+                Button {
+                    librarySearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13.5))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.84))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+        )
+    }
+
     private func libraryMetadataPill(text: String, systemName: String) -> some View {
         Label(text, systemImage: systemName)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.secondary.opacity(0.08))
-            )
-    }
-
-    private func libraryMetadataPillIcon(systemName: String) -> some View {
-        Image(systemName: systemName)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .frame(width: 30, height: 24)
             .background(
                 Capsule(style: .continuous)
                     .fill(Color.secondary.opacity(0.08))
@@ -977,7 +1013,7 @@ struct ContentView: View {
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(selectedValue == option.label ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.08), lineWidth: 1)
+                                    .strokeBorder(selectedValue == option.label ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.08), lineWidth: 1)
                             )
                         }
                         .buttonStyle(.plain)
@@ -1130,7 +1166,7 @@ struct ContentView: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSelected ? Color.accentColor.opacity(0.45) : Color.secondary.opacity(0.12), lineWidth: 1)
+                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.45) : Color.secondary.opacity(0.12), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -2857,6 +2893,8 @@ struct ContentView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
                                 ForEach(Array(summary.zoomMarkers.enumerated()), id: \.element.id) { index, marker in
+                                    let isSelected = viewModel.selectedZoomMarkerID == marker.id
+                                    let isPlaybackHighlighted = isMarkerPlaybackHighlighted(marker)
                                     VStack(alignment: .leading, spacing: 6) {
                                         HStack(spacing: 10) {
                                             Text("#\(index + 1)")
@@ -2905,12 +2943,34 @@ struct ContentView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .background(
                                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.12) : Color.clear)
+                                            .fill(
+                                                isPlaybackHighlighted
+                                                    ? Color.accentColor.opacity(0.20)
+                                                    : isSelected
+                                                    ? Color.accentColor.opacity(0.12)
+                                                    : Color.clear
+                                            )
                                     )
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .stroke(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.08), lineWidth: 1)
+                                            .strokeBorder(
+                                                isPlaybackHighlighted
+                                                    ? Color.accentColor.opacity(0.55)
+                                                    : isSelected
+                                                    ? Color.accentColor.opacity(0.35)
+                                                    : Color.secondary.opacity(0.08),
+                                                lineWidth: 1
+                                            )
                                     )
+                                    .overlay(alignment: .leading) {
+                                        if isPlaybackHighlighted {
+                                            Capsule(style: .continuous)
+                                                .fill(Color.accentColor)
+                                                .frame(width: 4)
+                                                .padding(.vertical, 8)
+                                                .padding(.leading, 2)
+                                        }
+                                    }
                                     .opacity(marker.enabled ? 1.0 : 0.5)
                                     .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                     .onTapGesture {
@@ -2951,7 +3011,21 @@ struct ContentView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                     TextField("Untitled Capture", text: $captureInfoTitleDraft)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.84))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(
+                                    focusedCaptureInfoField == .title ? Color.accentColor.opacity(0.32) : Color.secondary.opacity(0.14),
+                                    lineWidth: 1
+                                )
+                        )
                         .focused($focusedCaptureInfoField, equals: .title)
                 }
 
@@ -2960,7 +3034,21 @@ struct ContentView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                     TextField("Default Collection", text: $captureInfoCollectionDraft)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.84))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(
+                                    focusedCaptureInfoField == .collection ? Color.accentColor.opacity(0.32) : Color.secondary.opacity(0.14),
+                                    lineWidth: 1
+                                )
+                        )
                         .focused($focusedCaptureInfoField, equals: .collection)
                         .overlay(alignment: .topLeading) {
                             if focusedCaptureInfoField == .collection,
@@ -2980,7 +3068,21 @@ struct ContentView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                     TextField("General Project", text: $captureInfoProjectDraft)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.84))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(
+                                    focusedCaptureInfoField == .project ? Color.accentColor.opacity(0.32) : Color.secondary.opacity(0.14),
+                                    lineWidth: 1
+                                )
+                        )
                         .focused($focusedCaptureInfoField, equals: .project)
                         .overlay(alignment: .topLeading) {
                             if focusedCaptureInfoField == .project,
@@ -3551,6 +3653,18 @@ struct ContentView: View {
         }
 
         return nil
+    }
+
+    private func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
+        guard timelinePhase(for: marker, at: viewModel.currentPlaybackTime) != nil else {
+            return false
+        }
+
+        if viewModel.activePreviewMarkerID == marker.id {
+            return true
+        }
+
+        return viewModel.isPlaybackActive && viewModel.selectedZoomMarkerID == marker.id
     }
 
     private func timelinePhase(for marker: ZoomPlanItem, at currentTime: Double) -> MarkerTimingPhase? {
