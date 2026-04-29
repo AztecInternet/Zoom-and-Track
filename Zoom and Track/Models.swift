@@ -473,6 +473,7 @@ struct ClickPulseConfiguration: Codable, Equatable {
 struct ZoomPlanItem: Codable, Identifiable {
     var id: String
     var type: String
+    var markerName: String?
     var markerKind: ZoomMarkerKind
     var sourceEventTimestamp: Double
     var rawX: Double?
@@ -494,10 +495,12 @@ struct ZoomPlanItem: Codable, Identifiable {
     var bounceAmount: Double
     var clickPulse: ClickPulseConfiguration?
     var noZoomFallbackMode: NoZoomFallbackMode
+    var displayOrder: Int?
 
     private enum CodingKeys: String, CodingKey {
         case id
         case type
+        case markerName
         case markerKind
         case sourceEventTimestamp
         case rawX
@@ -519,11 +522,13 @@ struct ZoomPlanItem: Codable, Identifiable {
         case bounceAmount
         case clickPulse
         case noZoomFallbackMode
+        case displayOrder
     }
 
     init(
         id: String,
         type: String,
+        markerName: String? = nil,
         markerKind: ZoomMarkerKind = .clickFocus,
         sourceEventTimestamp: Double,
         rawX: Double?,
@@ -544,10 +549,12 @@ struct ZoomPlanItem: Codable, Identifiable {
         zoomType: ZoomType,
         bounceAmount: Double,
         clickPulse: ClickPulseConfiguration? = nil,
-        noZoomFallbackMode: NoZoomFallbackMode = .pan
+        noZoomFallbackMode: NoZoomFallbackMode = .pan,
+        displayOrder: Int? = nil
     ) {
         self.id = id
         self.type = type
+        self.markerName = markerName
         self.markerKind = markerKind
         self.sourceEventTimestamp = sourceEventTimestamp
         self.rawX = rawX
@@ -569,12 +576,14 @@ struct ZoomPlanItem: Codable, Identifiable {
         self.bounceAmount = bounceAmount
         self.clickPulse = clickPulse
         self.noZoomFallbackMode = noZoomFallbackMode
+        self.displayOrder = displayOrder
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         type = try container.decode(String.self, forKey: .type)
+        markerName = try container.decodeIfPresent(String.self, forKey: .markerName)
         markerKind = try container.decodeIfPresent(ZoomMarkerKind.self, forKey: .markerKind) ?? .clickFocus
         sourceEventTimestamp = try container.decode(Double.self, forKey: .sourceEventTimestamp)
         rawX = try container.decodeIfPresent(Double.self, forKey: .rawX)
@@ -591,6 +600,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         bounceAmount = try container.decodeIfPresent(Double.self, forKey: .bounceAmount) ?? 0.35
         clickPulse = try container.decodeIfPresent(ClickPulseConfiguration.self, forKey: .clickPulse)
         noZoomFallbackMode = try container.decodeIfPresent(NoZoomFallbackMode.self, forKey: .noZoomFallbackMode) ?? .pan
+        displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
 
         let legacyDuration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? max(endTime - startTime, 0.5)
         let legacyPhases = ZoomPlanItem.legacyPhaseTiming(totalDuration: legacyDuration)
@@ -1118,7 +1128,7 @@ enum SharedMotionEngine {
         case .pan:
             return PreviewState(
                 scale: restingState.scale,
-                normalizedPoint: minimumPanTarget(from: restingState, toInclude: targetPoint)
+                normalizedPoint: centeredPanTarget(from: restingState, toward: targetPoint)
             )
         case .scale:
             let fittedScale = maximumVisibleScale(for: targetPoint, anchoredTo: restingState)
@@ -1134,25 +1144,15 @@ enum SharedMotionEngine {
         return CGRect(x: minX, y: minY, width: viewportWidth, height: viewportHeight)
     }
 
-    private static func minimumPanTarget(from state: PreviewState, toInclude targetPoint: CGPoint) -> CGPoint {
+    private static func centeredPanTarget(from state: PreviewState, toward targetPoint: CGPoint) -> CGPoint {
         let rect = visibleRect(for: state)
         let viewportWidth = rect.width
         let viewportHeight = rect.height
 
-        var minX = rect.minX
-        if targetPoint.x < rect.minX {
-            minX = targetPoint.x
-        } else if targetPoint.x > rect.maxX {
-            minX = targetPoint.x - viewportWidth
-        }
+        var minX = targetPoint.x - (viewportWidth / 2)
         minX = min(max(minX, 0), 1 - viewportWidth)
 
-        var minY = rect.minY
-        if targetPoint.y < rect.minY {
-            minY = targetPoint.y
-        } else if targetPoint.y > rect.maxY {
-            minY = targetPoint.y - viewportHeight
-        }
+        var minY = targetPoint.y - (viewportHeight / 2)
         minY = min(max(minY, 0), 1 - viewportHeight)
 
         return CGPoint(

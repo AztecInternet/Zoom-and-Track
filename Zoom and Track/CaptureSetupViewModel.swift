@@ -765,6 +765,13 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    func setMarkerName(_ markerName: String?, for markerID: String) {
+        updateMarker(withID: markerID) { marker in
+            let trimmed = markerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            marker.markerName = trimmed.isEmpty ? nil : trimmed
+        }
+    }
+
     func setSelectedMarkerZoomScale(_ zoomScale: Double) {
         updateSelectedMarker { marker in
             marker.zoomScale = zoomScale
@@ -883,6 +890,7 @@ final class CaptureSetupViewModel: ObservableObject {
         var markers = summary.zoomMarkers
         var duplicate = selectedMarker
         duplicate.id = nextZoomMarkerID(from: markers)
+        duplicate.displayOrder = nextMarkerDisplayOrder(from: markers)
         markers.append(duplicate)
         selectedZoomMarkerID = duplicate.id
         saveZoomMarkers(markers, basedOn: summary)
@@ -910,6 +918,7 @@ final class CaptureSetupViewModel: ObservableObject {
         let marker = ZoomPlanItem(
             id: nextZoomMarkerID(from: markers),
             type: "zoom",
+            markerName: nil,
             markerKind: .clickFocus,
             sourceEventTimestamp: eventTimestamp,
             rawX: nil,
@@ -929,10 +938,30 @@ final class CaptureSetupViewModel: ObservableObject {
             easeStyle: .smooth,
             zoomType: .inOut,
             bounceAmount: 0.35,
-            noZoomFallbackMode: defaultNoZoomFallbackMode
+            noZoomFallbackMode: defaultNoZoomFallbackMode,
+            displayOrder: nextMarkerDisplayOrder(from: markers)
         )
         markers.append(marker)
         selectedZoomMarkerID = marker.id
+        saveZoomMarkers(markers, basedOn: summary)
+    }
+
+    func reorderMarkerList(to orderedMarkerIDs: [String]) {
+        guard let summary = recordingSummary else { return }
+
+        var markers = summary.zoomMarkers
+        let orderedLookup = Dictionary(uniqueKeysWithValues: orderedMarkerIDs.enumerated().map { ($1, $0) })
+        var didChange = false
+
+        for index in markers.indices {
+            guard let displayOrder = orderedLookup[markers[index].id], markers[index].displayOrder != displayOrder else {
+                continue
+            }
+            markers[index].displayOrder = displayOrder
+            didChange = true
+        }
+
+        guard didChange else { return }
         saveZoomMarkers(markers, basedOn: summary)
     }
 
@@ -1289,6 +1318,10 @@ final class CaptureSetupViewModel: ObservableObject {
 
     private func selectedMarkerTimestamp(for markerID: String) -> Double {
         recordingSummary?.zoomMarkers.first(where: { $0.id == markerID })?.sourceEventTimestamp ?? currentPlaybackTime
+    }
+
+    private func nextMarkerDisplayOrder(from markers: [ZoomPlanItem]) -> Int {
+        markers.enumerated().map { $0.element.displayOrder ?? $0.offset }.max().map { $0 + 1 } ?? 0
     }
 
     private func summaryWithMarkers(_ markers: [ZoomPlanItem], basedOn summary: RecordingInspectionSummary) -> RecordingInspectionSummary {

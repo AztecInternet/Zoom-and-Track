@@ -7,6 +7,7 @@ import AppKit
 import AVFoundation
 import AVKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -19,6 +20,11 @@ struct ContentView: View {
     @State private var playbackScrubTime = 0.0
     @State private var isScrubbingPlayback = false
     @State private var suppressMarkerListAutoScrollUntil: Date?
+    @State private var draggedMarkerListID: String?
+    @State private var markerListDropTargetID: String?
+    @State private var markerListPreviewOrder: [String]?
+    @State private var renamingMarkerID: String?
+    @State private var markerNameDraft: String = ""
     @State private var hoveredTimelineMarkerID: String?
     @State private var isDraggingTimeline = false
     @State private var inspectorFocusedTimingPhase: MarkerTimingPhase?
@@ -88,12 +94,12 @@ struct ContentView: View {
         case zoomOut = "Zoom Out"
     }
 
-    private enum EditInspectorMode: String, CaseIterable, Identifiable {
-        case captureInfo = "Capture Info"
-        case markers = "Markers"
+private enum EditInspectorMode: String, CaseIterable, Identifiable {
+    case captureInfo = "Edit Capture Info"
+    case markers = "Edit Markers List"
 
-        var id: String { rawValue }
-    }
+    var id: String { rawValue }
+}
 
     private enum CaptureInfoField: Hashable {
         case title
@@ -2855,12 +2861,20 @@ struct ContentView: View {
             Text("Inspector")
                 .font(.system(size: 16, weight: .semibold))
 
-            Picker("Inspector Mode", selection: $inspectorMode) {
-                ForEach(EditInspectorMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Mode")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Picker("Mode", selection: $inspectorMode) {
+                    ForEach(EditInspectorMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
             }
-            .pickerStyle(.segmented)
 
             Group {
                 switch inspectorMode {
@@ -2877,130 +2891,203 @@ struct ContentView: View {
     }
 
     private func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
-        ScrollViewReader { proxy in
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Markers")
-                        .font(.system(size: 12, weight: .semibold))
+        let displayedMarkers = displayedMarkerList(summary.zoomMarkers)
+        let entries = displayedMarkers.enumerated().map { index, marker in
+            MarkerListEntry(
+                marker: marker,
+                markerNumber: index + 1,
+                isSelected: viewModel.selectedZoomMarkerID == marker.id,
+                isPlaybackHighlighted: isMarkerPlaybackHighlighted(marker)
+            )
+        }
+
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Markers")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                if entries.isEmpty {
+                    Text("No markers")
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
-
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if summary.zoomMarkers.isEmpty {
-                                Text("No markers")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            } else {
-                                ForEach(Array(summary.zoomMarkers.enumerated()), id: \.element.id) { index, marker in
-                                    let isSelected = viewModel.selectedZoomMarkerID == marker.id
-                                    let isPlaybackHighlighted = isMarkerPlaybackHighlighted(marker)
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        HStack(spacing: 10) {
-                                            Text("#\(index + 1)")
-                                                .font(.system(size: 11, weight: .semibold))
-                                                .frame(width: 26, alignment: .leading)
-                                            Text(timecodeString(for: marker.sourceEventTimestamp))
-                                                .font(.system(size: 11, design: .monospaced))
-                                                .frame(width: 88, alignment: .leading)
-                                            Image(systemName: markerTypeSymbol(for: marker.zoomType))
-                                                .font(.system(size: 12))
-                                                .foregroundStyle(.secondary)
-                                            Spacer(minLength: 0)
-                                            Button {
-                                                viewModel.toggleMarkerEnabled(marker.id)
-                                            } label: {
-                                                HStack(spacing: 4) {
-                                                    Image(systemName: marker.enabled ? "checkmark.circle.fill" : "circle")
-                                                    Text(marker.enabled ? "On" : "Off")
-                                                }
-                                                .font(.system(size: 11, weight: .medium))
-                                                .foregroundStyle(marker.enabled ? Color.accentColor : Color.secondary)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-
-                                        HStack(spacing: 12) {
-                                            Label {
-                                                Text(String(format: "%.1fx", marker.zoomScale))
-                                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                            } icon: {
-                                                Image(systemName: "viewfinder.rectangular")
-                                            }
-
-                                            Label {
-                                                Text(String(format: "%.2fs", marker.totalSegmentDuration))
-                                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                            } icon: {
-                                                Image(systemName: "timer")
-                                            }
-                                        }
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.secondary)
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(
-                                                isPlaybackHighlighted
-                                                    ? Color.accentColor.opacity(0.20)
-                                                    : isSelected
-                                                    ? Color.accentColor.opacity(0.12)
-                                                    : Color.clear
-                                            )
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .strokeBorder(
-                                                isPlaybackHighlighted
-                                                    ? Color.accentColor.opacity(0.55)
-                                                    : isSelected
-                                                    ? Color.accentColor.opacity(0.35)
-                                                    : Color.secondary.opacity(0.08),
-                                                lineWidth: 1
-                                            )
-                                    )
-                                    .overlay(alignment: .leading) {
-                                        if isPlaybackHighlighted {
-                                            Capsule(style: .continuous)
-                                                .fill(Color.accentColor)
-                                                .frame(width: 4)
-                                                .padding(.vertical, 8)
-                                                .padding(.leading, 2)
-                                        }
-                                    }
-                                    .opacity(marker.enabled ? 1.0 : 0.5)
-                                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                    .onTapGesture {
-                                        suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
-                                        viewModel.startMarkerPreview(marker.id)
-                                    }
-                                    .id(marker.id)
-                                }
-                            }
-                        }
                         .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    MarkerListTableView(
+                        entries: entries,
+                        selectedMarkerID: viewModel.selectedZoomMarkerID,
+                        onSelectMarker: { markerID in
+                            guard renamingMarkerID == nil else { return }
+                            suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
+                            viewModel.startMarkerPreview(markerID)
+                        },
+                        onToggleMarkerEnabled: viewModel.toggleMarkerEnabled(_:),
+                        onReorderMarkers: viewModel.reorderMarkerList(to:),
+                        renamingMarkerID: $renamingMarkerID,
+                        markerNameDraft: $markerNameDraft,
+                        onBeginRename: { marker in
+                            renamingMarkerID = marker.id
+                            markerNameDraft = marker.markerName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                                ? marker.markerName ?? ""
+                                : "Unnamed Marker"
+                        },
+                        onCommitRename: { markerID, name in
+                            viewModel.setMarkerName(name, for: markerID)
+                            renamingMarkerID = nil
+                        },
+                        onCancelRename: {
+                            renamingMarkerID = nil
+                        }
+                    )
+                    .frame(minHeight: 220)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            Divider()
+
+            markerEditorSection
+                .frame(maxWidth: .infinity, alignment: .bottomLeading)
+        }
+    }
+
+    private func markerListRow(
+        marker: ZoomPlanItem,
+        markerNumber: Int,
+        isSelected: Bool,
+        isPlaybackHighlighted: Bool,
+        isGhosted: Bool,
+        isLiftedPreview: Bool,
+        showsDropTarget: Bool,
+        dragProvider: (() -> NSItemProvider)? = nil
+    ) -> AnyView {
+        let backgroundFill: Color = isPlaybackHighlighted
+            ? Color.accentColor.opacity(0.20)
+            : isSelected
+            ? Color.accentColor.opacity(0.12)
+            : Color.clear
+        let strokeColor: Color = isPlaybackHighlighted
+            ? Color.accentColor.opacity(0.55)
+            : isSelected
+            ? Color.accentColor.opacity(0.35)
+            : Color.secondary.opacity(0.08)
+
+        return AnyView(VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Group {
+                    if let dragProvider {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .onDrag(dragProvider) {
+                                markerListDragPreview(
+                                    marker: marker,
+                                    markerNumber: markerNumber,
+                                    isSelected: isSelected,
+                                    isPlaybackHighlighted: isPlaybackHighlighted
+                                )
+                            }
+                    } else {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                Divider()
-
-                markerEditorSection
-                    .frame(maxWidth: .infinity, alignment: .bottomLeading)
+                Text("#\(markerNumber)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 26, alignment: .leading)
+                Text(timecodeString(for: marker.sourceEventTimestamp))
+                    .font(.system(size: 11, design: .monospaced))
+                    .frame(width: 88, alignment: .leading)
+                Image(systemName: markerTypeSymbol(for: marker.zoomType))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button {
+                    viewModel.toggleMarkerEnabled(marker.id)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: marker.enabled ? "checkmark.circle.fill" : "circle")
+                        Text(marker.enabled ? "On" : "Off")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(marker.enabled ? Color.accentColor : Color.secondary)
+                }
+                .buttonStyle(.plain)
             }
-            .onChange(of: viewModel.selectedZoomMarkerID) {
-                guard let selectedZoomMarkerID = viewModel.selectedZoomMarkerID else { return }
-                if let suppressUntil = suppressMarkerListAutoScrollUntil, Date() < suppressUntil {
-                    return
+
+            HStack(spacing: 12) {
+                Label {
+                    Text(String(format: "%.1fx", marker.zoomScale))
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                } icon: {
+                    Image(systemName: "viewfinder.rectangular")
                 }
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    proxy.scrollTo(selectedZoomMarkerID, anchor: .center)
+                Label {
+                    Text(String(format: "%.2fs", marker.totalSegmentDuration))
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                } icon: {
+                    Image(systemName: "timer")
                 }
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(backgroundFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(strokeColor, lineWidth: 1)
+        )
+        .overlay(alignment: .leading) {
+            if isPlaybackHighlighted {
+                Capsule(style: .continuous)
+                    .fill(Color.accentColor)
+                    .frame(width: 4)
+                    .padding(.vertical, 8)
+                    .padding(.leading, 2)
             }
         }
+        .overlay(alignment: .top) {
+            if showsDropTarget {
+                Capsule(style: .continuous)
+                    .fill(Color.accentColor.opacity(0.8))
+                    .frame(width: 110, height: 4)
+                    .offset(y: -2)
+            }
+        }
+        .opacity(isGhosted ? 0.26 : (marker.enabled ? 1.0 : 0.5))
+        .scaleEffect(isLiftedPreview ? 1.03 : 1, anchor: .center)
+        .shadow(
+            color: isLiftedPreview ? Color.black.opacity(0.18) : Color.clear,
+            radius: isLiftedPreview ? 14 : 0,
+            x: 0,
+            y: isLiftedPreview ? 8 : 0
+        ))
+    }
+
+    private func markerListDragPreview(
+        marker: ZoomPlanItem,
+        markerNumber: Int,
+        isSelected: Bool,
+        isPlaybackHighlighted: Bool
+    ) -> AnyView {
+        AnyView(markerListRow(
+            marker: marker,
+            markerNumber: markerNumber,
+            isSelected: isSelected,
+            isPlaybackHighlighted: isPlaybackHighlighted,
+            isGhosted: false,
+            isLiftedPreview: true,
+            showsDropTarget: false,
+            dragProvider: nil
+        )
+        .frame(width: 280))
     }
 
     private func captureInfoInspector(_ summary: RecordingInspectionSummary) -> some View {
@@ -3667,6 +3754,27 @@ struct ContentView: View {
         return viewModel.isPlaybackActive && viewModel.selectedZoomMarkerID == marker.id
     }
 
+    private func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
+        if let previewOrder {
+            let lookup = Dictionary(uniqueKeysWithValues: markers.map { ($0.id, $0) })
+            let ordered = previewOrder.compactMap { lookup[$0] }
+            let missing = markers.filter { !previewOrder.contains($0.id) }
+            return ordered + missing
+        }
+
+        return markers
+            .enumerated()
+            .sorted { lhs, rhs in
+                let leftOrder = lhs.element.displayOrder ?? lhs.offset
+                let rightOrder = rhs.element.displayOrder ?? rhs.offset
+                if leftOrder == rightOrder {
+                    return lhs.offset < rhs.offset
+                }
+                return leftOrder < rightOrder
+            }
+            .map(\.element)
+    }
+
     private func timelinePhase(for marker: ZoomPlanItem, at currentTime: Double) -> MarkerTimingPhase? {
         let timeline = zoomTimeline(for: marker)
         guard currentTime >= timeline.startTime, currentTime <= timeline.endTime else {
@@ -3807,6 +3915,484 @@ private enum AppTab: String, CaseIterable, Identifiable {
             return "play.rectangle"
         case .settings:
             return "gearshape"
+        }
+    }
+}
+
+private struct MarkerListEntry: Identifiable {
+    let marker: ZoomPlanItem
+    let markerNumber: Int
+    let isSelected: Bool
+    let isPlaybackHighlighted: Bool
+
+    var id: String { marker.id }
+}
+
+private struct MarkerListTableView: NSViewRepresentable {
+    let entries: [MarkerListEntry]
+    let selectedMarkerID: String?
+    let onSelectMarker: (String) -> Void
+    let onToggleMarkerEnabled: (String) -> Void
+    let onReorderMarkers: ([String]) -> Void
+    @Binding var renamingMarkerID: String?
+    @Binding var markerNameDraft: String
+    let onBeginRename: (ZoomPlanItem) -> Void
+    let onCommitRename: (String, String) -> Void
+    let onCancelRename: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+
+        let tableView = NSTableView()
+        tableView.headerView = nil
+        tableView.rowHeight = 76
+        tableView.intercellSpacing = NSSize(width: 0, height: 0)
+        tableView.backgroundColor = .clear
+        tableView.selectionHighlightStyle = .none
+        tableView.focusRingType = .none
+        tableView.allowsMultipleSelection = false
+        tableView.allowsEmptySelection = true
+        tableView.usesAlternatingRowBackgroundColors = false
+        tableView.gridStyleMask = []
+        tableView.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        tableView.style = .plain
+        tableView.delegate = context.coordinator
+        tableView.dataSource = context.coordinator
+        tableView.registerForDraggedTypes([.string])
+        tableView.setDraggingSourceOperationMask(.move, forLocal: true)
+
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("MarkerColumn"))
+        column.resizingMask = .autoresizingMask
+        tableView.addTableColumn(column)
+
+        scrollView.documentView = tableView
+        context.coordinator.tableView = tableView
+        return scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        context.coordinator.refreshTableIfNeeded()
+        context.coordinator.syncSelection()
+    }
+
+    final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+        var parent: MarkerListTableView
+        weak var tableView: NSTableView?
+        private var isProgrammaticSelectionChange = false
+        private var draggedMarkerID: String?
+        private var lastRenderedEntryIDs: [String] = []
+        private var lastRenderedSelectionID: String?
+        private var lastRenderedHighlightSignature: String = ""
+        private var lastRenderedRenamingMarkerID: String?
+
+        init(parent: MarkerListTableView) {
+            self.parent = parent
+        }
+
+        func numberOfRows(in tableView: NSTableView) -> Int {
+            parent.entries.count
+        }
+
+        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+            76
+        }
+
+        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+            let identifier = NSUserInterfaceItemIdentifier("MarkerListHostingCellView")
+            let cell = (tableView.makeView(withIdentifier: identifier, owner: nil) as? MarkerListHostingCellView) ?? MarkerListHostingCellView(identifier: identifier)
+            let entry = parent.entries[row]
+            cell.update(
+                rootView: MarkerListCellContent(
+                    entry: entry,
+                    onToggleEnabled: { [weak self] in
+                        self?.parent.onToggleMarkerEnabled(entry.id)
+                    },
+                    renamingMarkerID: parent.$renamingMarkerID,
+                    markerNameDraft: parent.$markerNameDraft,
+                    onBeginRename: { [weak self] in
+                        self?.parent.onBeginRename(entry.marker)
+                    },
+                    onCommitRename: { [weak self] name in
+                        self?.parent.onCommitRename(entry.id, name)
+                    },
+                    onCancelRename: { [weak self] in
+                        self?.parent.onCancelRename()
+                    }
+                )
+            )
+            return cell
+        }
+
+        func tableViewSelectionDidChange(_ notification: Notification) {
+            guard !isProgrammaticSelectionChange,
+                  let tableView,
+                  tableView.selectedRow >= 0,
+                  tableView.selectedRow < parent.entries.count else {
+                return
+            }
+
+            if let renamingMarkerID = parent.renamingMarkerID {
+                parent.onCommitRename(renamingMarkerID, parent.markerNameDraft)
+            }
+            parent.onSelectMarker(parent.entries[tableView.selectedRow].id)
+        }
+
+        func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
+            guard row < parent.entries.count else { return nil }
+            let markerID = parent.entries[row].id
+            draggedMarkerID = markerID
+            let item = NSPasteboardItem()
+            item.setString(markerID, forType: .string)
+            return item
+        }
+
+        func tableView(
+            _ tableView: NSTableView,
+            validateDrop info: NSDraggingInfo,
+            proposedRow row: Int,
+            proposedDropOperation dropOperation: NSTableView.DropOperation
+        ) -> NSDragOperation {
+            tableView.setDropRow(row, dropOperation: .above)
+            return .move
+        }
+
+        func tableView(
+            _ tableView: NSTableView,
+            acceptDrop info: NSDraggingInfo,
+            row: Int,
+            dropOperation: NSTableView.DropOperation
+        ) -> Bool {
+            let markerIDs = parent.entries.map(\.id)
+            guard let draggedMarkerID = draggedMarkerID ?? info.draggingPasteboard.string(forType: .string),
+                  let fromIndex = markerIDs.firstIndex(of: draggedMarkerID) else {
+                return false
+            }
+
+            var reordered = markerIDs
+            let draggedID = reordered.remove(at: fromIndex)
+            let insertionIndex = max(0, min(row > fromIndex ? row - 1 : row, reordered.count))
+            reordered.insert(draggedID, at: insertionIndex)
+            parent.onReorderMarkers(reordered)
+            self.draggedMarkerID = nil
+            return true
+        }
+
+        func syncSelection() {
+            guard let tableView else { return }
+            let targetRow = parent.entries.firstIndex { $0.id == parent.selectedMarkerID } ?? -1
+            if tableView.selectedRow != targetRow {
+                isProgrammaticSelectionChange = true
+                if targetRow >= 0 {
+                    tableView.selectRowIndexes(IndexSet(integer: targetRow), byExtendingSelection: false)
+                    tableView.scrollRowToVisible(targetRow)
+                } else {
+                    tableView.deselectAll(nil)
+                }
+                isProgrammaticSelectionChange = false
+            } else if targetRow >= 0 {
+                tableView.scrollRowToVisible(targetRow)
+            }
+        }
+
+        func refreshTableIfNeeded() {
+            guard let tableView else { return }
+
+            let entryIDs = parent.entries.map(\.id)
+            let selectionID = parent.selectedMarkerID
+            let highlightSignature = parent.entries.map { "\($0.id):\($0.isSelected):\($0.isPlaybackHighlighted):\($0.marker.markerName ?? ""):\($0.marker.enabled)" }.joined(separator: "|")
+            let renamingMarkerID = parent.renamingMarkerID
+
+            let shouldReload: Bool
+            if let renamingMarkerID, renamingMarkerID == lastRenderedRenamingMarkerID {
+                shouldReload = false
+            } else {
+                shouldReload =
+                    entryIDs != lastRenderedEntryIDs ||
+                    selectionID != lastRenderedSelectionID ||
+                    highlightSignature != lastRenderedHighlightSignature ||
+                    renamingMarkerID != lastRenderedRenamingMarkerID
+            }
+
+            if shouldReload {
+                tableView.reloadData()
+                lastRenderedEntryIDs = entryIDs
+                lastRenderedSelectionID = selectionID
+                lastRenderedHighlightSignature = highlightSignature
+                lastRenderedRenamingMarkerID = renamingMarkerID
+            }
+        }
+    }
+}
+
+private struct MarkerListCellContent: View {
+    let entry: MarkerListEntry
+    let onToggleEnabled: () -> Void
+    @Binding var renamingMarkerID: String?
+    @Binding var markerNameDraft: String
+    let onBeginRename: () -> Void
+    let onCommitRename: (String) -> Void
+    let onCancelRename: () -> Void
+    @FocusState private var isNameFieldFocused: Bool
+    @State private var isRenameButtonHovered = false
+
+    var body: some View {
+        let marker = entry.marker
+        let resolvedMarkerName = (marker.markerName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+            ? (marker.markerName ?? "")
+            : "Unnamed Marker"
+        let isRenaming = renamingMarkerID == entry.id
+        let backgroundFill: Color = entry.isPlaybackHighlighted
+            ? Color.accentColor.opacity(0.20)
+            : entry.isSelected
+            ? Color.accentColor.opacity(0.12)
+            : Color.clear
+        let strokeColor: Color = entry.isPlaybackHighlighted
+            ? Color.accentColor.opacity(0.55)
+            : entry.isSelected
+            ? Color.accentColor.opacity(0.35)
+            : Color.secondary.opacity(0.08)
+
+        HStack(alignment: .top, spacing: 10) {
+            dragGrip
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    Text(timecodeString(marker.sourceEventTimestamp))
+                        .font(.system(size: 11, design: .monospaced))
+                        .frame(width: 88, alignment: .leading)
+                    Spacer(minLength: 0)
+                    Button(action: onToggleEnabled) {
+                        HStack(spacing: 4) {
+                            Image(systemName: marker.enabled ? "checkmark.circle.fill" : "circle")
+                            Text(marker.enabled ? "On" : "Off")
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(marker.enabled ? Color.accentColor : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                HStack(spacing: 8) {
+                    if isRenaming {
+                        TextField("", text: $markerNameDraft)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11, weight: .medium))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color.accentColor.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .strokeBorder(Color.accentColor.opacity(0.22), lineWidth: 1)
+                            )
+                            .focused($isNameFieldFocused)
+                            .onSubmit {
+                                onCommitRename(markerNameDraft)
+                            }
+                            .onAppear {
+                                DispatchQueue.main.async {
+                                    isNameFieldFocused = true
+                                }
+                            }
+                    } else {
+                        Text(resolvedMarkerName)
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                    }
+
+                    Button {
+                        if !isRenaming {
+                            onBeginRename()
+                        }
+                    } label: {
+                        Image(systemName: "rectangle.and.pencil.and.ellipsis")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(isRenameButtonHovered ? Color.accentColor : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { isHovered in
+                        isRenameButtonHovered = isHovered
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                HStack(spacing: 12) {
+                    Label {
+                        Text(String(format: "%.1fx", marker.zoomScale))
+                            .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    } icon: {
+                        Image(systemName: "viewfinder.rectangular")
+                    }
+
+                    Label {
+                        Text(String(format: "%.2fs", marker.totalSegmentDuration))
+                            .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    } icon: {
+                        Image(systemName: "timer")
+                    }
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(backgroundFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(strokeColor, lineWidth: 1)
+        )
+        .overlay(alignment: .leading) {
+            if entry.isPlaybackHighlighted {
+                Capsule(style: .continuous)
+                    .fill(Color.accentColor)
+                    .frame(width: 4)
+                    .padding(.vertical, 8)
+                    .padding(.leading, 2)
+            }
+        }
+        .opacity(marker.enabled ? 1.0 : 0.5)
+        .contentShape(Rectangle())
+        .onChange(of: isNameFieldFocused) { _, isFocused in
+            guard isRenaming, !isFocused else { return }
+            onCommitRename(markerNameDraft)
+        }
+    }
+
+    private var dragGrip: some View {
+        HStack(spacing: 3) {
+            VStack(spacing: 4) {
+                ForEach(0..<5, id: \.self) { _ in
+                    Circle()
+                        .fill(Color.secondary.opacity(0.65))
+                        .frame(width: 2.5, height: 2.5)
+                }
+            }
+            VStack(spacing: 4) {
+                ForEach(0..<5, id: \.self) { _ in
+                    Circle()
+                        .fill(Color.secondary.opacity(0.65))
+                        .frame(width: 2.5, height: 2.5)
+                }
+            }
+        }
+        .frame(width: 16)
+        .frame(maxHeight: .infinity, alignment: .center)
+        .padding(.vertical, 2)
+    }
+
+    private func timecodeString(_ seconds: Double) -> String {
+        let clampedSeconds = max(seconds, 0)
+        let totalFrames = Int(clampedSeconds * 30)
+        let hours = totalFrames / (30 * 60 * 60)
+        let minutes = (totalFrames / (30 * 60)) % 60
+        let secs = (totalFrames / 30) % 60
+        let frames = totalFrames % 30
+        return String(format: "%02d:%02d:%02d:%02d", hours, minutes, secs, frames)
+    }
+}
+
+private final class MarkerListHostingCellView: NSTableCellView {
+    private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
+
+    init(identifier: NSUserInterfaceItemIdentifier) {
+        super.init(frame: .zero)
+        self.identifier = identifier
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        hostingView.setFrameSize(.zero)
+        addSubview(hostingView)
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(rootView: MarkerListCellContent) {
+        hostingView.rootView = AnyView(rootView)
+    }
+}
+
+private struct MarkerListReorderDropDelegate: DropDelegate {
+    let targetMarkerID: String
+    @Binding var previewOrder: [String]?
+    @Binding var draggedMarkerID: String?
+    @Binding var dropTargetMarkerID: String?
+    let reorderAction: ([String]) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [UTType.text])
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedMarkerID, draggedMarkerID != targetMarkerID else { return }
+        dropTargetMarkerID = targetMarkerID
+        guard var previewOrder,
+              let fromIndex = previewOrder.firstIndex(of: draggedMarkerID),
+              let toIndex = previewOrder.firstIndex(of: targetMarkerID),
+              fromIndex != toIndex else { return }
+
+        let draggedID = previewOrder.remove(at: fromIndex)
+        previewOrder.insert(draggedID, at: toIndex)
+        self.previewOrder = previewOrder
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        if draggedMarkerID != targetMarkerID {
+            dropTargetMarkerID = targetMarkerID
+        }
+        return DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let draggedMarkerID, draggedMarkerID != targetMarkerID else {
+            self.draggedMarkerID = nil
+            dropTargetMarkerID = nil
+            previewOrder = nil
+            return false
+        }
+
+        guard let previewOrder else {
+            self.draggedMarkerID = nil
+            dropTargetMarkerID = nil
+            return false
+        }
+
+        reorderAction(previewOrder)
+        self.draggedMarkerID = nil
+        dropTargetMarkerID = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            self.previewOrder = nil
+        }
+        return true
+    }
+
+    func dropExited(info: DropInfo) {
+        if !info.hasItemsConforming(to: [UTType.text]), dropTargetMarkerID == targetMarkerID {
+            dropTargetMarkerID = nil
         }
     }
 }

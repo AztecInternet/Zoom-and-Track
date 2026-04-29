@@ -790,6 +790,7 @@ struct ProjectBundleService {
                 ZoomPlanItem(
                     id: String(format: "zoom-%04d", index),
                     type: "zoom",
+                    markerName: nil,
                     sourceEventTimestamp: event.timestamp,
                     rawX: event.x,
                     rawY: event.y,
@@ -808,7 +809,8 @@ struct ProjectBundleService {
                     easeStyle: .smooth,
                     zoomType: .inOut,
                     bounceAmount: 0.35,
-                    noZoomFallbackMode: .pan
+                    noZoomFallbackMode: .pan,
+                    displayOrder: index
                 )
             )
             lastIncludedTimestamp = event.timestamp
