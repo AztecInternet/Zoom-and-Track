@@ -79,6 +79,7 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published private(set) var exportProgress: Double = 0
     @Published private(set) var exportStatusMessage: String?
     @Published private(set) var exportedRecordingURL: URL?
+    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
     
     private var hasRestoredLastRecording = false
     private var activePlaybackScopeURL: URL?
@@ -117,6 +118,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private let lastCollectionNameKey = "LastCollectionName"
     private let lastProjectNameKey = "LastProjectName"
     private let lastCaptureTypeKey = "LastCaptureType"
+    private let defaultNoZoomFallbackModeKey = "DefaultNoZoomFallbackMode"
     private lazy var recordingCoordinator = RecordingCoordinator(
         screenCaptureService: screenCaptureService,
         mediaWriterService: mediaWriterService,
@@ -651,6 +653,8 @@ final class CaptureSetupViewModel: ObservableObject {
         guard isTimelineScrubbing else { return }
         if let snappedMarkerID {
             selectedZoomMarkerID = snappedMarkerID
+        } else {
+            selectedZoomMarkerID = nil
         }
         seekPlayback(to: seconds)
     }
@@ -659,6 +663,8 @@ final class CaptureSetupViewModel: ObservableObject {
         guard isTimelineScrubbing else { return }
         if let snappedMarkerID {
             selectedZoomMarkerID = snappedMarkerID
+        } else {
+            selectedZoomMarkerID = nil
         }
         seekPlayback(to: seconds)
         isTimelineScrubbing = false
@@ -683,6 +689,8 @@ final class CaptureSetupViewModel: ObservableObject {
         if let snappedMarkerID {
             selectedZoomMarkerID = snappedMarkerID
             manualSelectionSuppressionUntil = Date().addingTimeInterval(0.35)
+        } else {
+            selectedZoomMarkerID = nil
         }
         seekPlayback(to: seconds)
     }
@@ -745,6 +753,18 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    func setMarkerEnabled(_ enabled: Bool, for markerID: String) {
+        updateMarker(withID: markerID) { marker in
+            marker.enabled = enabled
+        }
+    }
+
+    func toggleMarkerEnabled(_ markerID: String) {
+        updateMarker(withID: markerID) { marker in
+            marker.enabled.toggle()
+        }
+    }
+
     func setSelectedMarkerZoomScale(_ zoomScale: Double) {
         updateSelectedMarker { marker in
             marker.zoomScale = zoomScale
@@ -753,7 +773,7 @@ final class CaptureSetupViewModel: ObservableObject {
 
     func setSelectedMarkerLeadInTime(_ leadInTime: Double) {
         updateSelectedMarker { marker in
-            marker.leadInTime = min(max(leadInTime, 0), 2.0)
+            marker.leadInTime = min(max(leadInTime, 0), 20.0)
             syncMarkerTiming(&marker)
         }
     }
@@ -788,6 +808,9 @@ final class CaptureSetupViewModel: ObservableObject {
     func setSelectedMarkerZoomType(_ zoomType: ZoomType) {
         updateSelectedMarker { marker in
             marker.zoomType = zoomType
+            if zoomType == .noZoom {
+                marker.noZoomFallbackMode = defaultNoZoomFallbackMode
+            }
             syncMarkerTiming(&marker)
         }
     }
@@ -796,6 +819,17 @@ final class CaptureSetupViewModel: ObservableObject {
         updateSelectedMarker { marker in
             marker.bounceAmount = min(max(bounceAmount, 0), 1)
         }
+    }
+
+    func setSelectedMarkerNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
+        updateSelectedMarker { marker in
+            marker.noZoomFallbackMode = fallbackMode
+        }
+    }
+
+    func setDefaultNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
+        defaultNoZoomFallbackMode = fallbackMode
+        UserDefaults.standard.set(fallbackMode.rawValue, forKey: defaultNoZoomFallbackModeKey)
     }
 
     func setSelectedMarkerClickPulseEnabled(_ enabled: Bool) {
@@ -894,7 +928,8 @@ final class CaptureSetupViewModel: ObservableObject {
             duration: leadInTime + zoomInDuration + holdDuration + zoomOutDuration,
             easeStyle: .smooth,
             zoomType: .inOut,
-            bounceAmount: 0.35
+            bounceAmount: 0.35,
+            noZoomFallbackMode: defaultNoZoomFallbackMode
         )
         markers.append(marker)
         selectedZoomMarkerID = marker.id
@@ -938,6 +973,10 @@ final class CaptureSetupViewModel: ObservableObject {
         if let rawValue = defaults.string(forKey: lastCaptureTypeKey),
            let restoredType = CaptureType(rawValue: rawValue) {
             captureType = restoredType
+        }
+        if let rawValue = defaults.string(forKey: defaultNoZoomFallbackModeKey),
+           let restoredMode = NoZoomFallbackMode(rawValue: rawValue) {
+            defaultNoZoomFallbackMode = restoredMode
         }
     }
 
@@ -1194,6 +1233,17 @@ final class CaptureSetupViewModel: ObservableObject {
         saveZoomMarkers(markers, basedOn: summary)
     }
 
+    private func updateMarker(withID markerID: String, mutate: (inout ZoomPlanItem) -> Void) {
+        guard let summary = recordingSummary,
+              let index = summary.zoomMarkers.firstIndex(where: { $0.id == markerID }) else {
+            return
+        }
+
+        var markers = summary.zoomMarkers
+        mutate(&markers[index])
+        saveZoomMarkers(markers, basedOn: summary)
+    }
+
     private func saveZoomMarkers(_ markers: [ZoomPlanItem], basedOn summary: RecordingInspectionSummary) {
         do {
             let envelope = ZoomPlanEnvelope(schemaVersion: 1, source: "events.json", items: markers)
@@ -1271,7 +1321,7 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     private func syncMarkerTiming(_ marker: inout ZoomPlanItem) {
-        marker.leadInTime = min(max(marker.leadInTime, 0), 2.0)
+        marker.leadInTime = min(max(marker.leadInTime, 0), 20.0)
         marker.zoomInDuration = min(max(marker.zoomInDuration, 0.05), 3.0)
         marker.holdDuration = min(max(marker.holdDuration, 0.05), 10.0)
         marker.zoomOutDuration = min(max(marker.zoomOutDuration, 0.05), 3.0)
@@ -1294,6 +1344,11 @@ final class CaptureSetupViewModel: ObservableObject {
             marker.holdUntil = marker.sourceEventTimestamp
             marker.endTime = marker.sourceEventTimestamp + marker.zoomOutDuration
             marker.duration = marker.totalSegmentDuration
+        case .noZoom:
+            marker.startTime = max(0, marker.sourceEventTimestamp - marker.leadInTime - marker.zoomInDuration)
+            marker.holdUntil = marker.sourceEventTimestamp + marker.holdDuration
+            marker.endTime = marker.holdUntil
+            marker.duration = marker.totalSegmentDuration
         }
     }
 
@@ -1309,7 +1364,7 @@ final class CaptureSetupViewModel: ObservableObject {
         switch marker.zoomType {
         case .inOut, .outOnly:
             return (startTime, max(marker.endTime, marker.sourceEventTimestamp))
-        case .inOnly:
+        case .inOnly, .noZoom:
             return (startTime, max(marker.holdUntil, marker.sourceEventTimestamp))
         }
     }

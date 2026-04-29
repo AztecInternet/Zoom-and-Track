@@ -807,7 +807,8 @@ struct ProjectBundleService {
                     duration: leadInTime + zoomInDuration + holdDuration + zoomOutDuration,
                     easeStyle: .smooth,
                     zoomType: .inOut,
-                    bounceAmount: 0.35
+                    bounceAmount: 0.35,
+                    noZoomFallbackMode: .pan
                 )
             )
             lastIncludedTimestamp = event.timestamp

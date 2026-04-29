@@ -187,7 +187,7 @@ final class MarkerPreviewRenderService {
         switch marker.zoomType {
         case .inOut, .outOnly:
             return (startTime, max(marker.endTime, marker.sourceEventTimestamp))
-        case .inOnly:
+        case .inOnly, .noZoom:
             return (startTime, max(marker.holdUntil, marker.sourceEventTimestamp))
         }
     }
@@ -238,6 +238,12 @@ final class MarkerPreviewRenderService {
                     return inOnlyPreviewState(at: currentTime, stateEvent: stateEvent, timeline: timeline)
                 }
                 currentState = ZoomPreviewState(scale: stateEvent.scale, normalizedPoint: normalizedPoint)
+
+            case .noZoom:
+                if currentTime <= timeline.peakTime {
+                    return inOnlyPreviewState(at: currentTime, stateEvent: stateEvent, timeline: timeline)
+                }
+                currentState = ZoomPreviewState(scale: currentState.scale, normalizedPoint: currentState.normalizedPoint)
 
             case .outOnly:
                 if currentTime <= timeline.endTime {
@@ -301,13 +307,15 @@ final class MarkerPreviewRenderService {
     }
 
     private func zoomTimeline(for marker: ZoomPlanItem) -> (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double) {
-        let peakTime = marker.sourceEventTimestamp
         let safeLeadIn = max(marker.leadInTime, 0)
         let safeZoomIn = max(marker.zoomInDuration, 0.05)
         let safeHold = max(marker.holdDuration, 0.05)
         let safeZoomOut = max(marker.zoomOutDuration, 0.05)
-        let fallbackStart = max(0, peakTime - safeLeadIn - safeZoomIn)
-        let fallbackHoldUntil = peakTime + safeHold
+        let peakTime = marker.zoomType == .outOnly
+            ? marker.sourceEventTimestamp
+            : max(0, marker.sourceEventTimestamp - safeLeadIn)
+        let fallbackStart = max(0, marker.sourceEventTimestamp - safeLeadIn - safeZoomIn)
+        let fallbackHoldUntil = marker.sourceEventTimestamp + safeHold
         let fallbackEnd = fallbackHoldUntil + safeZoomOut
 
         switch marker.zoomType {
@@ -317,6 +325,10 @@ final class MarkerPreviewRenderService {
             let safeEndTime = marker.endTime.isFinite ? max(marker.endTime, safeHoldUntil) : fallbackEnd
             return (safeStart, peakTime, safeHoldUntil, safeEndTime)
         case .inOnly:
+            let safeStart = marker.startTime.isFinite ? max(0, min(marker.startTime, peakTime)) : fallbackStart
+            let safeHoldUntil = marker.holdUntil.isFinite ? max(marker.holdUntil, peakTime) : fallbackHoldUntil
+            return (safeStart, peakTime, safeHoldUntil, safeHoldUntil)
+        case .noZoom:
             let safeStart = marker.startTime.isFinite ? max(0, min(marker.startTime, peakTime)) : fallbackStart
             let safeHoldUntil = marker.holdUntil.isFinite ? max(marker.holdUntil, peakTime) : fallbackHoldUntil
             return (safeStart, peakTime, safeHoldUntil, safeHoldUntil)

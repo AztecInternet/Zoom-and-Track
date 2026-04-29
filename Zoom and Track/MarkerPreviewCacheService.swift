@@ -5,7 +5,7 @@ import Foundation
 final class MarkerPreviewCacheService {
     private let fileManager = FileManager.default
     private let cacheLifetime: TimeInterval = 7 * 24 * 60 * 60
-    private let previewRenderVersion = 3
+    private let previewRenderVersion = 4
 
     func cachedPreview(
         for recordingURL: URL,
@@ -125,6 +125,7 @@ final class MarkerPreviewCacheService {
             "zoomOutDuration=\(marker.zoomOutDuration)",
             "zoomScale=\(marker.zoomScale)",
             "zoomType=\(marker.zoomType.rawValue)",
+            "noZoomFallbackMode=\(marker.noZoomFallbackMode.rawValue)",
             "easeStyle=\(marker.easeStyle.rawValue)",
             "bounceAmount=\(marker.bounceAmount)",
             "clickPulsePreset=\(marker.clickPulse?.preset.rawValue ?? "none")",
@@ -175,7 +176,7 @@ final class MarkerPreviewCacheService {
         switch marker.zoomType {
         case .inOut, .outOnly:
             return (startTime, max(marker.endTime, marker.sourceEventTimestamp))
-        case .inOnly:
+        case .inOnly, .noZoom:
             return (startTime, max(marker.holdUntil, marker.sourceEventTimestamp))
         }
     }

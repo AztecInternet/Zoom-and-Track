@@ -386,6 +386,7 @@ enum ZoomType: String, Codable, CaseIterable, Identifiable {
     case inOut
     case inOnly
     case outOnly
+    case noZoom
 
     var id: String { rawValue }
 
@@ -397,6 +398,24 @@ enum ZoomType: String, Codable, CaseIterable, Identifiable {
             return "Zoom In Only"
         case .outOnly:
             return "Zoom Out Only"
+        case .noZoom:
+            return "No Zoom"
+        }
+    }
+}
+
+enum NoZoomFallbackMode: String, Codable, CaseIterable, Identifiable {
+    case pan
+    case scale
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .pan:
+            return "Pan"
+        case .scale:
+            return "Scale"
         }
     }
 }
@@ -474,6 +493,7 @@ struct ZoomPlanItem: Codable, Identifiable {
     var zoomType: ZoomType
     var bounceAmount: Double
     var clickPulse: ClickPulseConfiguration?
+    var noZoomFallbackMode: NoZoomFallbackMode
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -498,6 +518,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         case zoomType
         case bounceAmount
         case clickPulse
+        case noZoomFallbackMode
     }
 
     init(
@@ -522,7 +543,8 @@ struct ZoomPlanItem: Codable, Identifiable {
         easeStyle: ZoomEaseStyle,
         zoomType: ZoomType,
         bounceAmount: Double,
-        clickPulse: ClickPulseConfiguration? = nil
+        clickPulse: ClickPulseConfiguration? = nil,
+        noZoomFallbackMode: NoZoomFallbackMode = .pan
     ) {
         self.id = id
         self.type = type
@@ -546,6 +568,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         self.zoomType = zoomType
         self.bounceAmount = bounceAmount
         self.clickPulse = clickPulse
+        self.noZoomFallbackMode = noZoomFallbackMode
     }
 
     init(from decoder: Decoder) throws {
@@ -567,6 +590,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         zoomType = try container.decodeIfPresent(ZoomType.self, forKey: .zoomType) ?? .inOut
         bounceAmount = try container.decodeIfPresent(Double.self, forKey: .bounceAmount) ?? 0.35
         clickPulse = try container.decodeIfPresent(ClickPulseConfiguration.self, forKey: .clickPulse)
+        noZoomFallbackMode = try container.decodeIfPresent(NoZoomFallbackMode.self, forKey: .noZoomFallbackMode) ?? .pan
 
         let legacyDuration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? max(endTime - startTime, 0.5)
         let legacyPhases = ZoomPlanItem.legacyPhaseTiming(totalDuration: legacyDuration)
@@ -582,6 +606,8 @@ struct ZoomPlanItem: Codable, Identifiable {
             duration = max(leadInTime + zoomInDuration + holdDuration, 0.5)
         case .outOnly:
             duration = max(zoomOutDuration, 0.25)
+        case .noZoom:
+            duration = max(leadInTime + zoomInDuration + holdDuration, 0.5)
         }
     }
 
@@ -593,6 +619,8 @@ struct ZoomPlanItem: Codable, Identifiable {
             return max(leadInTime + zoomInDuration + holdDuration, 0.5)
         case .outOnly:
             return max(zoomOutDuration, 0.25)
+        case .noZoom:
+            return max(leadInTime + zoomInDuration + holdDuration, 0.5)
         }
     }
 
@@ -724,19 +752,21 @@ enum SharedMotionEngine {
         switch marker.zoomType {
         case .inOut, .outOnly:
             return (startTime, max(marker.endTime, pulseEndTime))
-        case .inOnly:
+        case .inOnly, .noZoom:
             return (startTime, max(marker.holdUntil, pulseEndTime))
         }
     }
 
     static func zoomTimeline(for marker: ZoomPlanItem) -> Timeline {
-        let peakTime = marker.sourceEventTimestamp
         let safeLeadIn = max(marker.leadInTime, 0)
         let safeZoomIn = max(marker.zoomInDuration, 0.05)
         let safeHold = max(marker.holdDuration, 0.05)
         let safeZoomOut = max(marker.zoomOutDuration, 0.05)
-        let fallbackStart = max(0, peakTime - safeLeadIn - safeZoomIn)
-        let fallbackHoldUntil = peakTime + safeHold
+        let peakTime = marker.zoomType == .outOnly
+            ? marker.sourceEventTimestamp
+            : max(0, marker.sourceEventTimestamp - safeLeadIn)
+        let fallbackStart = max(0, marker.sourceEventTimestamp - safeLeadIn - safeZoomIn)
+        let fallbackHoldUntil = marker.sourceEventTimestamp + safeHold
         let fallbackEnd = fallbackHoldUntil + safeZoomOut
 
         switch marker.zoomType {
@@ -753,6 +783,10 @@ enum SharedMotionEngine {
             let safeStart = marker.startTime.isFinite ? max(marker.startTime, peakTime) : peakTime
             let safeEndTime = marker.endTime.isFinite ? max(marker.endTime, safeStart) : peakTime + safeZoomOut
             return Timeline(startTime: safeStart, peakTime: peakTime, holdUntil: safeStart, endTime: safeEndTime)
+        case .noZoom:
+            let safeStart = marker.startTime.isFinite ? max(0, min(marker.startTime, peakTime)) : fallbackStart
+            let safeHoldUntil = marker.holdUntil.isFinite ? max(marker.holdUntil, peakTime) : fallbackHoldUntil
+            return Timeline(startTime: safeStart, peakTime: peakTime, holdUntil: safeHoldUntil, endTime: safeHoldUntil)
         }
     }
 
@@ -774,6 +808,7 @@ enum SharedMotionEngine {
         }
 
         var currentState = PreviewState(scale: 1, normalizedPoint: CGPoint(x: 0.5, y: 0.5))
+        var restingState = currentState
 
         for marker in enabledMarkers {
             let timeline = zoomTimeline(for: marker)
@@ -797,11 +832,13 @@ enum SharedMotionEngine {
                     return inOutPreviewState(at: currentTime, stateEvent: stateEvent, timeline: timeline, marker: marker)
                 }
                 currentState = PreviewState(scale: 1, normalizedPoint: normalizedPoint)
+                restingState = currentState
             case .inOnly:
                 if currentTime <= timeline.peakTime {
                     return inOnlyPreviewState(at: currentTime, stateEvent: stateEvent, timeline: timeline, marker: marker)
                 }
                 currentState = PreviewState(scale: stateEvent.scale, normalizedPoint: normalizedPoint)
+                restingState = currentState
             case .outOnly:
                 if currentTime <= timeline.endTime {
                     return outOnlyPreviewState(
@@ -814,6 +851,27 @@ enum SharedMotionEngine {
                     )
                 }
                 currentState = PreviewState(scale: 1, normalizedPoint: normalizedPoint)
+                restingState = currentState
+            case .noZoom:
+                let targetState = noZoomTargetState(
+                    currentState: currentState,
+                    restingState: restingState,
+                    targetPoint: normalizedPoint,
+                    fallbackMode: marker.noZoomFallbackMode
+                )
+                if currentTime <= timeline.peakTime {
+                    return noZoomPreviewState(
+                        at: currentTime,
+                        currentState: currentState,
+                        targetState: targetState,
+                        timeline: timeline,
+                        marker: marker
+                    )
+                }
+                if currentTime <= timeline.holdUntil {
+                    return targetState
+                }
+                currentState = targetState
             }
         }
 
@@ -1015,6 +1073,110 @@ enum SharedMotionEngine {
                 y: interpolate(from: currentState.normalizedPoint.y, to: targetPoint.y, progress: progress.pan)
             )
         )
+    }
+
+    private static func noZoomPreviewState(
+        at currentTime: Double,
+        currentState: PreviewState,
+        targetState: PreviewState,
+        timeline: Timeline,
+        marker: ZoomPlanItem
+    ) -> PreviewState {
+        let progress = motionProgress(
+            currentTime: currentTime,
+            startTime: timeline.startTime,
+            endTime: timeline.peakTime,
+            easeStyle: marker.easeStyle,
+            direction: .entering,
+            bounceAmount: marker.bounceAmount
+        )
+        return PreviewState(
+            scale: max(interpolate(from: currentState.scale, to: targetState.scale, progress: progress.scale), 1),
+            normalizedPoint: CGPoint(
+                x: interpolate(from: currentState.normalizedPoint.x, to: targetState.normalizedPoint.x, progress: progress.pan),
+                y: interpolate(from: currentState.normalizedPoint.y, to: targetState.normalizedPoint.y, progress: progress.pan)
+            )
+        )
+    }
+
+    private static func noZoomTargetState(
+        currentState: PreviewState,
+        restingState: PreviewState,
+        targetPoint: CGPoint,
+        fallbackMode: NoZoomFallbackMode
+    ) -> PreviewState {
+        guard restingState.scale > 1.0001 else {
+            return currentState
+        }
+
+        if visibleRect(for: restingState).contains(targetPoint) {
+            return restingState
+        }
+
+        switch fallbackMode {
+        case .pan:
+            return PreviewState(
+                scale: restingState.scale,
+                normalizedPoint: minimumPanTarget(from: restingState, toInclude: targetPoint)
+            )
+        case .scale:
+            let fittedScale = maximumVisibleScale(for: targetPoint, anchoredTo: restingState)
+            return PreviewState(scale: fittedScale, normalizedPoint: restingState.normalizedPoint)
+        }
+    }
+
+    private static func visibleRect(for state: PreviewState) -> CGRect {
+        let viewportWidth = 1 / max(state.scale, 1)
+        let viewportHeight = 1 / max(state.scale, 1)
+        let minX = min(max(state.normalizedPoint.x - (viewportWidth / 2), 0), 1 - viewportWidth)
+        let minY = min(max(state.normalizedPoint.y - (viewportHeight / 2), 0), 1 - viewportHeight)
+        return CGRect(x: minX, y: minY, width: viewportWidth, height: viewportHeight)
+    }
+
+    private static func minimumPanTarget(from state: PreviewState, toInclude targetPoint: CGPoint) -> CGPoint {
+        let rect = visibleRect(for: state)
+        let viewportWidth = rect.width
+        let viewportHeight = rect.height
+
+        var minX = rect.minX
+        if targetPoint.x < rect.minX {
+            minX = targetPoint.x
+        } else if targetPoint.x > rect.maxX {
+            minX = targetPoint.x - viewportWidth
+        }
+        minX = min(max(minX, 0), 1 - viewportWidth)
+
+        var minY = rect.minY
+        if targetPoint.y < rect.minY {
+            minY = targetPoint.y
+        } else if targetPoint.y > rect.maxY {
+            minY = targetPoint.y - viewportHeight
+        }
+        minY = min(max(minY, 0), 1 - viewportHeight)
+
+        return CGPoint(
+            x: minX + (viewportWidth / 2),
+            y: minY + (viewportHeight / 2)
+        )
+    }
+
+    private static func maximumVisibleScale(for targetPoint: CGPoint, anchoredTo state: PreviewState) -> CGFloat {
+        guard !visibleRect(for: state).contains(targetPoint) else {
+            return state.scale
+        }
+
+        var low: CGFloat = 1
+        var high = max(state.scale, 1)
+        for _ in 0..<16 {
+            let mid = (low + high) / 2
+            let candidate = PreviewState(scale: mid, normalizedPoint: state.normalizedPoint)
+            if visibleRect(for: candidate).contains(targetPoint) {
+                low = mid
+            } else {
+                high = mid
+            }
+        }
+        return max(low, 1)
     }
 
     private static func normalizedProgress(_ value: Double, start: Double, end: Double) -> Double {

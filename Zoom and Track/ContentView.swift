@@ -436,22 +436,6 @@ struct ContentView: View {
                 Spacer()
 
                 if viewModel.recordingSummary != nil {
-                    Button(isPlacingClickFocus ? "Cancel Add" : "Add Click Focus") {
-                        if isPlacingClickFocus {
-                            isPlacingClickFocus = false
-                        } else {
-                            viewModel.cancelPlaybackPreview()
-                            inspectorMode = .markers
-                            isPlaybackInspectorVisible = true
-                            pendingMarkerDragSourcePoint = nil
-                            isPlacingClickFocus = true
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!viewModel.canEditClickFocusMarkers && !isPlacingClickFocus)
-                }
-
-                if viewModel.recordingSummary != nil {
                     Button {
                         isPlaybackInfoPresented = true
                     } label: {
@@ -621,9 +605,26 @@ struct ContentView: View {
             settingsCard(
                 title: "Capture Defaults",
                 body: AnyView(
-                    Text("New captures are saved into the selected library root using Collection and Project folders.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("New captures are saved into the selected library root using Collection and Project folders.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("No Zoom Overflow")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            Picker("No Zoom Overflow", selection: Binding(
+                                get: { viewModel.defaultNoZoomFallbackMode },
+                                set: { viewModel.setDefaultNoZoomFallbackMode($0) }
+                            )) {
+                                ForEach(NoZoomFallbackMode.allCases) { mode in
+                                    Text(mode.displayName).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                    }
                 )
             )
 
@@ -1361,13 +1362,15 @@ struct ContentView: View {
     }
 
     private func zoomTimeline(for marker: ZoomPlanItem) -> (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double) {
-        let peakTime = marker.sourceEventTimestamp
         let safeLeadIn = max(marker.leadInTime, 0)
         let safeZoomIn = max(marker.zoomInDuration, 0.05)
         let safeHold = max(marker.holdDuration, 0.05)
         let safeZoomOut = max(marker.zoomOutDuration, 0.05)
-        let fallbackStart = max(0, peakTime - safeLeadIn - safeZoomIn)
-        let fallbackHoldUntil = peakTime + safeHold
+        let peakTime = marker.zoomType == .outOnly
+            ? marker.sourceEventTimestamp
+            : max(0, marker.sourceEventTimestamp - safeLeadIn)
+        let fallbackStart = max(0, marker.sourceEventTimestamp - safeLeadIn - safeZoomIn)
+        let fallbackHoldUntil = marker.sourceEventTimestamp + safeHold
         let fallbackEnd = fallbackHoldUntil + safeZoomOut
 
         switch marker.zoomType {
@@ -1378,6 +1381,11 @@ struct ContentView: View {
             return (safeStart, peakTime, safeHoldUntil, safeEndTime)
 
         case .inOnly:
+            let safeStart = marker.startTime.isFinite ? max(0, min(marker.startTime, peakTime)) : fallbackStart
+            let safeHoldUntil = marker.holdUntil.isFinite ? max(marker.holdUntil, peakTime) : fallbackHoldUntil
+            return (safeStart, peakTime, safeHoldUntil, safeHoldUntil)
+
+        case .noZoom:
             let safeStart = marker.startTime.isFinite ? max(0, min(marker.startTime, peakTime)) : fallbackStart
             let safeHoldUntil = marker.holdUntil.isFinite ? max(marker.holdUntil, peakTime) : fallbackHoldUntil
             return (safeStart, peakTime, safeHoldUntil, safeHoldUntil)
@@ -1569,6 +1577,9 @@ struct ContentView: View {
         let segmentOriginY: CGFloat = 16
         let hoveredTooltipEntry = hoveredTimelineTooltipEntry(in: summary)
         let timelineInteractionSuppressed = activeTimelineMarkerDragID != nil || NSEvent.modifierFlags.contains(.option)
+        let selectedMarker = viewModel.selectedZoomMarker
+        let showsPulseControls = selectedMarker?.isClickFocus == true
+        let showsNoZoomFallbackControls = selectedMarker?.zoomType == .noZoom
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -1576,6 +1587,13 @@ struct ContentView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
+                timelineToolbar(
+                    summary: summary,
+                    selectedMarker: selectedMarker,
+                    showsPulseControls: showsPulseControls,
+                    showsNoZoomFallbackControls: showsNoZoomFallbackControls
+                )
+                    .padding(.trailing, 18)
                 Text(timecodeString(for: viewModel.currentPlaybackTime))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
@@ -1755,6 +1773,187 @@ struct ContentView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(cardBackground)
+    }
+
+    @ViewBuilder
+    private func timelineToolbar(
+        summary: RecordingInspectionSummary,
+        selectedMarker: ZoomPlanItem?,
+        showsPulseControls: Bool,
+        showsNoZoomFallbackControls: Bool
+    ) -> some View {
+        let hasSelectedMarker = viewModel.selectedZoomMarkerID != nil
+
+        HStack(spacing: 10) {
+            Text("markers")
+                .font(.system(size: 10, weight: .light))
+                .foregroundStyle(Color.accentColor)
+
+            timelineGadget(
+                systemName: isPlacingClickFocus ? "xmark" : "plus",
+                isActive: isPlacingClickFocus,
+                isEnabled: viewModel.canEditClickFocusMarkers || isPlacingClickFocus,
+                help: isPlacingClickFocus ? "Cancel Add Click Focus" : "Add Click Focus"
+            ) {
+                if isPlacingClickFocus {
+                    isPlacingClickFocus = false
+                } else {
+                    viewModel.cancelPlaybackPreview()
+                    inspectorMode = .markers
+                    isPlaybackInspectorVisible = true
+                    pendingMarkerDragSourcePoint = nil
+                    isPlacingClickFocus = true
+                }
+            }
+
+            if hasSelectedMarker {
+                timelineGadget(
+                    systemName: "minus",
+                    isActive: false,
+                    isEnabled: true,
+                    help: "Delete Selected Marker"
+                ) {
+                    viewModel.deleteSelectedMarker()
+                }
+            }
+
+            if showsPulseControls, let selectedMarker {
+                Divider()
+                    .frame(height: 14)
+
+                Text("click pulse")
+                    .font(.system(size: 10, weight: .light))
+                    .foregroundStyle(Color.accentColor)
+
+                timelineGadget(
+                    systemName: "pointer.arrow.click.2",
+                    isActive: selectedMarker.isClickPulseEnabled,
+                    isEnabled: true,
+                    help: selectedMarker.isClickPulseEnabled ? "Disable Click Pulse" : "Enable Click Pulse"
+                ) {
+                    viewModel.setSelectedMarkerClickPulseEnabled(!selectedMarker.isClickPulseEnabled)
+                }
+
+                if selectedMarker.isClickPulseEnabled, let clickPulse = selectedMarker.clickPulse {
+                    Menu {
+                        ForEach(ClickPulsePreset.allCases) { preset in
+                            Button(preset.displayName) {
+                                viewModel.setSelectedMarkerClickPulsePreset(preset)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 18, height: 18)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .help("Click Pulse Style: \(clickPulse.preset.displayName)")
+                }
+            }
+
+            if showsNoZoomFallbackControls, let selectedMarker {
+                Divider()
+                    .frame(height: 14)
+
+                Text("overflow")
+                    .font(.system(size: 10, weight: .light))
+                    .foregroundStyle(Color.accentColor)
+
+                HStack(spacing: 2) {
+                    ForEach(NoZoomFallbackMode.allCases) { mode in
+                        Button {
+                            viewModel.setSelectedMarkerNoZoomFallbackMode(mode)
+                        } label: {
+                            Text(mode.displayName)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(selectedMarker.noZoomFallbackMode == mode ? Color.white : Color.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(selectedMarker.noZoomFallbackMode == mode ? Color.accentColor : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .help("No Zoom Overflow: \(mode.displayName)")
+                    }
+                }
+                .padding(2)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.secondary.opacity(0.1))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                )
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.secondary.opacity(0.08))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private func timelineGadget(
+        systemName: String,
+        isActive: Bool,
+        isEnabled: Bool,
+        help: String,
+        role: ButtonRole? = nil,
+        activeColor: Color? = nil,
+        inactiveColor: Color? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(role: role, action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(
+                    gadgetForegroundStyle(
+                        isActive: isActive,
+                        isEnabled: isEnabled,
+                        role: role,
+                        activeColor: activeColor,
+                        inactiveColor: inactiveColor
+                    )
+                )
+                .frame(width: 18, height: 18)
+                .contentShape(Rectangle().inset(by: -3))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .help(help)
+        .opacity(isEnabled ? 1 : 0.42)
+    }
+
+    private func gadgetForegroundStyle(
+        isActive: Bool,
+        isEnabled: Bool,
+        role: ButtonRole?,
+        activeColor: Color?,
+        inactiveColor: Color?
+    ) -> Color {
+        if isEnabled {
+            if let activeColor {
+                return activeColor
+            }
+            if role == .destructive {
+                return .red
+            }
+            return isActive ? .accentColor : .secondary
+        }
+
+        if let inactiveColor {
+            return inactiveColor
+        }
+        return .secondary
     }
 
     private func timelineSegment(
@@ -1955,6 +2154,10 @@ struct ContentView: View {
                         timelinePhaseBlock(color: leadColor, width: leadWidth)
                         timelinePhaseBlock(color: zoomInColor, width: zoomInWidth)
                         timelinePhaseBlock(color: holdColor, width: holdWidth)
+                    case .noZoom:
+                        timelinePhaseBlock(color: leadColor, width: leadWidth)
+                        timelinePhaseBlock(color: zoomInColor, width: zoomInWidth)
+                        timelinePhaseBlock(color: holdColor, width: holdWidth)
                     case .outOnly:
                         timelinePhaseBlock(color: zoomOutColor, width: max(totalWidth, emphasisWidth))
                     }
@@ -2055,6 +2258,8 @@ struct ContentView: View {
             return [zoomInStart, timeline.peakTime, timeline.holdUntil]
         case .inOnly:
             return [zoomInStart, timeline.peakTime]
+        case .noZoom:
+            return [zoomInStart, timeline.peakTime]
         case .outOnly:
             return []
         }
@@ -2074,6 +2279,10 @@ struct ContentView: View {
             items.append((.hold, phaseWidth(from: timeline.peakTime, to: timeline.holdUntil, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
             items.append((.zoomOut, phaseWidth(from: timeline.holdUntil, to: timeline.endTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
         case .inOnly:
+            items.append((.leadIn, phaseWidth(from: timeline.startTime, to: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+            items.append((.zoomIn, phaseWidth(from: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), to: timeline.peakTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+            items.append((.hold, phaseWidth(from: timeline.peakTime, to: timeline.holdUntil, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
+        case .noZoom:
             items.append((.leadIn, phaseWidth(from: timeline.startTime, to: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
             items.append((.zoomIn, phaseWidth(from: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), to: timeline.peakTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
             items.append((.hold, phaseWidth(from: timeline.peakTime, to: timeline.holdUntil, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: width)))
@@ -2154,6 +2363,8 @@ struct ContentView: View {
         case .inOut:
             return (start: max(timeline.startTime, 0), end: max(timeline.endTime, timeline.startTime))
         case .inOnly:
+            return (start: max(timeline.startTime, 0), end: max(timeline.holdUntil, timeline.startTime))
+        case .noZoom:
             return (start: max(timeline.startTime, 0), end: max(timeline.holdUntil, timeline.startTime))
         case .outOnly:
             return (start: max(timeline.startTime, 0), end: max(timeline.endTime, timeline.startTime))
@@ -2563,22 +2774,21 @@ struct ContentView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
                                 ForEach(Array(summary.zoomMarkers.enumerated()), id: \.element.id) { index, marker in
-                                    Button {
-                                        suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
-                                        viewModel.startMarkerPreview(marker.id)
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            HStack(spacing: 10) {
-                                                Text("#\(index + 1)")
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .frame(width: 26, alignment: .leading)
-                                                Text(timecodeString(for: marker.sourceEventTimestamp))
-                                                    .font(.system(size: 11, design: .monospaced))
-                                                    .frame(width: 88, alignment: .leading)
-                                                Image(systemName: markerTypeSymbol(for: marker.zoomType))
-                                                    .font(.system(size: 12))
-                                                    .foregroundStyle(.secondary)
-                                                Spacer(minLength: 0)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(spacing: 10) {
+                                            Text("#\(index + 1)")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .frame(width: 26, alignment: .leading)
+                                            Text(timecodeString(for: marker.sourceEventTimestamp))
+                                                .font(.system(size: 11, design: .monospaced))
+                                                .frame(width: 88, alignment: .leading)
+                                            Image(systemName: markerTypeSymbol(for: marker.zoomType))
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(.secondary)
+                                            Spacer(minLength: 0)
+                                            Button {
+                                                viewModel.toggleMarkerEnabled(marker.id)
+                                            } label: {
                                                 HStack(spacing: 4) {
                                                     Image(systemName: marker.enabled ? "checkmark.circle.fill" : "circle")
                                                     Text(marker.enabled ? "On" : "Off")
@@ -2586,39 +2796,44 @@ struct ContentView: View {
                                                 .font(.system(size: 11, weight: .medium))
                                                 .foregroundStyle(marker.enabled ? Color.accentColor : Color.secondary)
                                             }
-
-                                            HStack(spacing: 12) {
-                                                Label {
-                                                    Text(String(format: "%.1fx", marker.zoomScale))
-                                                        .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                                } icon: {
-                                                    Image(systemName: "viewfinder.rectangular")
-                                                }
-
-                                                Label {
-                                                    Text(String(format: "%.2fs", marker.totalSegmentDuration))
-                                                        .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                                } icon: {
-                                                    Image(systemName: "timer")
-                                                }
-                                            }
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(.secondary)
+                                            .buttonStyle(.plain)
                                         }
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 8)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.12) : Color.clear)
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .stroke(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.08), lineWidth: 1)
-                                        )
-                                        .opacity(marker.enabled ? 1.0 : 0.5)
+
+                                        HStack(spacing: 12) {
+                                            Label {
+                                                Text(String(format: "%.1fx", marker.zoomScale))
+                                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                            } icon: {
+                                                Image(systemName: "viewfinder.rectangular")
+                                            }
+
+                                            Label {
+                                                Text(String(format: "%.2fs", marker.totalSegmentDuration))
+                                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                            } icon: {
+                                                Image(systemName: "timer")
+                                            }
+                                        }
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
                                     }
-                                    .buttonStyle(.plain)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.12) : Color.clear)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .stroke(viewModel.selectedZoomMarkerID == marker.id ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.08), lineWidth: 1)
+                                    )
+                                    .opacity(marker.enabled ? 1.0 : 0.5)
+                                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .onTapGesture {
+                                        suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
+                                        viewModel.startMarkerPreview(marker.id)
+                                    }
                                     .id(marker.id)
                                 }
                             }
@@ -2897,68 +3112,17 @@ struct ContentView: View {
         if let marker = viewModel.selectedZoomMarker {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Marker \(markerDisplayNumber(for: marker))")
-                        .font(.headline)
-                    Text(timecodeString(for: marker.sourceEventTimestamp))
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-
-                Button("Delete Marker") {
-                    viewModel.deleteSelectedMarker()
-                }
-                .buttonStyle(.bordered)
-                .foregroundStyle(.red)
-
-                Toggle("Enabled", isOn: Binding(
-                    get: { marker.enabled },
-                    set: { viewModel.setSelectedMarkerEnabled($0) }
-                ))
-
-                if marker.isClickFocus {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Toggle("Show Click Pulse", isOn: Binding(
-                            get: { marker.isClickPulseEnabled },
-                            set: { viewModel.setSelectedMarkerClickPulseEnabled($0) }
-                        ))
-
-                        if let clickPulse = marker.clickPulse {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Click Pulse Style")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-                                Picker("Click Pulse Style", selection: Binding(
-                                    get: { clickPulse.preset },
-                                    set: { viewModel.setSelectedMarkerClickPulsePreset($0) }
-                                )) {
-                                    ForEach(ClickPulsePreset.allCases) { preset in
-                                        Text(preset.displayName).tag(preset)
-                                    }
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                            }
-                        }
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text("Marker \(markerDisplayNumber(for: marker))")
+                            .font(.headline)
+                        Spacer()
+                        Text(timecodeString(for: marker.sourceEventTimestamp))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Zoom Type")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    Picker("Zoom Type", selection: Binding(
-                        get: { marker.zoomType },
-                        set: { viewModel.setSelectedMarkerZoomType($0) }
-                    )) {
-                        ForEach(ZoomType.allCases) { zoomType in
-                            Text(zoomType.displayName).tag(zoomType)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                }
-
-                if marker.zoomType != .outOnly {
+                if marker.zoomType == .inOut || marker.zoomType == .inOnly {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text("Zoom Amount")
@@ -2988,7 +3152,7 @@ struct ContentView: View {
                         timingSliderRow(
                             title: "Lead-In Time",
                             value: marker.leadInTime,
-                            range: 0...2,
+                            range: 0...20,
                             phase: .leadIn,
                             action: viewModel.setSelectedMarkerLeadInTime
                         )
@@ -3017,7 +3181,7 @@ struct ContentView: View {
                         timingSliderRow(
                             title: "Lead-In Time",
                             value: marker.leadInTime,
-                            range: 0...2,
+                            range: 0...20,
                             phase: .leadIn,
                             action: viewModel.setSelectedMarkerLeadInTime
                         )
@@ -3043,88 +3207,86 @@ struct ContentView: View {
                             phase: .zoomOut,
                             action: viewModel.setSelectedMarkerZoomOutDuration
                         )
+                    case .noZoom:
+                        timingSliderRow(
+                            title: "Lead-In Time",
+                            value: marker.leadInTime,
+                            range: 0...20,
+                            phase: .leadIn,
+                            action: viewModel.setSelectedMarkerLeadInTime
+                        )
+                        timingSliderRow(
+                            title: "Move",
+                            value: marker.zoomInDuration,
+                            range: 0.05...3,
+                            phase: .zoomIn,
+                            action: viewModel.setSelectedMarkerZoomInDuration
+                        )
+                        timingSliderRow(
+                            title: "Hold",
+                            value: marker.holdDuration,
+                            range: 0.05...10,
+                            phase: .hold,
+                            action: viewModel.setSelectedMarkerHoldDuration
+                        )
                     }
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    ViewThatFits {
-                        HStack(alignment: .top, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Ease Style")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-                                Picker("Ease Style", selection: Binding(
-                                    get: { marker.easeStyle },
-                                    set: { viewModel.setSelectedMarkerEaseStyle($0) }
-                                )) {
-                                    ForEach(ZoomEaseStyle.allCases) { easeStyle in
-                                        Text(easeStyle.displayName).tag(easeStyle)
-                                    }
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Zoom Type")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            Picker("Zoom Type", selection: Binding(
+                                get: { marker.zoomType },
+                                set: { viewModel.setSelectedMarkerZoomType($0) }
+                            )) {
+                                ForEach(ZoomType.allCases) { zoomType in
+                                    Text(zoomType.displayName).tag(zoomType)
                                 }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
                             }
-
-                            if marker.easeStyle == .bounce {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        Text("Bounce Amount")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text(String(format: "%.2f", marker.bounceAmount))
-                                            .font(.system(size: 12, design: .monospaced))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Slider(
-                                        value: Binding(
-                                            get: { marker.bounceAmount },
-                                            set: { viewModel.setSelectedMarkerBounceAmount($0) }
-                                        ),
-                                        in: 0...1
-                                    )
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
                         }
 
-                        VStack(alignment: .leading, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Ease Style")
+                        Spacer(minLength: 0)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Ease Style")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            Picker("Ease Style", selection: Binding(
+                                get: { marker.easeStyle },
+                                set: { viewModel.setSelectedMarkerEaseStyle($0) }
+                            )) {
+                                ForEach(ZoomEaseStyle.allCases) { easeStyle in
+                                    Text(easeStyle.displayName).tag(easeStyle)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                    }
+
+                    if marker.easeStyle == .bounce {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Bounce Amount")
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(.secondary)
-                                Picker("Ease Style", selection: Binding(
-                                    get: { marker.easeStyle },
-                                    set: { viewModel.setSelectedMarkerEaseStyle($0) }
-                                )) {
-                                    ForEach(ZoomEaseStyle.allCases) { easeStyle in
-                                        Text(easeStyle.displayName).tag(easeStyle)
-                                    }
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
+                                Spacer()
+                                Text(String(format: "%.2f", marker.bounceAmount))
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundStyle(.secondary)
                             }
-
-                            if marker.easeStyle == .bounce {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        Text("Bounce Amount")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text(String(format: "%.2f", marker.bounceAmount))
-                                            .font(.system(size: 12, design: .monospaced))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Slider(
-                                        value: Binding(
-                                            get: { marker.bounceAmount },
-                                            set: { viewModel.setSelectedMarkerBounceAmount($0) }
-                                        ),
-                                        in: 0...1
-                                    )
-                                }
-                            }
+                            Slider(
+                                value: Binding(
+                                    get: { marker.bounceAmount },
+                                    set: { viewModel.setSelectedMarkerBounceAmount($0) }
+                                ),
+                                in: 0...1
+                            )
                         }
                     }
                 }
@@ -3189,6 +3351,8 @@ struct ContentView: View {
             return "arrow.left"
         case .inOut:
             return "arrow.left.arrow.right"
+        case .noZoom:
+            return "smallcircle.filled.circle"
         }
     }
 
@@ -3237,8 +3401,10 @@ struct ContentView: View {
             }
             Text("\(markerTypeSymbol(for: marker.zoomType)) \(marker.zoomType.displayName)")
                 .font(.system(size: 11))
-            Text("Zoom \(String(format: "%.1fx", marker.zoomScale))")
-                .font(.system(size: 11))
+            if marker.zoomType != .noZoom && marker.zoomType != .outOnly {
+                Text("Zoom \(String(format: "%.1fx", marker.zoomScale))")
+                    .font(.system(size: 11))
+            }
             Text("Lead-In \(String(format: "%.2fs", marker.leadInTime))")
                 .font(.system(size: 11))
             if marker.zoomType != .outOnly {
@@ -3249,8 +3415,10 @@ struct ContentView: View {
                 Text("Hold \(String(format: "%.2fs", marker.holdDuration))")
                     .font(.system(size: 11))
             }
-            Text("Zoom Out \(String(format: "%.2fs", marker.zoomOutDuration))")
-                .font(.system(size: 11))
+            if marker.zoomType == .inOut || marker.zoomType == .outOnly {
+                Text("Zoom Out \(String(format: "%.2fs", marker.zoomOutDuration))")
+                    .font(.system(size: 11))
+            }
             Text("Total \(String(format: "%.2fs", marker.totalSegmentDuration))")
                 .font(.system(size: 11))
             Text(marker.enabled ? "Enabled" : "Disabled")
@@ -3323,6 +3491,16 @@ struct ContentView: View {
             return .zoomOut
 
         case .inOnly:
+            let zoomInStart = max(timeline.peakTime - marker.zoomInDuration, timeline.startTime)
+            if currentTime < zoomInStart {
+                return .leadIn
+            }
+            if currentTime < timeline.peakTime {
+                return .zoomIn
+            }
+            return .hold
+
+        case .noZoom:
             let zoomInStart = max(timeline.peakTime - marker.zoomInDuration, timeline.startTime)
             if currentTime < zoomInStart {
                 return .leadIn
