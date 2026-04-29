@@ -739,10 +739,11 @@ enum SharedMotionEngine {
     }
 
     private enum MotionTuning {
-        static let bounceApproachFraction = 0.82
-        static let bounceMaxOvershoot = 0.14
-        static let bounceMinOvershoot = 0.04
-        static let bounceOscillationCount = 2.6
+        static let bounceMinBlend = 0.3
+        static let bounceMaxDamping = 6.5
+        static let bounceMinDamping = 3.5
+        static let bounceMinFrequency = 9.0
+        static let bounceMaxFrequency = 16.0
         static let panBounceInfluence = 0.35
     }
 
@@ -1212,17 +1213,23 @@ enum SharedMotionEngine {
 
     private static func bounceProgress(_ progress: Double, amount: Double) -> Double {
         let clampedAmount = min(max(amount, 0), 1)
-        let approachFraction = MotionTuning.bounceApproachFraction
-        if progress <= approachFraction {
-            let approachProgress = normalizedProgress(progress, start: 0, end: approachFraction)
-            return eased(approachProgress, style: .smooth, direction: .entering)
+        let smoothProgress = eased(progress, style: .smooth, direction: .entering)
+        if clampedAmount <= 0 {
+            return smoothProgress
         }
 
-        let bounceProgress = normalizedProgress(progress, start: approachFraction, end: 1)
-        let overshoot = MotionTuning.bounceMinOvershoot + (MotionTuning.bounceMaxOvershoot * clampedAmount)
-        let envelope = pow(1 - bounceProgress, 2.2) * overshoot
-        let oscillation = sin(bounceProgress * .pi * MotionTuning.bounceOscillationCount)
-        return 1 + (envelope * oscillation)
+        let damping = MotionTuning.bounceMaxDamping - ((MotionTuning.bounceMaxDamping - MotionTuning.bounceMinDamping) * clampedAmount)
+        let frequency = MotionTuning.bounceMinFrequency + ((MotionTuning.bounceMaxFrequency - MotionTuning.bounceMinFrequency) * clampedAmount)
+        let rawSpring = 1 - (exp(-damping * smoothProgress) * cos(frequency * smoothProgress))
+        let terminalSpring = 1 - (exp(-damping) * cos(frequency))
+        guard rawSpring.isFinite, terminalSpring.isFinite, abs(terminalSpring) > .ulpOfOne else {
+            return smoothProgress
+        }
+
+        let normalizedSpring = rawSpring / terminalSpring
+        let blend = MotionTuning.bounceMinBlend + ((1 - MotionTuning.bounceMinBlend) * clampedAmount)
+        let resolvedProgress = smoothProgress + ((normalizedSpring - smoothProgress) * blend)
+        return min(max(resolvedProgress, 0), 1.08)
     }
 
     private static func eased(_ progress: Double, style: ZoomEaseStyle, direction: MotionDirection) -> Double {

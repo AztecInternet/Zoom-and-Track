@@ -113,7 +113,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private let markerPreviewCacheService = MarkerPreviewCacheService()
     private let exportRenderService = ExportRenderService()
     private let previewTransitionFadeInDuration: TimeInterval = 0.12
-    private let previewTransitionHoldDuration: TimeInterval = 0.28
+    private let previewTransitionHoldDuration: TimeInterval = 1.0
     private let previewTransitionFadeOutDuration: TimeInterval = 0.16
     private let lastCollectionNameKey = "LastCollectionName"
     private let lastProjectNameKey = "LastProjectName"
@@ -1435,11 +1435,8 @@ final class CaptureSetupViewModel: ObservableObject {
         playbackPresentationMode = .playingRenderedPreview
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         isPlaybackActive = false
-        let previewStartDelay: TimeInterval = recordingSummary?.zoomMarkers.first(where: { $0.id == markerID })?.clickPulse == nil
-            ? previewTransitionHoldDuration
-            : 0
         playbackTransitionTask = Task { [weak self, weak player] in
-            try? await Task.sleep(for: .seconds(previewStartDelay))
+            try? await Task.sleep(for: .seconds(self?.previewTransitionHoldDuration ?? 1.0))
             await MainActor.run {
                 guard let self, let player else { return }
                 if self.playbackTransitionPlateState != .hidden {

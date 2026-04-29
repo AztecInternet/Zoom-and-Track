@@ -3,11 +3,13 @@
 //  Zoom and Track
 //
 
+import AppKit
 import AVFoundation
 import AVKit
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel = CaptureSetupViewModel()
     @State private var selectedTab: AppTab? = .capture
     @State private var playbackVideoHeightOverride: CGFloat?
@@ -200,6 +202,7 @@ struct ContentView: View {
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 24)
+        .background(detailBackground)
     }
 
     private var captureView: some View {
@@ -708,49 +711,15 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .background(cardBackground)
                     } else {
-                        List(filteredItems) { item in
-                            HStack(alignment: .top, spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(item.title)
-                                        .font(.system(size: 14, weight: .semibold))
-                                    Text("\(item.collectionName) • \(item.projectName)")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.secondary)
-                                    HStack(spacing: 10) {
-                                        Text(item.captureType.displayName)
-                                        Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                        if let duration = item.duration {
-                                            Text(String(format: "%.2fs", duration))
-                                        }
-                                    }
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
-                                    if !item.isAvailable, let statusMessage = item.statusMessage {
-                                        Text("\(item.status.displayName) • \(statusMessage)")
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundStyle(.orange)
-                                    }
-                                }
-
-                                Spacer(minLength: 12)
-
-                                VStack(alignment: .trailing, spacing: 8) {
-                                    Button("Edit") {
-                                        viewModel.openLibraryCapture(item)
-                                        selectedTab = .review
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(!item.canOpenInEditor)
-
-                                    Button("Reveal") {
-                                        viewModel.revealLibraryCapture(item)
-                                    }
-                                    .buttonStyle(.borderless)
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 12) {
+                                ForEach(filteredItems) { item in
+                                    libraryCaptureRow(item)
                                 }
                             }
-                            .padding(.vertical, 6)
+                            .padding(16)
                         }
-                        .listStyle(.inset)
+                        .background(cardBackground)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -769,6 +738,93 @@ struct ContentView: View {
             && matchesLibraryProjectFilter(item)
             && matchesLibraryTypeFilter(item)
         }
+    }
+
+    private func libraryCaptureRow(_ item: CaptureLibraryItem) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(item.title)
+                    .font(.system(size: 14, weight: .semibold))
+
+                Text("\(item.collectionName) • \(item.projectName)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 10) {
+                    libraryMetadataPill(text: item.captureType.displayName, systemName: "tag")
+                    libraryMetadataPill(
+                        text: item.createdAt.formatted(date: .abbreviated, time: .shortened),
+                        systemName: "calendar"
+                    )
+                    if let duration = item.duration {
+                        libraryMetadataPill(
+                            text: String(format: "%.2fs", duration),
+                            systemName: "timer"
+                        )
+                    }
+
+                    Button {
+                        viewModel.revealLibraryCapture(item)
+                    } label: {
+                        libraryMetadataPillIcon(systemName: "arrow.folder.forward.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Reveal in Finder")
+                }
+
+                if !item.isAvailable, let statusMessage = item.statusMessage {
+                    Label("\(item.status.displayName) • \(statusMessage)", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            VStack(alignment: .trailing, spacing: 8) {
+                Button("Edit") {
+                    viewModel.openLibraryCapture(item)
+                    selectedTab = .review
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(!item.canOpenInEditor)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.58))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.secondary.opacity(0.10), lineWidth: 1)
+        )
+    }
+
+    private func libraryMetadataPill(text: String, systemName: String) -> some View {
+        Label(text, systemImage: systemName)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+            )
+    }
+
+    private func libraryMetadataPillIcon(systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 30, height: 24)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+            )
     }
 
     private var hasActiveLibraryFilters: Bool {
@@ -1270,10 +1326,19 @@ struct ContentView: View {
 
             if playbackTransitionPlateState != .hidden {
                 ZStack {
-                    Color.black
-                        .opacity(0.8)
-                    Color.accentColor
-                        .opacity(0.2)
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                    Rectangle()
+                        .fill(Color.black.opacity(colorScheme == .dark ? 0.34 : 0.16))
+                    LinearGradient(
+                        colors: [
+                            Color.accentColor.opacity(colorScheme == .dark ? 0.24 : 0.18),
+                            Color.black.opacity(colorScheme == .dark ? 0.18 : 0.08)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .blendMode(.plusLighter)
 
                     Image("Logo")
                         .resizable()
@@ -2713,6 +2778,24 @@ struct ContentView: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
             )
+    }
+
+    private var detailBackground: some View {
+        ZStack {
+            if colorScheme == .light {
+                Color(nsColor: .windowBackgroundColor)
+                accentTint
+                    .opacity(0.20)
+            } else {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+            }
+        }
+    }
+
+    private var accentTint: Color {
+        let accent = NSColor.controlAccentColor.usingColorSpace(.deviceRGB) ?? .systemBlue
+        return Color(nsColor: accent)
     }
 
     private func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
