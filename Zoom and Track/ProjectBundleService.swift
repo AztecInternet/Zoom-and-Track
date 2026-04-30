@@ -810,6 +810,7 @@ struct ProjectBundleService {
                     zoomType: .inOut,
                     bounceAmount: 0.35,
                     noZoomFallbackMode: .pan,
+                    noZoomOverflowRegion: nil,
                     displayOrder: index
                 )
             )

@@ -834,6 +834,16 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    func setSelectedMarkerNoZoomOverflowRegion(_ region: NoZoomOverflowRegion?) {
+        updateSelectedMarker { marker in
+            marker.noZoomOverflowRegion = region
+        }
+    }
+
+    func clearSelectedMarkerNoZoomOverflowRegion() {
+        setSelectedMarkerNoZoomOverflowRegion(nil)
+    }
+
     func setDefaultNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
         defaultNoZoomFallbackMode = fallbackMode
         UserDefaults.standard.set(fallbackMode.rawValue, forKey: defaultNoZoomFallbackModeKey)
@@ -939,6 +949,7 @@ final class CaptureSetupViewModel: ObservableObject {
             zoomType: .inOut,
             bounceAmount: 0.35,
             noZoomFallbackMode: defaultNoZoomFallbackMode,
+            noZoomOverflowRegion: nil,
             displayOrder: nextMarkerDisplayOrder(from: markers)
         )
         markers.append(marker)
@@ -1704,8 +1715,23 @@ final class CaptureSetupViewModel: ObservableObject {
         }
 
         let eligibleMarkers = summary.zoomMarkers.filter { $0.enabled }
-        let markers = eligibleMarkers.isEmpty ? summary.zoomMarkers : eligibleMarkers
-        let markerID = markers.last(where: { $0.sourceEventTimestamp <= currentTime })?.id
+        let markers = (eligibleMarkers.isEmpty ? summary.zoomMarkers : eligibleMarkers)
+            .sorted { lhs, rhs in
+                let leftTimeline = SharedMotionEngine.zoomTimeline(for: lhs)
+                let rightTimeline = SharedMotionEngine.zoomTimeline(for: rhs)
+                if leftTimeline.startTime == rightTimeline.startTime {
+                    if lhs.sourceEventTimestamp == rhs.sourceEventTimestamp {
+                        return lhs.id < rhs.id
+                    }
+                    return lhs.sourceEventTimestamp < rhs.sourceEventTimestamp
+                }
+                return leftTimeline.startTime < rightTimeline.startTime
+            }
+        let activeMarkerID = markers.last { marker in
+            let timeline = SharedMotionEngine.zoomTimeline(for: marker)
+            return currentTime >= timeline.startTime && currentTime <= timeline.endTime
+        }?.id
+        let markerID = activeMarkerID ?? markers.last(where: { $0.sourceEventTimestamp <= currentTime })?.id
 
         if selectedZoomMarkerID != markerID {
             selectedZoomMarkerID = markerID

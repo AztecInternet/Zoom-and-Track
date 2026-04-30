@@ -420,6 +420,13 @@ enum NoZoomFallbackMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+struct NoZoomOverflowRegion: Codable, Equatable {
+    var centerX: Double
+    var centerY: Double
+    var width: Double
+    var height: Double
+}
+
 enum ZoomMarkerKind: String, Codable {
     case clickFocus
 }
@@ -495,6 +502,7 @@ struct ZoomPlanItem: Codable, Identifiable {
     var bounceAmount: Double
     var clickPulse: ClickPulseConfiguration?
     var noZoomFallbackMode: NoZoomFallbackMode
+    var noZoomOverflowRegion: NoZoomOverflowRegion?
     var displayOrder: Int?
 
     private enum CodingKeys: String, CodingKey {
@@ -522,6 +530,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         case bounceAmount
         case clickPulse
         case noZoomFallbackMode
+        case noZoomOverflowRegion
         case displayOrder
     }
 
@@ -550,6 +559,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         bounceAmount: Double,
         clickPulse: ClickPulseConfiguration? = nil,
         noZoomFallbackMode: NoZoomFallbackMode = .pan,
+        noZoomOverflowRegion: NoZoomOverflowRegion? = nil,
         displayOrder: Int? = nil
     ) {
         self.id = id
@@ -576,6 +586,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         self.bounceAmount = bounceAmount
         self.clickPulse = clickPulse
         self.noZoomFallbackMode = noZoomFallbackMode
+        self.noZoomOverflowRegion = noZoomOverflowRegion
         self.displayOrder = displayOrder
     }
 
@@ -600,6 +611,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         bounceAmount = try container.decodeIfPresent(Double.self, forKey: .bounceAmount) ?? 0.35
         clickPulse = try container.decodeIfPresent(ClickPulseConfiguration.self, forKey: .clickPulse)
         noZoomFallbackMode = try container.decodeIfPresent(NoZoomFallbackMode.self, forKey: .noZoomFallbackMode) ?? .pan
+        noZoomOverflowRegion = try container.decodeIfPresent(NoZoomOverflowRegion.self, forKey: .noZoomOverflowRegion)
         displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
 
         let legacyDuration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? max(endTime - startTime, 0.5)
@@ -864,10 +876,15 @@ enum SharedMotionEngine {
                 currentState = PreviewState(scale: 1, normalizedPoint: normalizedPoint)
                 restingState = currentState
             case .noZoom:
+                let targetRegion = normalizedRegion(
+                    for: marker,
+                    coordinateSpace: coordinateSpace
+                )
                 let targetState = noZoomTargetState(
                     currentState: currentState,
                     restingState: restingState,
                     targetPoint: normalizedPoint,
+                    targetRegion: targetRegion,
                     fallbackMode: marker.noZoomFallbackMode
                 )
                 if currentTime <= timeline.peakTime {
@@ -1114,23 +1131,42 @@ enum SharedMotionEngine {
         currentState: PreviewState,
         restingState: PreviewState,
         targetPoint: CGPoint,
+        targetRegion: NoZoomOverflowRegion?,
         fallbackMode: NoZoomFallbackMode
     ) -> PreviewState {
         guard restingState.scale > 1.0001 else {
             return currentState
         }
 
-        if visibleRect(for: restingState).contains(targetPoint) {
-            return restingState
-        }
-
         switch fallbackMode {
         case .pan:
+            if visibleRect(for: restingState).contains(targetPoint) {
+                return restingState
+            }
             return PreviewState(
                 scale: restingState.scale,
                 normalizedPoint: centeredPanTarget(from: restingState, toward: targetPoint)
             )
         case .scale:
+            if let targetRegion {
+                let restingVisibleRect = visibleRect(for: restingState)
+                if restingVisibleRect.contains(rect(for: targetRegion)) {
+                    return restingState
+                }
+
+                let fittedScale = fittedScale(for: targetRegion)
+                return PreviewState(
+                    scale: fittedScale,
+                    normalizedPoint: clampedTargetCenter(
+                        target: CGPoint(x: targetRegion.centerX, y: targetRegion.centerY),
+                        scale: fittedScale
+                    )
+                )
+            }
+
+            if visibleRect(for: restingState).contains(targetPoint) {
+                return restingState
+            }
             let fittedScale = maximumVisibleScale(for: targetPoint, anchoredTo: restingState)
             return PreviewState(scale: fittedScale, normalizedPoint: restingState.normalizedPoint)
         }
@@ -1142,6 +1178,30 @@ enum SharedMotionEngine {
         let minX = min(max(state.normalizedPoint.x - (viewportWidth / 2), 0), 1 - viewportWidth)
         let minY = min(max(state.normalizedPoint.y - (viewportHeight / 2), 0), 1 - viewportHeight)
         return CGRect(x: minX, y: minY, width: viewportWidth, height: viewportHeight)
+    }
+
+    private static func rect(for region: NoZoomOverflowRegion) -> CGRect {
+        CGRect(
+            x: region.centerX - (region.width / 2),
+            y: region.centerY - (region.height / 2),
+            width: region.width,
+            height: region.height
+        )
+    }
+
+    private static func fittedScale(for region: NoZoomOverflowRegion) -> CGFloat {
+        let safeWidth = max(region.width, 0.0001)
+        let safeHeight = max(region.height, 0.0001)
+        return max(1, min(1 / safeWidth, 1 / safeHeight))
+    }
+
+    private static func clampedTargetCenter(target: CGPoint, scale: CGFloat) -> CGPoint {
+        let viewportWidth = 1 / max(scale, 1)
+        let viewportHeight = 1 / max(scale, 1)
+        return CGPoint(
+            x: min(max(target.x, viewportWidth / 2), 1 - (viewportWidth / 2)),
+            y: min(max(target.y, viewportHeight / 2), 1 - (viewportHeight / 2))
+        )
     }
 
     private static func centeredPanTarget(from state: PreviewState, toward targetPoint: CGPoint) -> CGPoint {
@@ -1178,6 +1238,26 @@ enum SharedMotionEngine {
             }
         }
         return max(low, 1)
+    }
+
+    private static func normalizedRegion(
+        for marker: ZoomPlanItem,
+        coordinateSpace: CoordinateSpace
+    ) -> NoZoomOverflowRegion? {
+        guard let region = marker.noZoomOverflowRegion else { return nil }
+
+        let centerX = min(max(region.centerX, 0), 1)
+        let baseCenterY = min(max(region.centerY, 0), 1)
+        let centerY = coordinateSpace == .bottomLeft ? (1 - baseCenterY) : baseCenterY
+        let width = min(max(region.width, 0.0001), 1)
+        let height = min(max(region.height, 0.0001), 1)
+
+        return NoZoomOverflowRegion(
+            centerX: centerX,
+            centerY: centerY,
+            width: width,
+            height: height
+        )
     }
 
     private static func normalizedProgress(_ value: Double, start: Double, end: Double) -> Double {

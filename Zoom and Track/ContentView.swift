@@ -33,6 +33,8 @@ struct ContentView: View {
     @State private var exportShareAnchorView: NSView?
     @State private var isPlacingClickFocus = false
     @State private var pendingMarkerDragSourcePoint: CGPoint?
+    @State private var isDrawingNoZoomOverflowRegion = false
+    @State private var pendingNoZoomOverflowRegion: NoZoomOverflowRegion?
     @State private var activeTimelineMarkerDragID: String?
     @State private var activeTimelineMarkerDragStartTime: Double?
     @State private var librarySearchText = ""
@@ -87,8 +89,8 @@ struct ContentView: View {
         var id: String { marker.id }
     }
 
-    private enum MarkerTimingPhase: String {
-        case leadIn = "Lead-In"
+private enum MarkerTimingPhase: String {
+        case leadIn = "Motion to Click Offset"
         case zoomIn = "Zoom In"
         case hold = "Hold"
         case zoomOut = "Zoom Out"
@@ -504,6 +506,8 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                                 playbackTransitionPlateState: viewModel.playbackTransitionPlateState,
                                 isPlacingClickFocus: isPlacingClickFocus,
                                 draggedMarkerSourcePoint: pendingMarkerDragSourcePoint,
+                                isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion,
+                                pendingNoZoomOverflowRegion: pendingNoZoomOverflowRegion,
                                 placeClickFocusAction: { sourcePoint in
                                     viewModel.addClickFocusMarker(at: sourcePoint)
                                     pendingMarkerDragSourcePoint = nil
@@ -515,6 +519,9 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                                 commitDraggedMarkerAction: { sourcePoint in
                                     viewModel.moveSelectedMarker(to: sourcePoint)
                                     pendingMarkerDragSourcePoint = nil
+                                },
+                                updateNoZoomOverflowRegionAction: { region in
+                                    pendingNoZoomOverflowRegion = region
                                 }
                             )
                                 .frame(height: videoHeight)
@@ -1197,9 +1204,12 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
         playbackTransitionPlateState: CaptureSetupViewModel.PlaybackTransitionPlateState,
         isPlacingClickFocus: Bool,
         draggedMarkerSourcePoint: CGPoint?,
+        isDrawingNoZoomOverflowRegion: Bool,
+        pendingNoZoomOverflowRegion: NoZoomOverflowRegion?,
         placeClickFocusAction: @escaping (CGPoint) -> Void,
         dragSelectedMarkerAction: @escaping (CGPoint) -> Void,
-        commitDraggedMarkerAction: @escaping (CGPoint) -> Void
+        commitDraggedMarkerAction: @escaping (CGPoint) -> Void,
+        updateNoZoomOverflowRegionAction: @escaping (NoZoomOverflowRegion?) -> Void
     ) -> some View {
         let safeAspectRatio = max(aspectRatio, 0.1)
 
@@ -1209,9 +1219,12 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
             GeometryReader { geometry in
                 let fittedRect = fittedVideoRect(in: geometry.size, aspectRatio: safeAspectRatio)
                 let isMarkerDragActive = draggedMarkerSourcePoint != nil
+                let isOverflowRegionDrawActive = isDrawingNoZoomOverflowRegion
                 let previewState = isRenderedPreviewActive
                     ? nil
                     : isMarkerDragActive
+                    ? nil
+                    : isOverflowRegionDrawActive
                     ? nil
                     : activeZoomPreviewState(
                         at: currentTime,
@@ -1239,6 +1252,7 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                 .coordinateSpace(name: "videoOverlay")
 
                 if !isRenderedPreviewActive,
+                   !isOverflowRegionDrawActive,
                    let mapping = mappedOverlayPoint(
                     for: selectedMarker,
                     contentCoordinateSize: contentCoordinateSize,
@@ -1334,6 +1348,98 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                                         return
                                     }
                                     placeClickFocusAction(sourcePoint)
+                                }
+                        )
+                }
+
+                if isOverflowRegionDrawActive {
+                    Rectangle()
+                        .fill(Color.accentColor.opacity(0.06))
+                        .frame(width: fittedRect.width, height: fittedRect.height)
+                        .overlay {
+                            ZStack {
+                                if let region = pendingNoZoomOverflowRegion ?? selectedMarker?.noZoomOverflowRegion,
+                                   let overlayRect = overlayRect(
+                                    for: region,
+                                    contentCoordinateSize: contentCoordinateSize,
+                                    in: geometry.size,
+                                    videoAspectRatio: safeAspectRatio
+                                ) {
+                                    let cornerRadii = overflowRegionCornerRadii(for: overlayRect, within: fittedRect)
+
+                                    UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
+                                        .fill(Color.accentColor.opacity(0.10))
+                                        .frame(width: overlayRect.width, height: overlayRect.height)
+                                        .overlay(
+                                            UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
+                                                .strokeBorder(Color.accentColor, lineWidth: 2)
+                                        )
+                                        .position(x: overlayRect.midX - fittedRect.minX, y: overlayRect.midY - fittedRect.minY)
+                                }
+
+                                VStack(spacing: 8) {
+                                    Image(systemName: "viewfinder.rectangular")
+                                        .font(.system(size: 18, weight: .semibold))
+                                    Text("Drag to draw the Scale overflow region")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(Color.black.opacity(0.62))
+                                )
+                                .padding(.top, 18)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                            }
+                        }
+                        .position(x: fittedRect.midX, y: fittedRect.midY)
+                        .gesture(
+                            DragGesture(minimumDistance: 0, coordinateSpace: .named("videoOverlay"))
+                                .onChanged { value in
+                                    guard let startSourcePoint = sourcePoint(
+                                        for: value.startLocation,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ), let currentSourcePoint = sourcePoint(
+                                        for: value.location,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ) else {
+                                        return
+                                    }
+                                    updateNoZoomOverflowRegionAction(
+                                        noZoomOverflowRegion(
+                                            from: startSourcePoint,
+                                            to: currentSourcePoint,
+                                            contentCoordinateSize: contentCoordinateSize
+                                        )
+                                    )
+                                }
+                                .onEnded { value in
+                                    guard let startSourcePoint = sourcePoint(
+                                        for: value.startLocation,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ), let endSourcePoint = sourcePoint(
+                                        for: value.location,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ) else {
+                                        return
+                                    }
+                                    updateNoZoomOverflowRegionAction(
+                                        noZoomOverflowRegion(
+                                            from: startSourcePoint,
+                                            to: endSourcePoint,
+                                            contentCoordinateSize: contentCoordinateSize
+                                        )
+                                    )
                                 }
                         )
                 }
@@ -1856,7 +1962,11 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("⌥ Click to select a Marker, ⌥ Click + Drag to reposition, ←/→ to nudge 0.1s")
+                Text(
+                    isDrawingNoZoomOverflowRegion
+                    ? "←/→/↑/↓ to nudge the overflow region, ⌥ + Arrow for 10x speed"
+                    : "⌥ Click to select a Marker, ⌥ Click + Drag to reposition, ←/→ to nudge 0.1s"
+                )
                     .font(.system(size: 10, weight: .light))
                     .foregroundStyle(.secondary)
             }
@@ -1864,8 +1974,31 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
         .focusable(interactions: .edit)
         .focusEffectDisabled()
         .focused($isTimelineKeyboardFocused)
-        .onKeyPress(keys: [.leftArrow, .rightArrow]) { keyPress in
+        .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { keyPress in
             guard viewModel.selectedZoomMarkerID != nil else { return .ignored }
+            if isDrawingNoZoomOverflowRegion,
+               let selectedMarker = viewModel.selectedZoomMarker,
+               let region = pendingNoZoomOverflowRegion ?? selectedMarker.noZoomOverflowRegion {
+                let nudgeDistance = keyPress.modifiers.contains(.option) ? 10.0 : 1.0
+                let nudgedRegion: NoZoomOverflowRegion?
+                switch keyPress.key {
+                case .leftArrow:
+                    nudgedRegion = nudgedNoZoomOverflowRegion(region, deltaX: -nudgeDistance, deltaY: 0, contentCoordinateSize: summary.contentCoordinateSize)
+                case .rightArrow:
+                    nudgedRegion = nudgedNoZoomOverflowRegion(region, deltaX: nudgeDistance, deltaY: 0, contentCoordinateSize: summary.contentCoordinateSize)
+                case .upArrow:
+                    nudgedRegion = nudgedNoZoomOverflowRegion(region, deltaX: 0, deltaY: -nudgeDistance, contentCoordinateSize: summary.contentCoordinateSize)
+                case .downArrow:
+                    nudgedRegion = nudgedNoZoomOverflowRegion(region, deltaX: 0, deltaY: nudgeDistance, contentCoordinateSize: summary.contentCoordinateSize)
+                default:
+                    nudgedRegion = nil
+                }
+                if let nudgedRegion {
+                    pendingNoZoomOverflowRegion = nudgedRegion
+                    return .handled
+                }
+                return .ignored
+            }
             switch keyPress.key {
             case .leftArrow:
                 viewModel.nudgeSelectedTimelineMarker(by: -1)
@@ -1970,6 +2103,9 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                 HStack(spacing: 2) {
                     ForEach(NoZoomFallbackMode.allCases) { mode in
                         Button {
+                            if mode != .scale {
+                                isDrawingNoZoomOverflowRegion = false
+                            }
                             viewModel.setSelectedMarkerNoZoomFallbackMode(mode)
                         } label: {
                             Text(mode.displayName)
@@ -1995,6 +2131,38 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                     Capsule(style: .continuous)
                         .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
                 )
+
+                if selectedMarker.noZoomFallbackMode == .scale {
+                    Divider()
+                        .frame(height: 14)
+
+                    Text("region")
+                        .font(.system(size: 10, weight: .light))
+                        .foregroundStyle(Color.accentColor)
+
+                    timelineGadget(
+                        systemName: isDrawingNoZoomOverflowRegion ? "checkmark" : "viewfinder.rectangular",
+                        isActive: isDrawingNoZoomOverflowRegion,
+                        isEnabled: true,
+                        help: isDrawingNoZoomOverflowRegion ? "Save Scale Overflow Region" : "Draw Scale Overflow Region"
+                    ) {
+                        if isDrawingNoZoomOverflowRegion {
+                            viewModel.setSelectedMarkerNoZoomOverflowRegion(
+                                pendingNoZoomOverflowRegion ?? selectedMarker.noZoomOverflowRegion
+                            )
+                            isDrawingNoZoomOverflowRegion = false
+                        } else {
+                            viewModel.cancelPlaybackPreview()
+                            inspectorMode = .markers
+                            isPlaybackInspectorVisible = true
+                            isPlacingClickFocus = false
+                            pendingMarkerDragSourcePoint = nil
+                            pendingNoZoomOverflowRegion = selectedMarker.noZoomOverflowRegion
+                            isDrawingNoZoomOverflowRegion = true
+                            isTimelineKeyboardFocused = true
+                        }
+                    }
+                }
             }
         }
         .padding(.horizontal, 10)
@@ -2747,6 +2915,140 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
         )
     }
 
+    private func noZoomOverflowRegion(
+        from startPoint: CGPoint,
+        to endPoint: CGPoint,
+        contentCoordinateSize: CGSize
+    ) -> NoZoomOverflowRegion? {
+        guard let rect = aspectLockedSourceRect(
+            from: startPoint,
+            to: endPoint,
+            contentCoordinateSize: contentCoordinateSize
+        ) else {
+            return nil
+        }
+
+        return NoZoomOverflowRegion(
+            centerX: rect.midX / contentCoordinateSize.width,
+            centerY: rect.midY / contentCoordinateSize.height,
+            width: rect.width / contentCoordinateSize.width,
+            height: rect.height / contentCoordinateSize.height
+        )
+    }
+
+    private func aspectLockedSourceRect(
+        from startPoint: CGPoint,
+        to endPoint: CGPoint,
+        contentCoordinateSize: CGSize
+    ) -> CGRect? {
+        guard contentCoordinateSize.width > 0, contentCoordinateSize.height > 0 else {
+            return nil
+        }
+
+        let aspectRatio = contentCoordinateSize.width / contentCoordinateSize.height
+        let deltaX = endPoint.x - startPoint.x
+        let deltaY = endPoint.y - startPoint.y
+        let horizontalLimit = deltaX >= 0 ? contentCoordinateSize.width - startPoint.x : startPoint.x
+        let verticalLimit = deltaY >= 0 ? contentCoordinateSize.height - startPoint.y : startPoint.y
+        let maxWidth = min(horizontalLimit, verticalLimit * aspectRatio)
+        guard maxWidth.isFinite, maxWidth > 1 else {
+            return nil
+        }
+
+        let desiredWidth = max(abs(deltaX), abs(deltaY) * aspectRatio)
+        let width = min(max(desiredWidth, 1), maxWidth)
+        let height = width / aspectRatio
+        let originX = deltaX >= 0 ? startPoint.x : startPoint.x - width
+        let originY = deltaY >= 0 ? startPoint.y : startPoint.y - height
+
+        let rect = CGRect(x: originX, y: originY, width: width, height: height)
+        return rect.standardized
+    }
+
+    private func overlayRect(
+        for region: NoZoomOverflowRegion,
+        contentCoordinateSize: CGSize,
+        in containerSize: CGSize,
+        videoAspectRatio: CGFloat
+    ) -> CGRect? {
+        guard contentCoordinateSize.width > 0, contentCoordinateSize.height > 0 else {
+            return nil
+        }
+
+        let sourceRect = CGRect(
+            x: (region.centerX - (region.width / 2)) * contentCoordinateSize.width,
+            y: (region.centerY - (region.height / 2)) * contentCoordinateSize.height,
+            width: region.width * contentCoordinateSize.width,
+            height: region.height * contentCoordinateSize.height
+        )
+
+        guard let topLeft = overlayPoint(
+            for: sourceRect.origin,
+            contentCoordinateSize: contentCoordinateSize,
+            in: containerSize,
+            videoAspectRatio: videoAspectRatio
+        ), let bottomRight = overlayPoint(
+            for: CGPoint(x: sourceRect.maxX, y: sourceRect.maxY),
+            contentCoordinateSize: contentCoordinateSize,
+            in: containerSize,
+            videoAspectRatio: videoAspectRatio
+        ) else {
+            return nil
+        }
+
+        return CGRect(
+            x: topLeft.x,
+            y: topLeft.y,
+            width: bottomRight.x - topLeft.x,
+            height: bottomRight.y - topLeft.y
+        ).standardized
+    }
+
+    private func overflowRegionCornerRadii(for overlayRect: CGRect, within fittedRect: CGRect) -> RectangleCornerRadii {
+        let baseRadius: CGFloat = 10
+        let canvasCornerRadius: CGFloat = 18
+        let edgeTolerance: CGFloat = 0.5
+
+        let touchesLeft = abs(overlayRect.minX - fittedRect.minX) <= edgeTolerance
+        let touchesRight = abs(overlayRect.maxX - fittedRect.maxX) <= edgeTolerance
+        let touchesTop = abs(overlayRect.minY - fittedRect.minY) <= edgeTolerance
+        let touchesBottom = abs(overlayRect.maxY - fittedRect.maxY) <= edgeTolerance
+
+        return RectangleCornerRadii(
+            topLeading: touchesTop && touchesLeft ? canvasCornerRadius : baseRadius,
+            bottomLeading: touchesBottom && touchesLeft ? canvasCornerRadius : baseRadius,
+            bottomTrailing: touchesBottom && touchesRight ? canvasCornerRadius : baseRadius,
+            topTrailing: touchesTop && touchesRight ? canvasCornerRadius : baseRadius
+        )
+    }
+
+    private func nudgedNoZoomOverflowRegion(
+        _ region: NoZoomOverflowRegion,
+        deltaX: Double,
+        deltaY: Double,
+        contentCoordinateSize: CGSize
+    ) -> NoZoomOverflowRegion? {
+        guard contentCoordinateSize.width > 0, contentCoordinateSize.height > 0 else {
+            return nil
+        }
+
+        let normalizedDeltaX = deltaX / contentCoordinateSize.width
+        let normalizedDeltaY = deltaY / contentCoordinateSize.height
+        let halfWidth = region.width / 2
+        let halfHeight = region.height / 2
+        let minCenterX = halfWidth
+        let maxCenterX = 1 - halfWidth
+        let minCenterY = halfHeight
+        let maxCenterY = 1 - halfHeight
+
+        return NoZoomOverflowRegion(
+            centerX: min(max(region.centerX + normalizedDeltaX, minCenterX), maxCenterX),
+            centerY: min(max(region.centerY + normalizedDeltaY, minCenterY), maxCenterY),
+            width: region.width,
+            height: region.height
+        )
+    }
+
     private func fittedVideoRect(in containerSize: CGSize, aspectRatio: CGFloat) -> CGRect {
         let safeAspectRatio = max(aspectRatio, 0.1)
         let containerAspectRatio = containerSize.width / max(containerSize.height, 1)
@@ -2856,15 +3158,20 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
         }
     }
 
+    private func inspectorSectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(0.8)
+            .foregroundStyle(Color.accentColor)
+    }
+
     private func markerInspectorCard(_ summary: RecordingInspectionSummary) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Inspector")
                 .font(.system(size: 16, weight: .semibold))
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Mode")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                inspectorSectionHeader("Mode")
 
                 Picker("Mode", selection: $inspectorMode) {
                     ForEach(EditInspectorMode.allCases) { mode in
@@ -2901,11 +3208,9 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
             )
         }
 
-        return VStack(alignment: .leading, spacing: 16) {
+        return VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Markers")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                inspectorSectionHeader("Markers")
 
                 if entries.isEmpty {
                     Text("No markers")
@@ -3415,14 +3720,12 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Timing")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                    inspectorSectionHeader("Timing")
 
                     switch marker.zoomType {
                     case .inOut:
                         timingSliderRow(
-                            title: "Lead-In Time",
+                            title: "Motion to Click Offset",
                             value: marker.leadInTime,
                             range: 0...20,
                             phase: .leadIn,
@@ -3451,7 +3754,7 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                         )
                     case .inOnly:
                         timingSliderRow(
-                            title: "Lead-In Time",
+                            title: "Motion to Click Offset",
                             value: marker.leadInTime,
                             range: 0...20,
                             phase: .leadIn,
@@ -3481,25 +3784,18 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                         )
                     case .noZoom:
                         timingSliderRow(
-                            title: "Lead-In Time",
+                            title: "Motion to Click Offset",
                             value: marker.leadInTime,
                             range: 0...20,
                             phase: .leadIn,
                             action: viewModel.setSelectedMarkerLeadInTime
                         )
                         timingSliderRow(
-                            title: "Move",
+                            title: marker.noZoomFallbackMode == .pan ? "Pan Speed" : "Scale Speed",
                             value: marker.zoomInDuration,
                             range: 0.05...3,
                             phase: .zoomIn,
                             action: viewModel.setSelectedMarkerZoomInDuration
-                        )
-                        timingSliderRow(
-                            title: "Hold",
-                            value: marker.holdDuration,
-                            range: 0.05...10,
-                            phase: .hold,
-                            action: viewModel.setSelectedMarkerHoldDuration
                         )
                     }
                 }
@@ -3507,9 +3803,7 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Zoom Type")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.secondary)
+                            inspectorSectionHeader("Zoom Type")
                             Picker("Zoom Type", selection: Binding(
                                 get: { marker.zoomType },
                                 set: { viewModel.setSelectedMarkerZoomType($0) }
@@ -3677,7 +3971,7 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                 Text("Zoom \(String(format: "%.1fx", marker.zoomScale))")
                     .font(.system(size: 11))
             }
-            Text("Lead-In \(String(format: "%.2fs", marker.leadInTime))")
+            Text("Motion to Click Offset \(String(format: "%.2fs", marker.leadInTime))")
                 .font(.system(size: 11))
             if marker.zoomType != .outOnly {
                 Text("Zoom In \(String(format: "%.2fs", marker.zoomInDuration))")
@@ -3952,7 +4246,7 @@ private struct MarkerListTableView: NSViewRepresentable {
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
 
-        let tableView = NSTableView()
+        let tableView = MarkerListNativeTableView()
         tableView.headerView = nil
         tableView.rowHeight = 76
         tableView.intercellSpacing = NSSize(width: 0, height: 0)
@@ -3969,6 +4263,8 @@ private struct MarkerListTableView: NSViewRepresentable {
         tableView.dataSource = context.coordinator
         tableView.registerForDraggedTypes([.string])
         tableView.setDraggingSourceOperationMask(.move, forLocal: true)
+        tableView.target = context.coordinator
+        tableView.action = #selector(Coordinator.handleTableViewAction(_:))
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("MarkerColumn"))
         column.resizingMask = .autoresizingMask
@@ -3997,6 +4293,17 @@ private struct MarkerListTableView: NSViewRepresentable {
 
         init(parent: MarkerListTableView) {
             self.parent = parent
+        }
+
+        @objc
+        func handleTableViewAction(_ sender: Any?) {
+            guard let tableView else { return }
+            let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+            guard row >= 0, row < parent.entries.count else { return }
+            if let renamingMarkerID = parent.renamingMarkerID {
+                parent.onCommitRename(renamingMarkerID, parent.markerNameDraft)
+            }
+            parent.onSelectMarker(parent.entries[row].id)
         }
 
         func numberOfRows(in tableView: NSTableView) -> Int {
@@ -4044,7 +4351,6 @@ private struct MarkerListTableView: NSViewRepresentable {
             if let renamingMarkerID = parent.renamingMarkerID {
                 parent.onCommitRename(renamingMarkerID, parent.markerNameDraft)
             }
-            parent.onSelectMarker(parent.entries[tableView.selectedRow].id)
         }
 
         func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
@@ -4333,6 +4639,12 @@ private final class MarkerListHostingCellView: NSTableCellView {
 
     func update(rootView: MarkerListCellContent) {
         hostingView.rootView = AnyView(rootView)
+    }
+}
+
+private final class MarkerListNativeTableView: NSTableView {
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
     }
 }
 
