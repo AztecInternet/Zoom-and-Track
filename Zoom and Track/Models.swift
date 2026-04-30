@@ -355,6 +355,29 @@ struct ZoomPlanEnvelope: Codable {
     let schemaVersion: Int
     let source: String
     let items: [ZoomPlanItem]
+    let effectItems: [EffectPlanItem]
+
+    init(schemaVersion: Int, source: String, items: [ZoomPlanItem], effectItems: [EffectPlanItem] = []) {
+        self.schemaVersion = schemaVersion
+        self.source = source
+        self.items = items
+        self.effectItems = effectItems
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case source
+        case items
+        case effectItems
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        source = try container.decode(String.self, forKey: .source)
+        items = try container.decode([ZoomPlanItem].self, forKey: .items)
+        effectItems = try container.decodeIfPresent([EffectPlanItem].self, forKey: .effectItems) ?? []
+    }
 }
 
 enum ZoomEaseStyle: String, Codable, CaseIterable, Identifiable {
@@ -425,6 +448,38 @@ struct NoZoomOverflowRegion: Codable, Equatable {
     var centerY: Double
     var width: Double
     var height: Double
+}
+
+enum EffectStyle: String, Codable, CaseIterable, Identifiable {
+    case blur
+    case darken
+    case tint
+    case blurDarken
+
+    var id: String { rawValue }
+}
+
+struct EffectFocusRegion: Codable, Equatable {
+    var centerX: Double
+    var centerY: Double
+    var width: Double
+    var height: Double
+}
+
+struct EffectPlanItem: Codable, Identifiable, Equatable {
+    var id: String
+    var markerName: String?
+    var sourceEventTimestamp: Double
+    var startTime: Double
+    var endTime: Double
+    var fadeInDuration: Double
+    var fadeOutDuration: Double
+    var enabled: Bool
+    var displayOrder: Int?
+    var style: EffectStyle
+    var amount: Double
+    var cornerRadius: Double
+    var focusRegion: EffectFocusRegion?
 }
 
 enum ZoomMarkerKind: String, Codable {
@@ -711,6 +766,7 @@ struct RecordingInspectionSummary {
     let lastEventTimestamp: Double?
     let duration: Double?
     let zoomMarkers: [ZoomPlanItem]
+    let effectMarkers: [EffectPlanItem]
 
     var displayTitle: String {
         captureTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? bundleName : captureTitle

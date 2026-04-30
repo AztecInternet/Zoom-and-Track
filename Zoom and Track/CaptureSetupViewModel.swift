@@ -69,6 +69,7 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published var activeRecordingTargetName: String?
     @Published var recordingStartedAt: Date?
     @Published var selectedZoomMarkerID: String?
+    @Published var selectedEffectMarkerID: String?
     @Published var currentPlaybackTime: Double = 0
     @Published var isPlaybackActive = false
     @Published var isRenderingMarkerPreview = false
@@ -171,6 +172,10 @@ final class CaptureSetupViewModel: ObservableObject {
 
     var selectedZoomMarker: ZoomPlanItem? {
         recordingSummary?.zoomMarkers.first { $0.id == selectedZoomMarkerID }
+    }
+
+    var selectedEffectMarker: EffectPlanItem? {
+        recordingSummary?.effectMarkers.first { $0.id == selectedEffectMarkerID }
     }
 
     var activePreviewMarkerID: String? {
@@ -844,6 +849,22 @@ final class CaptureSetupViewModel: ObservableObject {
         setSelectedMarkerNoZoomOverflowRegion(nil)
     }
 
+    func setSelectedEffectFocusRegion(_ region: EffectFocusRegion?) {
+        guard let summary = recordingSummary,
+              let selectedEffectMarkerID,
+              let index = summary.effectMarkers.firstIndex(where: { $0.id == selectedEffectMarkerID }) else {
+            return
+        }
+
+        var effectMarkers = summary.effectMarkers
+        effectMarkers[index].focusRegion = region
+        saveEffectMarkers(effectMarkers, basedOn: summary)
+    }
+
+    func clearSelectedEffectFocusRegion() {
+        setSelectedEffectFocusRegion(nil)
+    }
+
     func setDefaultNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
         defaultNoZoomFallbackMode = fallbackMode
         UserDefaults.standard.set(fallbackMode.rawValue, forKey: defaultNoZoomFallbackModeKey)
@@ -1070,7 +1091,8 @@ final class CaptureSetupViewModel: ObservableObject {
                 firstEventTimestamp: summary.firstEventTimestamp,
                 lastEventTimestamp: summary.lastEventTimestamp,
                 duration: summary.duration,
-                zoomMarkers: summary.zoomMarkers
+                zoomMarkers: summary.zoomMarkers,
+                effectMarkers: summary.effectMarkers
             )
             recordingSummary = updatedSummary
             captureTitle = updatedManifest.captureTitle
@@ -1286,7 +1308,12 @@ final class CaptureSetupViewModel: ObservableObject {
 
     private func saveZoomMarkers(_ markers: [ZoomPlanItem], basedOn summary: RecordingInspectionSummary) {
         do {
-            let envelope = ZoomPlanEnvelope(schemaVersion: 1, source: "events.json", items: markers)
+            let envelope = ZoomPlanEnvelope(
+                schemaVersion: 1,
+                source: "events.json",
+                items: markers,
+                effectItems: summary.effectMarkers
+            )
             try projectBundleService.saveZoomPlan(envelope, in: summary.bundleURL)
             let updatedSummary = summaryWithMarkers(markers, basedOn: summary)
             publishOnNextRunLoop { [weak self] in
@@ -1360,8 +1387,53 @@ final class CaptureSetupViewModel: ObservableObject {
             firstEventTimestamp: summary.firstEventTimestamp,
             lastEventTimestamp: summary.lastEventTimestamp,
             duration: summary.duration,
-            zoomMarkers: markers
+            zoomMarkers: markers,
+            effectMarkers: summary.effectMarkers
         )
+    }
+
+    private func saveEffectMarkers(_ effectMarkers: [EffectPlanItem], basedOn summary: RecordingInspectionSummary) {
+        do {
+            let envelope = ZoomPlanEnvelope(
+                schemaVersion: 1,
+                source: "events.json",
+                items: summary.zoomMarkers,
+                effectItems: effectMarkers
+            )
+            try projectBundleService.saveZoomPlan(envelope, in: summary.bundleURL)
+            let updatedSummary = RecordingInspectionSummary(
+                bundleURL: summary.bundleURL,
+                bundleName: summary.bundleName,
+                captureID: summary.captureID,
+                collectionName: summary.collectionName,
+                projectName: summary.projectName,
+                captureType: summary.captureType,
+                captureTitle: summary.captureTitle,
+                createdAt: summary.createdAt,
+                updatedAt: summary.updatedAt,
+                recordingURL: summary.recordingURL,
+                videoAspectRatio: summary.videoAspectRatio,
+                contentCoordinateSize: summary.contentCoordinateSize,
+                captureSourceKind: summary.captureSourceKind,
+                captureSourceTitle: summary.captureSourceTitle,
+                totalEventCount: summary.totalEventCount,
+                cursorMovedCount: summary.cursorMovedCount,
+                leftMouseDownCount: summary.leftMouseDownCount,
+                leftMouseUpCount: summary.leftMouseUpCount,
+                rightMouseDownCount: summary.rightMouseDownCount,
+                rightMouseUpCount: summary.rightMouseUpCount,
+                firstEventTimestamp: summary.firstEventTimestamp,
+                lastEventTimestamp: summary.lastEventTimestamp,
+                duration: summary.duration,
+                zoomMarkers: summary.zoomMarkers,
+                effectMarkers: effectMarkers
+            )
+            publishOnNextRunLoop { [weak self] in
+                self?.recordingSummary = updatedSummary
+            }
+        } catch {
+            statusMessage = "Could not save zoomPlan.json: \(error.localizedDescription)"
+        }
     }
 
     private func syncMarkerTiming(_ marker: inout ZoomPlanItem) {

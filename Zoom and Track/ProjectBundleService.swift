@@ -271,7 +271,8 @@ struct ProjectBundleService {
             firstEventTimestamp: envelope.events.first?.timestamp,
             lastEventTimestamp: envelope.events.last?.timestamp,
             duration: duration,
-            zoomMarkers: zoomPlan.items
+            zoomMarkers: zoomPlan.items,
+            effectMarkers: zoomPlan.effectItems
         )
     }
 

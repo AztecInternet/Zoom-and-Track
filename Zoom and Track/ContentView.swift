@@ -38,6 +38,7 @@ struct ContentView: View {
     @State private var activeTimelineMarkerDragID: String?
     @State private var activeTimelineMarkerDragStartTime: Double?
     @State private var librarySearchText = ""
+    @State private var editorMode: ReviewEditorMode = .zoomAndClicks
     @State private var inspectorMode: EditInspectorMode = .markers
     @State private var selectedLibraryCollectionFilter: String?
     @State private var selectedLibraryProjectFilter: String?
@@ -89,6 +90,16 @@ struct ContentView: View {
         var id: String { marker.id }
     }
 
+    private struct EffectTimelineSegmentLayout: Identifiable {
+        let marker: EffectPlanItem
+        let lane: Int
+        let startRatio: Double
+        let eventRatio: Double
+        let endRatio: Double
+
+        var id: String { marker.id }
+    }
+
 private enum MarkerTimingPhase: String {
         case leadIn = "Motion to Click Offset"
         case zoomIn = "Zoom In"
@@ -99,6 +110,13 @@ private enum MarkerTimingPhase: String {
 private enum EditInspectorMode: String, CaseIterable, Identifiable {
     case captureInfo = "Edit Capture Info"
     case markers = "Edit Markers List"
+
+    var id: String { rawValue }
+}
+
+private enum ReviewEditorMode: String, CaseIterable, Identifiable {
+    case zoomAndClicks = "Zoom & Clicks"
+    case effects = "Effects"
 
     var id: String { rawValue }
 }
@@ -496,7 +514,7 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                                 mainPlayer: mainPlayer,
                                 previewPlayer: viewModel.previewPlayer,
                                 aspectRatio: summary.videoAspectRatio,
-                                selectedMarker: viewModel.selectedZoomMarker,
+                                selectedMarker: editorMode == .zoomAndClicks ? viewModel.selectedZoomMarker : nil,
                                 contentCoordinateSize: summary.contentCoordinateSize,
                                 zoomMarkers: summary.zoomMarkers,
                                 currentTime: viewModel.currentPlaybackTime,
@@ -504,10 +522,10 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                                 renderingStatusMessage: viewModel.markerPreviewStatusMessage,
                                 playbackPresentationMode: viewModel.playbackPresentationMode,
                                 playbackTransitionPlateState: viewModel.playbackTransitionPlateState,
-                                isPlacingClickFocus: isPlacingClickFocus,
-                                draggedMarkerSourcePoint: pendingMarkerDragSourcePoint,
-                                isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion,
-                                pendingNoZoomOverflowRegion: pendingNoZoomOverflowRegion,
+                                isPlacingClickFocus: editorMode == .zoomAndClicks ? isPlacingClickFocus : false,
+                                draggedMarkerSourcePoint: editorMode == .zoomAndClicks ? pendingMarkerDragSourcePoint : nil,
+                                isDrawingNoZoomOverflowRegion: editorMode == .zoomAndClicks ? isDrawingNoZoomOverflowRegion : false,
+                                pendingNoZoomOverflowRegion: editorMode == .zoomAndClicks ? pendingNoZoomOverflowRegion : nil,
                                 placeClickFocusAction: { sourcePoint in
                                     viewModel.addClickFocusMarker(at: sourcePoint)
                                     pendingMarkerDragSourcePoint = nil
@@ -551,6 +569,14 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                     .onChange(of: viewModel.currentPlaybackTime) {
                         guard !isScrubbingPlayback else { return }
                         playbackScrubTime = viewModel.currentPlaybackTime
+                    }
+                    .onChange(of: editorMode) {
+                        isPlacingClickFocus = false
+                        pendingMarkerDragSourcePoint = nil
+                        isDrawingNoZoomOverflowRegion = false
+                        pendingNoZoomOverflowRegion = nil
+                        activeTimelineMarkerDragID = nil
+                        activeTimelineMarkerDragStartTime = nil
                     }
                 }
             } else {
@@ -1786,31 +1812,126 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
     private func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
         let duration = max(summary.duration ?? 0, 0.001)
         let segmentLayouts = timelineSegmentLayouts(for: summary.zoomMarkers, duration: duration)
+        let effectLayouts = effectTimelineSegmentLayouts(for: summary.effectMarkers, duration: duration)
         let trackCenterY: CGFloat = 34
         let segmentOriginY: CGFloat = 16
         let hoveredTooltipEntry = hoveredTimelineTooltipEntry(in: summary)
         let timelineInteractionSuppressed = activeTimelineMarkerDragID != nil || NSEvent.modifierFlags.contains(.option)
-        let selectedMarker = viewModel.selectedZoomMarker
+        let selectedMarker = editorMode == .zoomAndClicks ? viewModel.selectedZoomMarker : nil
         let showsPulseControls = selectedMarker?.isClickFocus == true
         let showsNoZoomFallbackControls = selectedMarker?.zoomType == .noZoom
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Timeline")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                timelineToolbar(
-                    summary: summary,
-                    selectedMarker: selectedMarker,
-                    showsPulseControls: showsPulseControls,
-                    showsNoZoomFallbackControls: showsNoZoomFallbackControls
+                HStack(spacing: 10) {
+                    Text("editor")
+                        .font(.system(size: 10, weight: .light))
+                        .foregroundStyle(Color.accentColor)
+
+                    HStack(spacing: 2) {
+                        ForEach(ReviewEditorMode.allCases) { mode in
+                            Button {
+                                editorMode = mode
+                            } label: {
+                                Text(mode.rawValue)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(segmentedPillTextColor(isSelected: editorMode == mode))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        Capsule(style: .continuous)
+                                            .fill(segmentedPillBackgroundColor(isSelected: editorMode == mode))
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .help(mode.rawValue)
+                        }
+                    }
+                    .padding(2)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.secondary.opacity(0.1))
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                    )
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .frame(height: 32)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.secondary.opacity(0.1))
                 )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                )
+                Spacer()
+                if editorMode == .zoomAndClicks {
+                    timelineToolbar(
+                        summary: summary,
+                        selectedMarker: selectedMarker,
+                        showsPulseControls: showsPulseControls,
+                        showsNoZoomFallbackControls: showsNoZoomFallbackControls
+                    )
+                        .padding(.trailing, 18)
+                } else {
+                    HStack(spacing: 10) {
+                        Text("effects")
+                            .font(.system(size: 10, weight: .light))
+                            .foregroundStyle(Color.accentColor)
+
+                        HStack(spacing: 2) {
+                            Text("mode")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(segmentedPillBackgroundColor(isSelected: false))
+                                )
+
+                            Text("style")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(segmentedPillBackgroundColor(isSelected: false))
+                                )
+                        }
+                        .padding(2)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(Color.secondary.opacity(0.1))
+                        )
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                        )
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .frame(height: 32)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.secondary.opacity(0.1))
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                    )
                     .padding(.trailing, 18)
+                }
                 Text(timecodeString(for: viewModel.currentPlaybackTime))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
+            .frame(minHeight: 28)
 
             GeometryReader { geometry in
                 let width = max(geometry.size.width, 1)
@@ -1829,38 +1950,86 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                             .position(x: width / 2, y: trackCenterY)
                     }
 
-                    ForEach(segmentLayouts) { layout in
-                        let displayedPhase = displayedTimelinePhase(for: layout.marker)
-                        timelineSegment(
-                            layout: layout,
-                            width: width,
-                            duration: duration,
-                            verticalOrigin: segmentOriginY,
-                            isSelected: viewModel.selectedZoomMarkerID == layout.marker.id,
-                            isEnabled: layout.marker.enabled,
-                            activePhase: displayedPhase,
-                            onOptionDragChanged: { translationX in
-                                isTimelineKeyboardFocused = true
-                                if activeTimelineMarkerDragID == nil {
-                                    activeTimelineMarkerDragID = layout.marker.id
-                                    activeTimelineMarkerDragStartTime = layout.marker.sourceEventTimestamp
-                                    viewModel.beginTimelineMarkerMove(layout.marker.id)
+                    if editorMode == .zoomAndClicks {
+                        ForEach(effectLayouts) { layout in
+                            referenceTimelineSegment(
+                                startRatio: layout.startRatio,
+                                eventRatio: layout.eventRatio,
+                                endRatio: layout.endRatio,
+                                lane: layout.lane,
+                                width: width,
+                                verticalOrigin: segmentOriginY,
+                                tint: Color.secondary,
+                                opacity: 0.24
+                            )
+                        }
+
+                        ForEach(segmentLayouts) { layout in
+                            let displayedPhase = displayedTimelinePhase(for: layout.marker)
+                            timelineSegment(
+                                layout: layout,
+                                width: width,
+                                duration: duration,
+                                verticalOrigin: segmentOriginY,
+                                isSelected: viewModel.selectedZoomMarkerID == layout.marker.id,
+                                isEnabled: layout.marker.enabled,
+                                activePhase: displayedPhase,
+                                onOptionDragChanged: { translationX in
+                                    isTimelineKeyboardFocused = true
+                                    if activeTimelineMarkerDragID == nil {
+                                        activeTimelineMarkerDragID = layout.marker.id
+                                        activeTimelineMarkerDragStartTime = layout.marker.sourceEventTimestamp
+                                        viewModel.beginTimelineMarkerMove(layout.marker.id)
+                                    }
+                                    guard activeTimelineMarkerDragID == layout.marker.id else { return }
+                                    let startTime = activeTimelineMarkerDragStartTime ?? layout.marker.sourceEventTimestamp
+                                    let targetTime = startTime + (Double(translationX / width) * duration)
+                                    viewModel.previewTimelineMarkerMove(layout.marker.id, to: targetTime)
+                                },
+                                onOptionDragEnded: { translationX in
+                                    isTimelineKeyboardFocused = true
+                                    guard activeTimelineMarkerDragID == layout.marker.id else { return }
+                                    let startTime = activeTimelineMarkerDragStartTime ?? layout.marker.sourceEventTimestamp
+                                    let targetTime = startTime + (Double(translationX / width) * duration)
+                                    viewModel.commitTimelineMarkerMove(layout.marker.id, to: targetTime)
+                                    activeTimelineMarkerDragID = nil
+                                    activeTimelineMarkerDragStartTime = nil
                                 }
-                                guard activeTimelineMarkerDragID == layout.marker.id else { return }
-                                let startTime = activeTimelineMarkerDragStartTime ?? layout.marker.sourceEventTimestamp
-                                let targetTime = startTime + (Double(translationX / width) * duration)
-                                viewModel.previewTimelineMarkerMove(layout.marker.id, to: targetTime)
-                            },
-                            onOptionDragEnded: { translationX in
-                                isTimelineKeyboardFocused = true
-                                guard activeTimelineMarkerDragID == layout.marker.id else { return }
-                                let startTime = activeTimelineMarkerDragStartTime ?? layout.marker.sourceEventTimestamp
-                                let targetTime = startTime + (Double(translationX / width) * duration)
-                                viewModel.commitTimelineMarkerMove(layout.marker.id, to: targetTime)
-                                activeTimelineMarkerDragID = nil
-                                activeTimelineMarkerDragStartTime = nil
-                            }
-                        )
+                            )
+                        }
+                    } else {
+                        ForEach(segmentLayouts) { layout in
+                            referenceTimelineSegment(
+                                startRatio: layout.startRatio,
+                                eventRatio: layout.eventRatio,
+                                endRatio: layout.endRatio,
+                                lane: layout.lane,
+                                width: width,
+                                verticalOrigin: segmentOriginY,
+                                tint: Color.secondary,
+                                opacity: 0.34
+                            )
+                        }
+
+                        ForEach(effectLayouts) { layout in
+                            referenceTimelineSegment(
+                                startRatio: layout.startRatio,
+                                eventRatio: layout.eventRatio,
+                                endRatio: layout.endRatio,
+                                lane: layout.lane,
+                                width: width,
+                                verticalOrigin: segmentOriginY,
+                                tint: Color.accentColor,
+                                opacity: 0.78
+                            )
+                        }
+
+                        if effectLayouts.isEmpty {
+                            Text("Effects bars will appear here")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
                     }
 
                     if !timelineInteractionSuppressed,
@@ -1916,7 +2085,9 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                             }
 
                             if isDraggingTimeline {
-                                let snap = timelineSnapTarget(at: currentX, width: width, duration: duration, markers: summary.zoomMarkers)
+                                let snap = editorMode == .zoomAndClicks
+                                    ? timelineSnapTarget(at: currentX, width: width, duration: duration, markers: summary.zoomMarkers)
+                                    : nil
                                 viewModel.updateTimelineScrub(
                                     to: snap?.time ?? timelineTime(for: currentX, width: width, duration: duration),
                                     snappedMarkerID: snap?.marker.id
@@ -1926,7 +2097,9 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                         .onEnded { value in
                             guard activeTimelineMarkerDragID == nil else { return }
                             let endX = min(max(value.location.x, 0), width)
-                            let snap = timelineSnapTarget(at: endX, width: width, duration: duration, markers: summary.zoomMarkers)
+                            let snap = editorMode == .zoomAndClicks
+                                ? timelineSnapTarget(at: endX, width: width, duration: duration, markers: summary.zoomMarkers)
+                                : nil
                             let targetTime = snap?.time ?? timelineTime(for: endX, width: width, duration: duration)
 
                             if isDraggingTimeline {
@@ -1963,7 +2136,9 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                 }
 
                 Text(
-                    isDrawingNoZoomOverflowRegion
+                    editorMode == .effects
+                    ? "Effects mode is read-only in this phase. Zoom & Click bars are shown as grey reference guides."
+                    : isDrawingNoZoomOverflowRegion
                     ? "←/→/↑/↓ to nudge the overflow region, ⌥ + Arrow for 10x speed"
                     : "⌥ Click to select a Marker, ⌥ Click + Drag to reposition, ←/→ to nudge 0.1s"
                 )
@@ -1975,6 +2150,7 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
         .focusEffectDisabled()
         .focused($isTimelineKeyboardFocused)
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { keyPress in
+            guard editorMode == .zoomAndClicks else { return .ignored }
             guard viewModel.selectedZoomMarkerID != nil else { return .ignored }
             if isDrawingNoZoomOverflowRegion,
                let selectedMarker = viewModel.selectedZoomMarker,
@@ -2110,12 +2286,12 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                         } label: {
                             Text(mode.displayName)
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(selectedMarker.noZoomFallbackMode == mode ? Color.white : Color.secondary)
+                                .foregroundStyle(segmentedPillTextColor(isSelected: selectedMarker.noZoomFallbackMode == mode))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
                                 .background(
                                     Capsule(style: .continuous)
-                                        .fill(selectedMarker.noZoomFallbackMode == mode ? Color.accentColor : Color.clear)
+                                        .fill(segmentedPillBackgroundColor(isSelected: selectedMarker.noZoomFallbackMode == mode))
                                 )
                         }
                         .buttonStyle(.plain)
@@ -2229,6 +2405,14 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
             return inactiveColor
         }
         return .secondary
+    }
+
+    private func segmentedPillTextColor(isSelected: Bool) -> Color {
+        isSelected ? .white : .secondary
+    }
+
+    private func segmentedPillBackgroundColor(isSelected: Bool) -> Color {
+        isSelected ? .accentColor : Color.secondary.opacity(0.08)
     }
 
     private func timelineSegment(
@@ -2631,6 +2815,34 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
         }
     }
 
+    private func effectTimelineSegmentLayouts(for markers: [EffectPlanItem], duration: Double) -> [EffectTimelineSegmentLayout] {
+        let safeDuration = max(duration, 0.001)
+        let maxLaneCount = 3
+        var laneEndRatios = Array(repeating: -Double.infinity, count: maxLaneCount)
+
+        return markers
+            .sorted {
+                if $0.startTime == $1.startTime {
+                    return $0.sourceEventTimestamp < $1.sourceEventTimestamp
+                }
+                return $0.startTime < $1.startTime
+            }
+            .map { marker in
+                let eventRatio = min(max(marker.sourceEventTimestamp / safeDuration, 0), 1)
+                let startRatio = min(max(marker.startTime / safeDuration, 0), eventRatio)
+                let endRatio = min(max(marker.endTime / safeDuration, eventRatio), 1)
+                let lane = timelineLane(for: startRatio, endRatio: endRatio, laneEndRatios: &laneEndRatios)
+
+                return EffectTimelineSegmentLayout(
+                    marker: marker,
+                    lane: lane,
+                    startRatio: startRatio,
+                    eventRatio: eventRatio,
+                    endRatio: endRatio
+                )
+            }
+    }
+
     private func timelineSegmentWindow(for marker: ZoomPlanItem) -> (start: Double, end: Double) {
         let timeline = zoomTimeline(for: marker)
 
@@ -2644,6 +2856,39 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
         case .outOnly:
             return (start: max(timeline.startTime, 0), end: max(timeline.endTime, timeline.startTime))
         }
+    }
+
+    @ViewBuilder
+    private func referenceTimelineSegment(
+        startRatio: Double,
+        eventRatio: Double,
+        endRatio: Double,
+        lane: Int,
+        width: CGFloat,
+        verticalOrigin: CGFloat,
+        tint: Color,
+        opacity: Double
+    ) -> some View {
+        let laneHeight: CGFloat = 9
+        let laneSpacing: CGFloat = 4
+        let laneY = verticalOrigin + (CGFloat(lane) * (laneHeight + laneSpacing))
+        let startX = CGFloat(startRatio) * width
+        let endX = CGFloat(endRatio) * width
+        let eventX = CGFloat(eventRatio) * width
+        let barWidth = max(endX - startX, 10)
+
+        ZStack {
+            Capsule(style: .continuous)
+                .fill(tint.opacity(opacity))
+                .frame(width: barWidth, height: laneHeight)
+                .position(x: startX + (barWidth / 2), y: laneY + (laneHeight / 2))
+
+            Capsule(style: .continuous)
+                .fill(tint.opacity(min(opacity + 0.12, 1)))
+                .frame(width: 5, height: 14)
+                .position(x: eventX, y: laneY + (laneHeight / 2))
+        }
+        .allowsHitTesting(false)
     }
 
     private func timelineLane(for startRatio: Double, endRatio: Double, laneEndRatios: inout [Double]) -> Int {
@@ -3170,6 +3415,9 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
             Text("Inspector")
                 .font(.system(size: 16, weight: .semibold))
 
+            if editorMode == .effects {
+                effectsInspector(summary)
+            } else {
             VStack(alignment: .leading, spacing: 8) {
                 inspectorSectionHeader("Mode")
 
@@ -3191,10 +3439,33 @@ private enum EditInspectorMode: String, CaseIterable, Identifiable {
                     markersInspector(summary)
                 }
             }
+            }
         }
         .padding(20)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(cardBackground)
+    }
+
+    private func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                inspectorSectionHeader("Effects")
+                Text("This phase adds the separate Effects editor mode and ghosted timeline references. Effect markers, lists, and controls land in the next phase.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                inspectorSectionHeader("Status")
+                Text(summary.effectMarkers.isEmpty ? "No effect markers yet" : "\(summary.effectMarkers.count) effect marker" + (summary.effectMarkers.count == 1 ? "" : "s"))
+                    .font(.system(size: 13, weight: .medium))
+                Text("Zoom & Click bars remain visible in the timeline as non-editable grey reference guides while you are in Effects mode.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
     }
 
     private func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
