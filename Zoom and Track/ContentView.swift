@@ -107,20 +107,6 @@ private enum MarkerTimingPhase: String {
         case zoomOut = "Zoom Out"
     }
 
-private enum EditInspectorMode: String, CaseIterable, Identifiable {
-    case captureInfo = "Edit Capture Info"
-    case markers = "Edit Markers List"
-
-    var id: String { rawValue }
-}
-
-private enum ReviewEditorMode: String, CaseIterable, Identifiable {
-    case zoomAndClicks = "Zoom & Clicks"
-    case effects = "Effects"
-
-    var id: String { rawValue }
-}
-
     private enum CaptureInfoField: Hashable {
         case title
         case collection
@@ -1823,51 +1809,9 @@ private enum ReviewEditorMode: String, CaseIterable, Identifiable {
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                HStack(spacing: 10) {
-                    Text("editor")
-                        .font(.system(size: 10, weight: .light))
-                        .foregroundStyle(Color.accentColor)
-
-                    HStack(spacing: 2) {
-                        ForEach(ReviewEditorMode.allCases) { mode in
-                            Button {
-                                editorMode = mode
-                            } label: {
-                                Text(mode.rawValue)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(segmentedPillTextColor(isSelected: editorMode == mode))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 2)
-                                    .background(
-                                        Capsule(style: .continuous)
-                                            .fill(segmentedPillBackgroundColor(isSelected: editorMode == mode))
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .help(mode.rawValue)
-                        }
-                    }
-                    .padding(2)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(Color.secondary.opacity(0.1))
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-                    )
+                ReviewEditorModeControlStrip(editorMode: editorMode) { mode in
+                    editorMode = mode
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .frame(height: 32)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(Color.secondary.opacity(0.1))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-                )
                 Spacer()
                 if editorMode == .zoomAndClicks {
                     timelineToolbar(
@@ -1878,53 +1822,7 @@ private enum ReviewEditorMode: String, CaseIterable, Identifiable {
                     )
                         .padding(.trailing, 18)
                 } else {
-                    HStack(spacing: 10) {
-                        Text("effects")
-                            .font(.system(size: 10, weight: .light))
-                            .foregroundStyle(Color.accentColor)
-
-                        HStack(spacing: 2) {
-                            Text("mode")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule(style: .continuous)
-                                        .fill(segmentedPillBackgroundColor(isSelected: false))
-                                )
-
-                            Text("style")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule(style: .continuous)
-                                        .fill(segmentedPillBackgroundColor(isSelected: false))
-                                )
-                        }
-                        .padding(2)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(Color.secondary.opacity(0.1))
-                        )
-                        .overlay(
-                            Capsule(style: .continuous)
-                                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-                        )
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .frame(height: 32)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(Color.secondary.opacity(0.1))
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-                    )
+                    EffectsPlaceholderControlStrip()
                     .padding(.trailing, 18)
                 }
                 Text(timecodeString(for: viewModel.currentPlaybackTime))
@@ -2198,19 +2096,15 @@ private enum ReviewEditorMode: String, CaseIterable, Identifiable {
         showsPulseControls: Bool,
         showsNoZoomFallbackControls: Bool
     ) -> some View {
-        let hasSelectedMarker = viewModel.selectedZoomMarkerID != nil
-
-        HStack(spacing: 10) {
-            Text("markers")
-                .font(.system(size: 10, weight: .light))
-                .foregroundStyle(Color.accentColor)
-
-            timelineGadget(
-                systemName: isPlacingClickFocus ? "xmark" : "plus",
-                isActive: isPlacingClickFocus,
-                isEnabled: viewModel.canEditClickFocusMarkers || isPlacingClickFocus,
-                help: isPlacingClickFocus ? "Cancel Add Click Focus" : "Add Click Focus"
-            ) {
+        TimelineToolbarView(
+            hasSelectedMarker: viewModel.selectedZoomMarkerID != nil,
+            canEditClickFocusMarkers: viewModel.canEditClickFocusMarkers,
+            isPlacingClickFocus: isPlacingClickFocus,
+            selectedMarker: selectedMarker,
+            showsPulseControls: showsPulseControls,
+            showsNoZoomFallbackControls: showsNoZoomFallbackControls,
+            isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion,
+            onToggleAddClickFocus: {
                 if isPlacingClickFocus {
                     isPlacingClickFocus = false
                 } else {
@@ -2220,199 +2114,42 @@ private enum ReviewEditorMode: String, CaseIterable, Identifiable {
                     pendingMarkerDragSourcePoint = nil
                     isPlacingClickFocus = true
                 }
-            }
-
-            if hasSelectedMarker {
-                timelineGadget(
-                    systemName: "minus",
-                    isActive: false,
-                    isEnabled: true,
-                    help: "Delete Selected Marker"
-                ) {
-                    viewModel.deleteSelectedMarker()
+            },
+            onDeleteSelectedMarker: {
+                viewModel.deleteSelectedMarker()
+            },
+            onToggleClickPulse: {
+                guard let selectedMarker else { return }
+                viewModel.setSelectedMarkerClickPulseEnabled(!selectedMarker.isClickPulseEnabled)
+            },
+            onSelectClickPulsePreset: { preset in
+                viewModel.setSelectedMarkerClickPulsePreset(preset)
+            },
+            onSelectNoZoomFallbackMode: { mode in
+                if mode != .scale {
+                    isDrawingNoZoomOverflowRegion = false
                 }
-            }
-
-            if showsPulseControls, let selectedMarker {
-                Divider()
-                    .frame(height: 14)
-
-                Text("click pulse")
-                    .font(.system(size: 10, weight: .light))
-                    .foregroundStyle(Color.accentColor)
-
-                timelineGadget(
-                    systemName: "pointer.arrow.click.2",
-                    isActive: selectedMarker.isClickPulseEnabled,
-                    isEnabled: true,
-                    help: selectedMarker.isClickPulseEnabled ? "Disable Click Pulse" : "Enable Click Pulse"
-                ) {
-                    viewModel.setSelectedMarkerClickPulseEnabled(!selectedMarker.isClickPulseEnabled)
-                }
-
-                if selectedMarker.isClickPulseEnabled, let clickPulse = selectedMarker.clickPulse {
-                    Menu {
-                        ForEach(ClickPulsePreset.allCases) { preset in
-                            Button(preset.displayName) {
-                                viewModel.setSelectedMarkerClickPulsePreset(preset)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 18, height: 18)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .help("Click Pulse Style: \(clickPulse.preset.displayName)")
-                }
-            }
-
-            if showsNoZoomFallbackControls, let selectedMarker {
-                Divider()
-                    .frame(height: 14)
-
-                Text("overflow")
-                    .font(.system(size: 10, weight: .light))
-                    .foregroundStyle(Color.accentColor)
-
-                HStack(spacing: 2) {
-                    ForEach(NoZoomFallbackMode.allCases) { mode in
-                        Button {
-                            if mode != .scale {
-                                isDrawingNoZoomOverflowRegion = false
-                            }
-                            viewModel.setSelectedMarkerNoZoomFallbackMode(mode)
-                        } label: {
-                            Text(mode.displayName)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(segmentedPillTextColor(isSelected: selectedMarker.noZoomFallbackMode == mode))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule(style: .continuous)
-                                        .fill(segmentedPillBackgroundColor(isSelected: selectedMarker.noZoomFallbackMode == mode))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .help("No Zoom Overflow: \(mode.displayName)")
-                    }
-                }
-                .padding(2)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(Color.secondary.opacity(0.1))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-                )
-
-                if selectedMarker.noZoomFallbackMode == .scale {
-                    Divider()
-                        .frame(height: 14)
-
-                    Text("region")
-                        .font(.system(size: 10, weight: .light))
-                        .foregroundStyle(Color.accentColor)
-
-                    timelineGadget(
-                        systemName: isDrawingNoZoomOverflowRegion ? "checkmark" : "viewfinder.rectangular",
-                        isActive: isDrawingNoZoomOverflowRegion,
-                        isEnabled: true,
-                        help: isDrawingNoZoomOverflowRegion ? "Save Scale Overflow Region" : "Draw Scale Overflow Region"
-                    ) {
-                        if isDrawingNoZoomOverflowRegion {
-                            viewModel.setSelectedMarkerNoZoomOverflowRegion(
-                                pendingNoZoomOverflowRegion ?? selectedMarker.noZoomOverflowRegion
-                            )
-                            isDrawingNoZoomOverflowRegion = false
-                        } else {
-                            viewModel.cancelPlaybackPreview()
-                            inspectorMode = .markers
-                            isPlaybackInspectorVisible = true
-                            isPlacingClickFocus = false
-                            pendingMarkerDragSourcePoint = nil
-                            pendingNoZoomOverflowRegion = selectedMarker.noZoomOverflowRegion
-                            isDrawingNoZoomOverflowRegion = true
-                            isTimelineKeyboardFocused = true
-                        }
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            Capsule(style: .continuous)
-                .fill(Color.secondary.opacity(0.08))
-        )
-        .overlay(
-            Capsule(style: .continuous)
-                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
-        )
-    }
-
-    private func timelineGadget(
-        systemName: String,
-        isActive: Bool,
-        isEnabled: Bool,
-        help: String,
-        role: ButtonRole? = nil,
-        activeColor: Color? = nil,
-        inactiveColor: Color? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(role: role, action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(
-                    gadgetForegroundStyle(
-                        isActive: isActive,
-                        isEnabled: isEnabled,
-                        role: role,
-                        activeColor: activeColor,
-                        inactiveColor: inactiveColor
+                viewModel.setSelectedMarkerNoZoomFallbackMode(mode)
+            },
+            onToggleOverflowRegion: {
+                guard let selectedMarker else { return }
+                if isDrawingNoZoomOverflowRegion {
+                    viewModel.setSelectedMarkerNoZoomOverflowRegion(
+                        pendingNoZoomOverflowRegion ?? selectedMarker.noZoomOverflowRegion
                     )
-                )
-                .frame(width: 18, height: 18)
-                .contentShape(Rectangle().inset(by: -3))
-        }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled)
-        .help(help)
-        .opacity(isEnabled ? 1 : 0.42)
-    }
-
-    private func gadgetForegroundStyle(
-        isActive: Bool,
-        isEnabled: Bool,
-        role: ButtonRole?,
-        activeColor: Color?,
-        inactiveColor: Color?
-    ) -> Color {
-        if isEnabled {
-            if let activeColor {
-                return activeColor
+                    isDrawingNoZoomOverflowRegion = false
+                } else {
+                    viewModel.cancelPlaybackPreview()
+                    inspectorMode = .markers
+                    isPlaybackInspectorVisible = true
+                    isPlacingClickFocus = false
+                    pendingMarkerDragSourcePoint = nil
+                    pendingNoZoomOverflowRegion = selectedMarker.noZoomOverflowRegion
+                    isDrawingNoZoomOverflowRegion = true
+                    isTimelineKeyboardFocused = true
+                }
             }
-            if role == .destructive {
-                return .red
-            }
-            return isActive ? .accentColor : .secondary
-        }
-
-        if let inactiveColor {
-            return inactiveColor
-        }
-        return .secondary
-    }
-
-    private func segmentedPillTextColor(isSelected: Bool) -> Color {
-        isSelected ? .white : .secondary
-    }
-
-    private func segmentedPillBackgroundColor(isSelected: Bool) -> Color {
-        isSelected ? .accentColor : Color.secondary.opacity(0.08)
+        )
     }
 
     private func timelineSegment(
@@ -3403,34 +3140,12 @@ private enum ReviewEditorMode: String, CaseIterable, Identifiable {
         }
     }
 
-    private func inspectorSectionHeader(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(.system(size: 11, weight: .semibold))
-            .tracking(0.8)
-            .foregroundStyle(Color.accentColor)
-    }
-
     private func markerInspectorCard(_ summary: RecordingInspectionSummary) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Inspector")
-                .font(.system(size: 16, weight: .semibold))
-
-            if editorMode == .effects {
-                effectsInspector(summary)
-            } else {
-            VStack(alignment: .leading, spacing: 8) {
-                inspectorSectionHeader("Mode")
-
-                Picker("Mode", selection: $inspectorMode) {
-                    ForEach(EditInspectorMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: .infinity)
-            }
-
+        ReviewInspectorCard(
+            editorMode: editorMode,
+            inspectorMode: $inspectorMode,
+            effectMarkerCount: summary.effectMarkers.count
+        ) {
             Group {
                 switch inspectorMode {
                 case .captureInfo:
@@ -3439,33 +3154,10 @@ private enum ReviewEditorMode: String, CaseIterable, Identifiable {
                     markersInspector(summary)
                 }
             }
-            }
         }
         .padding(20)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(cardBackground)
-    }
-
-    private func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                inspectorSectionHeader("Effects")
-                Text("This phase adds the separate Effects editor mode and ghosted timeline references. Effect markers, lists, and controls land in the next phase.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                inspectorSectionHeader("Status")
-                Text(summary.effectMarkers.isEmpty ? "No effect markers yet" : "\(summary.effectMarkers.count) effect marker" + (summary.effectMarkers.count == 1 ? "" : "s"))
-                    .font(.system(size: 13, weight: .medium))
-                Text("Zoom & Click bars remain visible in the timeline as non-editable grey reference guides while you are in Effects mode.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-        }
     }
 
     private func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
@@ -3481,7 +3173,7 @@ private enum ReviewEditorMode: String, CaseIterable, Identifiable {
 
         return VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
-                inspectorSectionHeader("Markers")
+                InspectorSectionHeaderView(title: "Markers")
 
                 if entries.isEmpty {
                     Text("No markers")
@@ -3991,7 +3683,7 @@ private enum ReviewEditorMode: String, CaseIterable, Identifiable {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    inspectorSectionHeader("Timing")
+                    InspectorSectionHeaderView(title: "Timing")
 
                     switch marker.zoomType {
                     case .inOut:
@@ -4074,7 +3766,7 @@ private enum ReviewEditorMode: String, CaseIterable, Identifiable {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 6) {
-                            inspectorSectionHeader("Zoom Type")
+                            InspectorSectionHeaderView(title: "Zoom Type")
                             Picker("Zoom Type", selection: Binding(
                                 get: { marker.zoomType },
                                 set: { viewModel.setSelectedMarkerZoomType($0) }
