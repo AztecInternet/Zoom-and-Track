@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "DD9203032F9D6A80003C3C1A"
-               BuildableName = "Zoom and Track.app"
+               BuildableName = "FlowTrack Capture.app"
                BlueprintName = "Zoom and Track"
                ReferencedContainer = "container:Zoom and Track.xcodeproj">
             </BuildableReference>
@@ -46,7 +46,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "DD9203032F9D6A80003C3C1A"
-            BuildableName = "Zoom and Track.app"
+            BuildableName = "FlowTrack Capture.app"
             BlueprintName = "Zoom and Track"
             ReferencedContainer = "container:Zoom and Track.xcodeproj">
          </BuildableReference>
@@ -63,7 +63,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "DD9203032F9D6A80003C3C1A"
-            BuildableName = "Zoom and Track.app"
+            BuildableName = "FlowTrack Capture.app"
             BlueprintName = "Zoom and Track"
             ReferencedContainer = "container:Zoom and Track.xcodeproj">
          </BuildableReference>
