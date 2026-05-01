@@ -457,6 +457,19 @@ enum EffectStyle: String, Codable, CaseIterable, Identifiable {
     case blurDarken
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .blur:
+            return "Blur"
+        case .darken:
+            return "Darken"
+        case .tint:
+            return "Tint"
+        case .blurDarken:
+            return "Blur + Darken"
+        }
+    }
 }
 
 struct EffectFocusRegion: Codable, Equatable {

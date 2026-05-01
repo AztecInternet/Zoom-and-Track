@@ -25,6 +25,8 @@ struct ContentView: View {
     @State private var markerListPreviewOrder: [String]?
     @State private var renamingMarkerID: String?
     @State private var markerNameDraft: String = ""
+    @State private var renamingEffectMarkerID: String?
+    @State private var effectMarkerNameDraft: String = ""
     @State private var hoveredTimelineMarkerID: String?
     @State private var isDraggingTimeline = false
     @State private var inspectorFocusedTimingPhase: MarkerTimingPhase?
@@ -35,6 +37,9 @@ struct ContentView: View {
     @State private var pendingMarkerDragSourcePoint: CGPoint?
     @State private var isDrawingNoZoomOverflowRegion = false
     @State private var pendingNoZoomOverflowRegion: NoZoomOverflowRegion?
+    @State private var isDrawingEffectFocusRegion = false
+    @State private var pendingEffectFocusRegion: EffectFocusRegion?
+    @State private var effectFocusRegionInteractionBase: EffectFocusRegion?
     @State private var activeTimelineMarkerDragID: String?
     @State private var activeTimelineMarkerDragStartTime: Double?
     @State private var librarySearchText = ""
@@ -63,6 +68,13 @@ struct ContentView: View {
         let normalizedPoint: CGPoint
     }
 
+    private enum EffectRegionHandle: Hashable {
+        case topLeading
+        case topTrailing
+        case bottomLeading
+        case bottomTrailing
+    }
+
     private struct ZoomStateEvent {
         let marker: ZoomPlanItem
         let normalizedPoint: CGPoint
@@ -82,16 +94,6 @@ struct ContentView: View {
     private struct TimelineSegmentLayout: Identifiable {
         let marker: ZoomPlanItem
         let markerNumber: Int
-        let lane: Int
-        let startRatio: Double
-        let eventRatio: Double
-        let endRatio: Double
-
-        var id: String { marker.id }
-    }
-
-    private struct EffectTimelineSegmentLayout: Identifiable {
-        let marker: EffectPlanItem
         let lane: Int
         let startRatio: Double
         let eventRatio: Double
@@ -186,7 +188,7 @@ private enum MarkerTimingPhase: String {
                     .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .foregroundStyle(isSelected ? accentContrastingTextColor() : Color.primary)
             .padding(.horizontal, 12)
             .frame(height: 40)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -413,7 +415,7 @@ private enum MarkerTimingPhase: String {
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(viewModel.canStopRecording || viewModel.sessionState == .stopping ? .white : accentContrastingTextColor())
                 .frame(width: 190, height: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -501,6 +503,7 @@ private enum MarkerTimingPhase: String {
                                 previewPlayer: viewModel.previewPlayer,
                                 aspectRatio: summary.videoAspectRatio,
                                 selectedMarker: editorMode == .zoomAndClicks ? viewModel.selectedZoomMarker : nil,
+                                selectedEffectMarker: editorMode == .effects ? viewModel.selectedEffectMarker : nil,
                                 contentCoordinateSize: summary.contentCoordinateSize,
                                 zoomMarkers: summary.zoomMarkers,
                                 currentTime: viewModel.currentPlaybackTime,
@@ -512,6 +515,8 @@ private enum MarkerTimingPhase: String {
                                 draggedMarkerSourcePoint: editorMode == .zoomAndClicks ? pendingMarkerDragSourcePoint : nil,
                                 isDrawingNoZoomOverflowRegion: editorMode == .zoomAndClicks ? isDrawingNoZoomOverflowRegion : false,
                                 pendingNoZoomOverflowRegion: editorMode == .zoomAndClicks ? pendingNoZoomOverflowRegion : nil,
+                                isDrawingEffectFocusRegion: editorMode == .effects ? isDrawingEffectFocusRegion : false,
+                                pendingEffectFocusRegion: editorMode == .effects ? pendingEffectFocusRegion : nil,
                                 placeClickFocusAction: { sourcePoint in
                                     viewModel.addClickFocusMarker(at: sourcePoint)
                                     pendingMarkerDragSourcePoint = nil
@@ -526,6 +531,9 @@ private enum MarkerTimingPhase: String {
                                 },
                                 updateNoZoomOverflowRegionAction: { region in
                                     pendingNoZoomOverflowRegion = region
+                                },
+                                updateEffectFocusRegionAction: { region in
+                                    pendingEffectFocusRegion = region
                                 }
                             )
                                 .frame(height: videoHeight)
@@ -561,8 +569,12 @@ private enum MarkerTimingPhase: String {
                         pendingMarkerDragSourcePoint = nil
                         isDrawingNoZoomOverflowRegion = false
                         pendingNoZoomOverflowRegion = nil
+                        isDrawingEffectFocusRegion = false
+                        pendingEffectFocusRegion = nil
+                        effectFocusRegionInteractionBase = nil
                         activeTimelineMarkerDragID = nil
                         activeTimelineMarkerDragStartTime = nil
+                        renamingEffectMarkerID = nil
                     }
                 }
             } else {
@@ -817,7 +829,7 @@ private enum MarkerTimingPhase: String {
                         .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
-                        .foregroundStyle(Color.white)
+                        .foregroundStyle(accentContrastingTextColor())
                         .background(
                             RoundedRectangle(cornerRadius: 13, style: .continuous)
                                 .fill(Color.accentColor)
@@ -1207,6 +1219,7 @@ private enum MarkerTimingPhase: String {
         previewPlayer: AVPlayer?,
         aspectRatio: CGFloat,
         selectedMarker: ZoomPlanItem?,
+        selectedEffectMarker: EffectPlanItem?,
         contentCoordinateSize: CGSize,
         zoomMarkers: [ZoomPlanItem],
         currentTime: Double,
@@ -1218,10 +1231,13 @@ private enum MarkerTimingPhase: String {
         draggedMarkerSourcePoint: CGPoint?,
         isDrawingNoZoomOverflowRegion: Bool,
         pendingNoZoomOverflowRegion: NoZoomOverflowRegion?,
+        isDrawingEffectFocusRegion: Bool,
+        pendingEffectFocusRegion: EffectFocusRegion?,
         placeClickFocusAction: @escaping (CGPoint) -> Void,
         dragSelectedMarkerAction: @escaping (CGPoint) -> Void,
         commitDraggedMarkerAction: @escaping (CGPoint) -> Void,
-        updateNoZoomOverflowRegionAction: @escaping (NoZoomOverflowRegion?) -> Void
+        updateNoZoomOverflowRegionAction: @escaping (NoZoomOverflowRegion?) -> Void,
+        updateEffectFocusRegionAction: @escaping (EffectFocusRegion?) -> Void
     ) -> some View {
         let safeAspectRatio = max(aspectRatio, 0.1)
 
@@ -1232,11 +1248,14 @@ private enum MarkerTimingPhase: String {
                 let fittedRect = fittedVideoRect(in: geometry.size, aspectRatio: safeAspectRatio)
                 let isMarkerDragActive = draggedMarkerSourcePoint != nil
                 let isOverflowRegionDrawActive = isDrawingNoZoomOverflowRegion
+                let isEffectRegionDrawActive = isDrawingEffectFocusRegion
                 let previewState = isRenderedPreviewActive
                     ? nil
                     : isMarkerDragActive
                     ? nil
                     : isOverflowRegionDrawActive
+                    ? nil
+                    : isEffectRegionDrawActive
                     ? nil
                     : activeZoomPreviewState(
                         at: currentTime,
@@ -1377,7 +1396,11 @@ private enum MarkerTimingPhase: String {
                                     in: geometry.size,
                                     videoAspectRatio: safeAspectRatio
                                 ) {
-                                    let cornerRadii = overflowRegionCornerRadii(for: overlayRect, within: fittedRect)
+                                    let cornerRadii = overflowRegionCornerRadii(
+                                        for: overlayRect,
+                                        within: fittedRect,
+                                        baseRadius: CGFloat(max(selectedEffectMarker?.cornerRadius ?? 18, 0))
+                                    )
 
                                     UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
                                         .fill(Color.accentColor.opacity(0.10))
@@ -1452,6 +1475,197 @@ private enum MarkerTimingPhase: String {
                                             contentCoordinateSize: contentCoordinateSize
                                         )
                                     )
+                                }
+                        )
+                }
+
+                if isEffectRegionDrawActive {
+                    Rectangle()
+                        .fill(Color.orange.opacity(0.06))
+                        .frame(width: fittedRect.width, height: fittedRect.height)
+                        .overlay {
+                            ZStack {
+                                if let region = pendingEffectFocusRegion ?? selectedEffectMarker?.focusRegion,
+                                   let overlayRect = overlayRect(
+                                    for: region,
+                                    contentCoordinateSize: contentCoordinateSize,
+                                    in: geometry.size,
+                                    videoAspectRatio: safeAspectRatio
+                                ) {
+                                    let cornerRadii = overflowRegionCornerRadii(
+                                        for: overlayRect,
+                                        within: fittedRect,
+                                        baseRadius: CGFloat(max(selectedEffectMarker?.cornerRadius ?? 18, 0))
+                                    )
+
+                                    UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
+                                        .fill(Color.orange.opacity(0.10))
+                                        .frame(width: overlayRect.width, height: overlayRect.height)
+                                        .overlay(
+                                            UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
+                                                .strokeBorder(Color.orange, lineWidth: 2)
+                                        )
+                                        .position(x: overlayRect.midX - fittedRect.minX, y: overlayRect.midY - fittedRect.minY)
+                                        .contentShape(Rectangle())
+                                        .gesture(
+                                            DragGesture(minimumDistance: 0, coordinateSpace: .named("videoOverlay"))
+                                                .onChanged { value in
+                                                    let baseRegion = effectFocusRegionInteractionBase ?? region
+                                                    if effectFocusRegionInteractionBase == nil {
+                                                        effectFocusRegionInteractionBase = baseRegion
+                                                    }
+                                                    let deltaX = (value.translation.width / max(fittedRect.width, 1)) * contentCoordinateSize.width
+                                                    let deltaY = (value.translation.height / max(fittedRect.height, 1)) * contentCoordinateSize.height
+                                                    updateEffectFocusRegionAction(
+                                                        movedEffectFocusRegion(
+                                                            baseRegion,
+                                                            deltaX: deltaX,
+                                                            deltaY: deltaY,
+                                                            contentCoordinateSize: contentCoordinateSize
+                                                        )
+                                                    )
+                                                }
+                                                .onEnded { value in
+                                                    let baseRegion = effectFocusRegionInteractionBase ?? region
+                                                    let deltaX = (value.translation.width / max(fittedRect.width, 1)) * contentCoordinateSize.width
+                                                    let deltaY = (value.translation.height / max(fittedRect.height, 1)) * contentCoordinateSize.height
+                                                    updateEffectFocusRegionAction(
+                                                        movedEffectFocusRegion(
+                                                            baseRegion,
+                                                            deltaX: deltaX,
+                                                            deltaY: deltaY,
+                                                            contentCoordinateSize: contentCoordinateSize
+                                                        )
+                                                    )
+                                                    effectFocusRegionInteractionBase = nil
+                                                }
+                                        )
+
+                                    ForEach(
+                                        [
+                                            EffectRegionHandle.topLeading,
+                                            .topTrailing,
+                                            .bottomLeading,
+                                            .bottomTrailing
+                                        ],
+                                        id: \.self
+                                    ) { handle in
+                                        let handlePoint = effectRegionHandlePoint(for: handle, in: overlayRect)
+
+                                        Circle()
+                                            .fill(Color.orange)
+                                            .frame(width: 12, height: 12)
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(Color.white.opacity(0.7), lineWidth: 1)
+                                            )
+                                            .position(x: handlePoint.x - fittedRect.minX, y: handlePoint.y - fittedRect.minY)
+                                            .gesture(
+                                                DragGesture(minimumDistance: 0, coordinateSpace: .named("videoOverlay"))
+                                                    .onChanged { value in
+                                                        let baseRegion = effectFocusRegionInteractionBase ?? region
+                                                        if effectFocusRegionInteractionBase == nil {
+                                                            effectFocusRegionInteractionBase = baseRegion
+                                                        }
+                                                        updateEffectFocusRegionAction(
+                                                            resizedEffectFocusRegion(
+                                                                baseRegion,
+                                                                dragging: handle,
+                                                                to: CGPoint(
+                                                                    x: value.location.x + fittedRect.minX,
+                                                                    y: value.location.y + fittedRect.minY
+                                                                ),
+                                                                contentCoordinateSize: contentCoordinateSize,
+                                                                in: geometry.size,
+                                                                videoAspectRatio: safeAspectRatio
+                                                            )
+                                                        )
+                                                    }
+                                                    .onEnded { value in
+                                                        let baseRegion = effectFocusRegionInteractionBase ?? region
+                                                        updateEffectFocusRegionAction(
+                                                            resizedEffectFocusRegion(
+                                                                baseRegion,
+                                                                dragging: handle,
+                                                                to: CGPoint(
+                                                                    x: value.location.x + fittedRect.minX,
+                                                                    y: value.location.y + fittedRect.minY
+                                                                ),
+                                                                contentCoordinateSize: contentCoordinateSize,
+                                                                in: geometry.size,
+                                                                videoAspectRatio: safeAspectRatio
+                                                            )
+                                                        )
+                                                        effectFocusRegionInteractionBase = nil
+                                                    }
+                                            )
+                                    }
+                                }
+
+                                VStack(spacing: 8) {
+                                    Image(systemName: "viewfinder.rectangular")
+                                        .font(.system(size: 18, weight: .semibold))
+                                    Text("Drag to draw, move, or resize the Effect focus region")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(Color.black.opacity(0.62))
+                                )
+                                .padding(.top, 18)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                            }
+                        }
+                        .position(x: fittedRect.midX, y: fittedRect.midY)
+                        .gesture(
+                            DragGesture(minimumDistance: 0, coordinateSpace: .named("videoOverlay"))
+                                .onChanged { value in
+                                    guard let startSourcePoint = sourcePoint(
+                                        for: value.startLocation,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ), let currentSourcePoint = sourcePoint(
+                                        for: value.location,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ) else {
+                                        return
+                                    }
+                                    updateEffectFocusRegionAction(
+                                        effectFocusRegion(
+                                            from: startSourcePoint,
+                                            to: currentSourcePoint,
+                                            contentCoordinateSize: contentCoordinateSize
+                                        )
+                                    )
+                                }
+                                .onEnded { value in
+                                    guard let startSourcePoint = sourcePoint(
+                                        for: value.startLocation,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ), let endSourcePoint = sourcePoint(
+                                        for: value.location,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ) else {
+                                        return
+                                    }
+                                    updateEffectFocusRegionAction(
+                                        effectFocusRegion(
+                                            from: startSourcePoint,
+                                            to: endSourcePoint,
+                                            contentCoordinateSize: contentCoordinateSize
+                                        )
+                                    )
+                                    effectFocusRegionInteractionBase = nil
                                 }
                         )
                 }
@@ -1822,7 +2036,42 @@ private enum MarkerTimingPhase: String {
                     )
                         .padding(.trailing, 18)
                 } else {
-                    EffectsPlaceholderControlStrip()
+                    EffectsTimelineToolbarView(
+                        hasSelectedMarker: viewModel.selectedEffectMarkerID != nil,
+                        selectedMarker: viewModel.selectedEffectMarker,
+                        isDrawingFocusRegion: isDrawingEffectFocusRegion,
+                        onAddMarker: {
+                            viewModel.cancelPlaybackPreview()
+                            inspectorMode = .markers
+                            isPlaybackInspectorVisible = true
+                            viewModel.addEffectMarker()
+                        },
+                        onDeleteSelectedMarker: {
+                            viewModel.deleteSelectedEffectMarker()
+                        },
+                        onToggleFocusRegion: {
+                            guard let selectedMarker = viewModel.selectedEffectMarker else { return }
+                            if isDrawingEffectFocusRegion {
+                                viewModel.setSelectedEffectFocusRegion(
+                                    pendingEffectFocusRegion ?? selectedMarker.focusRegion
+                                )
+                                isDrawingEffectFocusRegion = false
+                                effectFocusRegionInteractionBase = nil
+                            } else {
+                                viewModel.cancelPlaybackPreview()
+                                isPlacingClickFocus = false
+                                pendingMarkerDragSourcePoint = nil
+                                isDrawingNoZoomOverflowRegion = false
+                                pendingNoZoomOverflowRegion = nil
+                                inspectorMode = .markers
+                                isPlaybackInspectorVisible = true
+                                pendingEffectFocusRegion = selectedMarker.focusRegion
+                                effectFocusRegionInteractionBase = nil
+                                isDrawingEffectFocusRegion = true
+                                isTimelineKeyboardFocused = true
+                            }
+                        }
+                    )
                     .padding(.trailing, 18)
                 }
                 Text(timecodeString(for: viewModel.currentPlaybackTime))
@@ -1910,15 +2159,16 @@ private enum MarkerTimingPhase: String {
                         }
 
                         ForEach(effectLayouts) { layout in
-                            referenceTimelineSegment(
-                                startRatio: layout.startRatio,
-                                eventRatio: layout.eventRatio,
-                                endRatio: layout.endRatio,
-                                lane: layout.lane,
+                            EffectTimelineSegmentView(
+                                layout: layout,
                                 width: width,
                                 verticalOrigin: segmentOriginY,
-                                tint: Color.accentColor,
-                                opacity: 0.78
+                                isSelected: viewModel.selectedEffectMarkerID == layout.marker.id,
+                                isEnabled: layout.marker.enabled,
+                                isPlaybackHighlighted: isEffectPlaybackHighlighted(layout.marker),
+                                onSelect: {
+                                    viewModel.selectEffectMarker(layout.marker.id, seekPlaybackHead: true)
+                                }
                             )
                         }
 
@@ -1983,32 +2233,54 @@ private enum MarkerTimingPhase: String {
                             }
 
                             if isDraggingTimeline {
-                                let snap = editorMode == .zoomAndClicks
+                                let zoomSnap = editorMode == .zoomAndClicks
                                     ? timelineSnapTarget(at: currentX, width: width, duration: duration, markers: summary.zoomMarkers)
                                     : nil
+                                let effectSnap = editorMode == .effects
+                                    ? effectTimelineSnapTarget(at: currentX, width: width, duration: duration, markers: summary.effectMarkers)
+                                    : nil
                                 viewModel.updateTimelineScrub(
-                                    to: snap?.time ?? timelineTime(for: currentX, width: width, duration: duration),
-                                    snappedMarkerID: snap?.marker.id
+                                    to: zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: currentX, width: width, duration: duration),
+                                    snappedMarkerID: zoomSnap?.marker.id,
+                                    snappedEffectMarkerID: effectSnap?.marker.id
                                 )
                             }
                         }
                         .onEnded { value in
                             guard activeTimelineMarkerDragID == nil else { return }
                             let endX = min(max(value.location.x, 0), width)
-                            let snap = editorMode == .zoomAndClicks
+                            let zoomSnap = editorMode == .zoomAndClicks
                                 ? timelineSnapTarget(at: endX, width: width, duration: duration, markers: summary.zoomMarkers)
                                 : nil
-                            let targetTime = snap?.time ?? timelineTime(for: endX, width: width, duration: duration)
+                            let effectSnap = editorMode == .effects
+                                ? effectTimelineSnapTarget(at: endX, width: width, duration: duration, markers: summary.effectMarkers)
+                                : nil
+                            let targetTime = zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: endX, width: width, duration: duration)
 
                             if isDraggingTimeline {
-                                viewModel.endTimelineScrub(at: targetTime, snappedMarkerID: snap?.marker.id)
+                                viewModel.endTimelineScrub(
+                                    at: targetTime,
+                                    snappedMarkerID: zoomSnap?.marker.id,
+                                    snappedEffectMarkerID: effectSnap?.marker.id
+                                )
                                 isDraggingTimeline = false
-                            } else if let snap {
+                            } else if let zoomSnap {
                                 isTimelineKeyboardFocused = true
                                 suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
-                                viewModel.startMarkerPreview(snap.marker.id)
+                                viewModel.startMarkerPreview(zoomSnap.marker.id)
+                            } else if let effectSnap {
+                                isTimelineKeyboardFocused = true
+                                viewModel.seekTimelineDirectly(
+                                    to: targetTime,
+                                    snappedMarkerID: nil,
+                                    snappedEffectMarkerID: effectSnap.marker.id
+                                )
                             } else {
-                                viewModel.seekTimelineDirectly(to: targetTime, snappedMarkerID: nil)
+                                viewModel.seekTimelineDirectly(
+                                    to: targetTime,
+                                    snappedMarkerID: nil,
+                                    snappedEffectMarkerID: nil
+                                )
                             }
                         }
                 )
@@ -2034,8 +2306,10 @@ private enum MarkerTimingPhase: String {
                 }
 
                 Text(
-                    editorMode == .effects
-                    ? "Effects mode is read-only in this phase. Zoom & Click bars are shown as grey reference guides."
+                    isDrawingEffectFocusRegion
+                    ? "←/→/↑/↓ to nudge the focus region, ⌥ + Arrow for 10x speed"
+                    : editorMode == .effects
+                    ? "Zoom & Click bars are shown as grey reference guides while editing effects."
                     : isDrawingNoZoomOverflowRegion
                     ? "←/→/↑/↓ to nudge the overflow region, ⌥ + Arrow for 10x speed"
                     : "⌥ Click to select a Marker, ⌥ Click + Drag to reposition, ←/→ to nudge 0.1s"
@@ -2048,6 +2322,31 @@ private enum MarkerTimingPhase: String {
         .focusEffectDisabled()
         .focused($isTimelineKeyboardFocused)
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { keyPress in
+            if editorMode == .effects,
+               let selectedMarker = viewModel.selectedEffectMarker,
+               isDrawingEffectFocusRegion,
+               let region = pendingEffectFocusRegion ?? selectedMarker.focusRegion {
+                let nudgeDistance = keyPress.modifiers.contains(.option) ? 10.0 : 1.0
+                let nudgedRegion: EffectFocusRegion?
+                switch keyPress.key {
+                case .leftArrow:
+                    nudgedRegion = nudgedEffectFocusRegion(region, deltaX: -nudgeDistance, deltaY: 0, contentCoordinateSize: summary.contentCoordinateSize)
+                case .rightArrow:
+                    nudgedRegion = nudgedEffectFocusRegion(region, deltaX: nudgeDistance, deltaY: 0, contentCoordinateSize: summary.contentCoordinateSize)
+                case .upArrow:
+                    nudgedRegion = nudgedEffectFocusRegion(region, deltaX: 0, deltaY: -nudgeDistance, contentCoordinateSize: summary.contentCoordinateSize)
+                case .downArrow:
+                    nudgedRegion = nudgedEffectFocusRegion(region, deltaX: 0, deltaY: nudgeDistance, contentCoordinateSize: summary.contentCoordinateSize)
+                default:
+                    nudgedRegion = nil
+                }
+                if let nudgedRegion {
+                    pendingEffectFocusRegion = nudgedRegion
+                    return .handled
+                }
+                return .ignored
+            }
+
             guard editorMode == .zoomAndClicks else { return .ignored }
             guard viewModel.selectedZoomMarkerID != nil else { return .ignored }
             if isDrawingNoZoomOverflowRegion,
@@ -2677,6 +2976,26 @@ private enum MarkerTimingPhase: String {
         return (nearest.0, nearest.0.sourceEventTimestamp)
     }
 
+    private func effectTimelineSnapTarget(
+        at x: CGFloat,
+        width: CGFloat,
+        duration: Double,
+        markers: [EffectPlanItem]
+    ) -> (marker: EffectPlanItem, time: Double)? {
+        let snapThreshold: CGFloat = 10
+        let markerPositions = markers.map { marker in
+            let ratio = min(max(marker.sourceEventTimestamp / max(duration, 0.001), 0), 1)
+            return (marker, CGFloat(ratio) * width)
+        }
+
+        guard let nearest = markerPositions.min(by: { abs($0.1 - x) < abs($1.1 - x) }),
+              abs(nearest.1 - x) <= snapThreshold else {
+            return nil
+        }
+
+        return (nearest.0, nearest.0.sourceEventTimestamp)
+    }
+
     private func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(summary.bundleName)
@@ -2918,6 +3237,22 @@ private enum MarkerTimingPhase: String {
         )
     }
 
+    private func effectFocusRegion(
+        from startPoint: CGPoint,
+        to endPoint: CGPoint,
+        contentCoordinateSize: CGSize
+    ) -> EffectFocusRegion? {
+        guard let rect = freeformSourceRect(
+            from: startPoint,
+            to: endPoint,
+            contentCoordinateSize: contentCoordinateSize
+        ) else {
+            return nil
+        }
+
+        return effectFocusRegion(for: rect, contentCoordinateSize: contentCoordinateSize)
+    }
+
     private func aspectLockedSourceRect(
         from startPoint: CGPoint,
         to endPoint: CGPoint,
@@ -2945,6 +3280,59 @@ private enum MarkerTimingPhase: String {
 
         let rect = CGRect(x: originX, y: originY, width: width, height: height)
         return rect.standardized
+    }
+
+    private func freeformSourceRect(
+        from startPoint: CGPoint,
+        to endPoint: CGPoint,
+        contentCoordinateSize: CGSize
+    ) -> CGRect? {
+        guard contentCoordinateSize.width > 0, contentCoordinateSize.height > 0 else {
+            return nil
+        }
+
+        let clampedStart = CGPoint(
+            x: min(max(startPoint.x, 0), contentCoordinateSize.width),
+            y: min(max(startPoint.y, 0), contentCoordinateSize.height)
+        )
+        let clampedEnd = CGPoint(
+            x: min(max(endPoint.x, 0), contentCoordinateSize.width),
+            y: min(max(endPoint.y, 0), contentCoordinateSize.height)
+        )
+        let rect = CGRect(
+            x: min(clampedStart.x, clampedEnd.x),
+            y: min(clampedStart.y, clampedEnd.y),
+            width: abs(clampedEnd.x - clampedStart.x),
+            height: abs(clampedEnd.y - clampedStart.y)
+        ).standardized
+        guard rect.width > 1, rect.height > 1 else {
+            return nil
+        }
+        return rect
+    }
+
+    private func effectFocusSourceRect(
+        for region: EffectFocusRegion,
+        contentCoordinateSize: CGSize
+    ) -> CGRect {
+        CGRect(
+            x: (region.centerX - (region.width / 2)) * contentCoordinateSize.width,
+            y: (region.centerY - (region.height / 2)) * contentCoordinateSize.height,
+            width: region.width * contentCoordinateSize.width,
+            height: region.height * contentCoordinateSize.height
+        )
+    }
+
+    private func effectFocusRegion(
+        for sourceRect: CGRect,
+        contentCoordinateSize: CGSize
+    ) -> EffectFocusRegion {
+        EffectFocusRegion(
+            centerX: sourceRect.midX / contentCoordinateSize.width,
+            centerY: sourceRect.midY / contentCoordinateSize.height,
+            width: sourceRect.width / contentCoordinateSize.width,
+            height: sourceRect.height / contentCoordinateSize.height
+        )
     }
 
     private func overlayRect(
@@ -2986,8 +3374,45 @@ private enum MarkerTimingPhase: String {
         ).standardized
     }
 
-    private func overflowRegionCornerRadii(for overlayRect: CGRect, within fittedRect: CGRect) -> RectangleCornerRadii {
-        let baseRadius: CGFloat = 10
+    private func overlayRect(
+        for region: EffectFocusRegion,
+        contentCoordinateSize: CGSize,
+        in containerSize: CGSize,
+        videoAspectRatio: CGFloat
+    ) -> CGRect? {
+        guard contentCoordinateSize.width > 0, contentCoordinateSize.height > 0 else {
+            return nil
+        }
+
+        let sourceRect = effectFocusSourceRect(for: region, contentCoordinateSize: contentCoordinateSize)
+
+        guard let topLeft = overlayPoint(
+            for: sourceRect.origin,
+            contentCoordinateSize: contentCoordinateSize,
+            in: containerSize,
+            videoAspectRatio: videoAspectRatio
+        ), let bottomRight = overlayPoint(
+            for: CGPoint(x: sourceRect.maxX, y: sourceRect.maxY),
+            contentCoordinateSize: contentCoordinateSize,
+            in: containerSize,
+            videoAspectRatio: videoAspectRatio
+        ) else {
+            return nil
+        }
+
+        return CGRect(
+            x: topLeft.x,
+            y: topLeft.y,
+            width: bottomRight.x - topLeft.x,
+            height: bottomRight.y - topLeft.y
+        ).standardized
+    }
+
+    private func overflowRegionCornerRadii(
+        for overlayRect: CGRect,
+        within fittedRect: CGRect,
+        baseRadius: CGFloat = 10
+    ) -> RectangleCornerRadii {
         let canvasCornerRadius: CGFloat = 18
         let edgeTolerance: CGFloat = 0.5
 
@@ -3029,6 +3454,96 @@ private enum MarkerTimingPhase: String {
             width: region.width,
             height: region.height
         )
+    }
+
+    private func nudgedEffectFocusRegion(
+        _ region: EffectFocusRegion,
+        deltaX: Double,
+        deltaY: Double,
+        contentCoordinateSize: CGSize
+    ) -> EffectFocusRegion? {
+        guard contentCoordinateSize.width > 0, contentCoordinateSize.height > 0 else {
+            return nil
+        }
+
+        let normalizedDeltaX = deltaX / contentCoordinateSize.width
+        let normalizedDeltaY = deltaY / contentCoordinateSize.height
+        let halfWidth = region.width / 2
+        let halfHeight = region.height / 2
+        let minCenterX = halfWidth
+        let maxCenterX = 1 - halfWidth
+        let minCenterY = halfHeight
+        let maxCenterY = 1 - halfHeight
+
+        return EffectFocusRegion(
+            centerX: min(max(region.centerX + normalizedDeltaX, minCenterX), maxCenterX),
+            centerY: min(max(region.centerY + normalizedDeltaY, minCenterY), maxCenterY),
+            width: region.width,
+            height: region.height
+        )
+    }
+
+    private func movedEffectFocusRegion(
+        _ region: EffectFocusRegion,
+        deltaX: Double,
+        deltaY: Double,
+        contentCoordinateSize: CGSize
+    ) -> EffectFocusRegion? {
+        nudgedEffectFocusRegion(region, deltaX: deltaX, deltaY: deltaY, contentCoordinateSize: contentCoordinateSize)
+    }
+
+    private func effectRegionHandlePoint(for handle: EffectRegionHandle, in rect: CGRect) -> CGPoint {
+        switch handle {
+        case .topLeading:
+            return CGPoint(x: rect.minX, y: rect.minY)
+        case .topTrailing:
+            return CGPoint(x: rect.maxX, y: rect.minY)
+        case .bottomLeading:
+            return CGPoint(x: rect.minX, y: rect.maxY)
+        case .bottomTrailing:
+            return CGPoint(x: rect.maxX, y: rect.maxY)
+        }
+    }
+
+    private func resizedEffectFocusRegion(
+        _ region: EffectFocusRegion,
+        dragging handle: EffectRegionHandle,
+        to overlayPoint: CGPoint,
+        contentCoordinateSize: CGSize,
+        in containerSize: CGSize,
+        videoAspectRatio: CGFloat
+    ) -> EffectFocusRegion? {
+        guard let currentPoint = sourcePoint(
+            for: overlayPoint,
+            contentCoordinateSize: contentCoordinateSize,
+            in: containerSize,
+            videoAspectRatio: videoAspectRatio
+        ) else {
+            return nil
+        }
+
+        let sourceRect = effectFocusSourceRect(for: region, contentCoordinateSize: contentCoordinateSize)
+        let anchorPoint: CGPoint
+        switch handle {
+        case .topLeading:
+            anchorPoint = CGPoint(x: sourceRect.maxX, y: sourceRect.maxY)
+        case .topTrailing:
+            anchorPoint = CGPoint(x: sourceRect.minX, y: sourceRect.maxY)
+        case .bottomLeading:
+            anchorPoint = CGPoint(x: sourceRect.maxX, y: sourceRect.minY)
+        case .bottomTrailing:
+            anchorPoint = CGPoint(x: sourceRect.minX, y: sourceRect.minY)
+        }
+
+        guard let resizedRect = freeformSourceRect(
+            from: anchorPoint,
+            to: currentPoint,
+            contentCoordinateSize: contentCoordinateSize
+        ) else {
+            return nil
+        }
+
+        return effectFocusRegion(for: resizedRect, contentCoordinateSize: contentCoordinateSize)
     }
 
     private func fittedVideoRect(in containerSize: CGSize, aspectRatio: CGFloat) -> CGRect {
@@ -3154,10 +3669,70 @@ private enum MarkerTimingPhase: String {
                     markersInspector(summary)
                 }
             }
+        } effectsContent: {
+            effectsInspector(summary)
         }
         .padding(20)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(cardBackground)
+    }
+
+    private func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
+        let displayedMarkers = displayedEffectMarkerList(summary.effectMarkers)
+        let entries = displayedMarkers.enumerated().map { index, marker in
+            EffectListEntry(
+                marker: marker,
+                markerNumber: index + 1,
+                isSelected: viewModel.selectedEffectMarkerID == marker.id,
+                isPlaybackHighlighted: isEffectPlaybackHighlighted(marker)
+            )
+        }
+
+        return VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 10) {
+                InspectorSectionHeaderView(title: "Effects")
+
+                if entries.isEmpty {
+                    Text("No effect markers")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    EffectListTableView(
+                        entries: entries,
+                        selectedMarkerID: viewModel.selectedEffectMarkerID,
+                        onSelectMarker: { markerID in
+                            guard renamingEffectMarkerID == nil else { return }
+                            viewModel.selectEffectMarker(markerID, seekPlaybackHead: false)
+                        },
+                        onToggleMarkerEnabled: viewModel.toggleEffectMarkerEnabled(_:),
+                        onReorderMarkers: viewModel.reorderEffectMarkerList(to:),
+                        renamingMarkerID: $renamingEffectMarkerID,
+                        markerNameDraft: $effectMarkerNameDraft,
+                        onBeginRename: { marker in
+                            renamingEffectMarkerID = marker.id
+                            effectMarkerNameDraft = marker.markerName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                                ? marker.markerName ?? ""
+                                : "Unnamed Effect"
+                        },
+                        onCommitRename: { markerID, name in
+                            viewModel.setEffectMarkerName(name, for: markerID)
+                            renamingEffectMarkerID = nil
+                        },
+                        onCancelRename: {
+                            renamingEffectMarkerID = nil
+                        }
+                    )
+                    .frame(minHeight: 220)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            Divider()
+
+            effectEditorSection
+                .frame(maxWidth: .infinity, alignment: .bottomLeading)
+        }
     }
 
     private func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
@@ -3633,7 +4208,7 @@ private enum MarkerTimingPhase: String {
                 } label: {
                     Text(type.displayName)
                         .font(.system(size: 12, weight: selectedType == type ? .semibold : .medium))
-                        .foregroundStyle(selectedType == type ? Color.white : Color.primary)
+                        .foregroundStyle(selectedType == type ? accentContrastingTextColor() : Color.primary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
@@ -3829,6 +4404,100 @@ private enum MarkerTimingPhase: String {
         }
     }
 
+    @ViewBuilder
+    private var effectEditorSection: some View {
+        if let marker = viewModel.selectedEffectMarker {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(marker.markerName?.isEmpty == false ? (marker.markerName ?? "Unnamed Effect") : "Unnamed Effect")
+                            .font(.headline)
+                        Spacer()
+                        Text(timecodeString(for: marker.sourceEventTimestamp))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Amount")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Slider(
+                            value: Binding(
+                                get: { marker.amount },
+                                set: { viewModel.setSelectedEffectAmount($0) }
+                            ),
+                            in: 0...1
+                        )
+                        Text(String(format: "%.0f%%", marker.amount * 100))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    InspectorSectionHeaderView(title: "Timing")
+                    timingSliderRow(
+                        title: "Fade In",
+                        value: marker.fadeInDuration,
+                        range: 0.05...3,
+                        phase: .leadIn,
+                        action: viewModel.setSelectedEffectFadeInDuration
+                    )
+                    timingSliderRow(
+                        title: "Fade Out",
+                        value: marker.fadeOutDuration,
+                        range: 0.05...3,
+                        phase: .zoomOut,
+                        action: viewModel.setSelectedEffectFadeOutDuration
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    InspectorSectionHeaderView(title: "Style")
+                    Picker("Effect Style", selection: Binding(
+                        get: { marker.style },
+                        set: { viewModel.setSelectedEffectStyle($0) }
+                    )) {
+                        ForEach(EffectStyle.allCases) { style in
+                            Text(style.displayName).tag(style)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Corner Radius")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Slider(
+                            value: Binding(
+                                get: { marker.cornerRadius },
+                                set: { viewModel.setSelectedEffectCornerRadius($0) }
+                            ),
+                            in: 0...80
+                        )
+                        Text(String(format: "%.0f", marker.cornerRadius))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 36, alignment: .trailing)
+                    }
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Select an effect marker to edit")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private func markerDisplayNumber(for marker: ZoomPlanItem) -> Int {
         guard let summary = viewModel.recordingSummary,
               let index = summary.zoomMarkers.firstIndex(where: { $0.id == marker.id }) else {
@@ -4011,6 +4680,10 @@ private enum MarkerTimingPhase: String {
         return viewModel.isPlaybackActive && viewModel.selectedZoomMarkerID == marker.id
     }
 
+    private func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
+        viewModel.currentPlaybackTime >= marker.startTime && viewModel.currentPlaybackTime <= marker.endTime
+    }
+
     private func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
         if let previewOrder {
             let lookup = Dictionary(uniqueKeysWithValues: markers.map { ($0.id, $0) })
@@ -4020,6 +4693,20 @@ private enum MarkerTimingPhase: String {
         }
 
         return markers
+            .enumerated()
+            .sorted { lhs, rhs in
+                let leftOrder = lhs.element.displayOrder ?? lhs.offset
+                let rightOrder = rhs.element.displayOrder ?? rhs.offset
+                if leftOrder == rightOrder {
+                    return lhs.offset < rhs.offset
+                }
+                return leftOrder < rightOrder
+            }
+            .map(\.element)
+    }
+
+    private func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
+        markers
             .enumerated()
             .sorted { lhs, rhs in
                 let leftOrder = lhs.element.displayOrder ?? lhs.offset

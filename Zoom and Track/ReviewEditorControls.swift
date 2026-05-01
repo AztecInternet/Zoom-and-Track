@@ -113,9 +113,15 @@ struct EffectsPlaceholderControlStrip: View {
 }
 
 func segmentedPillTextColor(isSelected: Bool) -> Color {
-    isSelected ? .white : .secondary
+    isSelected ? accentContrastingTextColor() : .secondary
 }
 
 func segmentedPillBackgroundColor(isSelected: Bool) -> Color {
     isSelected ? .accentColor : Color.secondary.opacity(0.08)
+}
+
+func accentContrastingTextColor() -> Color {
+    let accent = NSColor.controlAccentColor.usingColorSpace(.deviceRGB) ?? .systemBlue
+    let brightness = (0.299 * accent.redComponent) + (0.587 * accent.greenComponent) + (0.114 * accent.blueComponent)
+    return brightness > 0.7 ? Color.black.opacity(0.8) : .white
 }

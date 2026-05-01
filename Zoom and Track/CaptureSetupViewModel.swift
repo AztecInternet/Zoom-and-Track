@@ -654,22 +654,32 @@ final class CaptureSetupViewModel: ObservableObject {
         manualSelectionSuppressionUntil = Date().addingTimeInterval(0.5)
     }
 
-    func updateTimelineScrub(to seconds: Double, snappedMarkerID: String?) {
+    func updateTimelineScrub(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
         guard isTimelineScrubbing else { return }
         if let snappedMarkerID {
             selectedZoomMarkerID = snappedMarkerID
         } else {
             selectedZoomMarkerID = nil
         }
+        if let snappedEffectMarkerID {
+            selectedEffectMarkerID = snappedEffectMarkerID
+        } else {
+            selectedEffectMarkerID = nil
+        }
         seekPlayback(to: seconds)
     }
 
-    func endTimelineScrub(at seconds: Double, snappedMarkerID: String?) {
+    func endTimelineScrub(at seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
         guard isTimelineScrubbing else { return }
         if let snappedMarkerID {
             selectedZoomMarkerID = snappedMarkerID
         } else {
             selectedZoomMarkerID = nil
+        }
+        if let snappedEffectMarkerID {
+            selectedEffectMarkerID = snappedEffectMarkerID
+        } else {
+            selectedEffectMarkerID = nil
         }
         seekPlayback(to: seconds)
         isTimelineScrubbing = false
@@ -680,7 +690,7 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
-    func seekTimelineDirectly(to seconds: Double, snappedMarkerID: String?) {
+    func seekTimelineDirectly(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
         guard canUsePlaybackTransport || isRenderedPreviewActive || playbackPresentationMode == .previewCompletedSlate else {
             return
         }
@@ -696,6 +706,12 @@ final class CaptureSetupViewModel: ObservableObject {
             manualSelectionSuppressionUntil = Date().addingTimeInterval(0.35)
         } else {
             selectedZoomMarkerID = nil
+        }
+        if let snappedEffectMarkerID {
+            selectedEffectMarkerID = snappedEffectMarkerID
+            manualSelectionSuppressionUntil = Date().addingTimeInterval(0.35)
+        } else {
+            selectedEffectMarkerID = nil
         }
         seekPlayback(to: seconds)
     }
@@ -863,6 +879,127 @@ final class CaptureSetupViewModel: ObservableObject {
 
     func clearSelectedEffectFocusRegion() {
         setSelectedEffectFocusRegion(nil)
+    }
+
+    func selectEffectMarker(_ markerID: String, seekPlaybackHead: Bool = true) {
+        guard let summary = recordingSummary,
+              let marker = summary.effectMarkers.first(where: { $0.id == markerID }) else {
+            return
+        }
+
+        selectedEffectMarkerID = markerID
+        if seekPlaybackHead {
+            seekPlayback(to: marker.sourceEventTimestamp)
+        } else {
+            currentPlaybackTime = marker.sourceEventTimestamp
+        }
+    }
+
+    func setSelectedEffectMarkerEnabled(_ enabled: Bool) {
+        updateSelectedEffectMarker { marker in
+            marker.enabled = enabled
+        }
+    }
+
+    func toggleEffectMarkerEnabled(_ markerID: String) {
+        updateEffectMarker(withID: markerID) { marker in
+            marker.enabled.toggle()
+        }
+    }
+
+    func setEffectMarkerName(_ markerName: String?, for markerID: String) {
+        updateEffectMarker(withID: markerID) { marker in
+            let trimmed = markerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            marker.markerName = trimmed.isEmpty ? nil : trimmed
+        }
+    }
+
+    func setSelectedEffectStyle(_ style: EffectStyle) {
+        updateSelectedEffectMarker { marker in
+            marker.style = style
+        }
+    }
+
+    func setSelectedEffectAmount(_ amount: Double) {
+        updateSelectedEffectMarker { marker in
+            marker.amount = min(max(amount, 0), 1)
+        }
+    }
+
+    func setSelectedEffectFadeInDuration(_ duration: Double) {
+        updateSelectedEffectMarker { marker in
+            marker.fadeInDuration = min(max(duration, 0.05), 3.0)
+        }
+    }
+
+    func setSelectedEffectFadeOutDuration(_ duration: Double) {
+        updateSelectedEffectMarker { marker in
+            marker.fadeOutDuration = min(max(duration, 0.05), 3.0)
+        }
+    }
+
+    func setSelectedEffectCornerRadius(_ radius: Double) {
+        updateSelectedEffectMarker { marker in
+            marker.cornerRadius = min(max(radius, 0), 80)
+        }
+    }
+
+    func addEffectMarker(at timestamp: Double? = nil) {
+        guard let summary = recordingSummary else { return }
+
+        let eventTimestamp = min(
+            max(timestamp ?? currentPlaybackTime, 0),
+            max(summary.duration ?? currentPlaybackTime, currentPlaybackTime)
+        )
+        let maxDuration = max(summary.duration ?? (eventTimestamp + 1.0), eventTimestamp)
+
+        var effectMarkers = summary.effectMarkers
+        let marker = EffectPlanItem(
+            id: nextEffectMarkerID(from: effectMarkers),
+            markerName: nil,
+            sourceEventTimestamp: eventTimestamp,
+            startTime: max(0, eventTimestamp - 0.35),
+            endTime: min(eventTimestamp + 1.0, maxDuration),
+            fadeInDuration: 0.18,
+            fadeOutDuration: 0.24,
+            enabled: true,
+            displayOrder: nextEffectDisplayOrder(from: effectMarkers),
+            style: .blurDarken,
+            amount: 0.55,
+            cornerRadius: 18,
+            focusRegion: nil
+        )
+        effectMarkers.append(marker)
+        selectedEffectMarkerID = marker.id
+        saveEffectMarkers(effectMarkers, basedOn: summary)
+    }
+
+    func deleteSelectedEffectMarker() {
+        guard let summary = recordingSummary, let selectedEffectMarkerID else { return }
+        var effectMarkers = summary.effectMarkers
+        effectMarkers.removeAll { $0.id == selectedEffectMarkerID }
+        self.selectedEffectMarkerID = nil
+        saveEffectMarkers(effectMarkers, basedOn: summary)
+    }
+
+    func reorderEffectMarkerList(to orderedMarkerIDs: [String]) {
+        guard let summary = recordingSummary else { return }
+
+        var effectMarkers = summary.effectMarkers
+        let orderedLookup = Dictionary(uniqueKeysWithValues: orderedMarkerIDs.enumerated().map { ($1, $0) })
+        var didChange = false
+
+        for index in effectMarkers.indices {
+            guard let displayOrder = orderedLookup[effectMarkers[index].id],
+                  effectMarkers[index].displayOrder != displayOrder else {
+                continue
+            }
+            effectMarkers[index].displayOrder = displayOrder
+            didChange = true
+        }
+
+        guard didChange else { return }
+        saveEffectMarkers(effectMarkers, basedOn: summary)
     }
 
     func setDefaultNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
@@ -1295,6 +1432,17 @@ final class CaptureSetupViewModel: ObservableObject {
         saveZoomMarkers(markers, basedOn: summary)
     }
 
+    private func updateSelectedEffectMarker(_ mutate: (inout EffectPlanItem) -> Void) {
+        guard let summary = recordingSummary, let selectedEffectMarkerID,
+              let index = summary.effectMarkers.firstIndex(where: { $0.id == selectedEffectMarkerID }) else {
+            return
+        }
+
+        var effectMarkers = summary.effectMarkers
+        mutate(&effectMarkers[index])
+        saveEffectMarkers(effectMarkers, basedOn: summary)
+    }
+
     private func updateMarker(withID markerID: String, mutate: (inout ZoomPlanItem) -> Void) {
         guard let summary = recordingSummary,
               let index = summary.zoomMarkers.firstIndex(where: { $0.id == markerID }) else {
@@ -1304,6 +1452,17 @@ final class CaptureSetupViewModel: ObservableObject {
         var markers = summary.zoomMarkers
         mutate(&markers[index])
         saveZoomMarkers(markers, basedOn: summary)
+    }
+
+    private func updateEffectMarker(withID markerID: String, mutate: (inout EffectPlanItem) -> Void) {
+        guard let summary = recordingSummary,
+              let index = summary.effectMarkers.firstIndex(where: { $0.id == markerID }) else {
+            return
+        }
+
+        var effectMarkers = summary.effectMarkers
+        mutate(&effectMarkers[index])
+        saveEffectMarkers(effectMarkers, basedOn: summary)
     }
 
     private func saveZoomMarkers(_ markers: [ZoomPlanItem], basedOn summary: RecordingInspectionSummary) {
@@ -1359,6 +1518,10 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     private func nextMarkerDisplayOrder(from markers: [ZoomPlanItem]) -> Int {
+        markers.enumerated().map { $0.element.displayOrder ?? $0.offset }.max().map { $0 + 1 } ?? 0
+    }
+
+    private func nextEffectDisplayOrder(from markers: [EffectPlanItem]) -> Int {
         markers.enumerated().map { $0.element.displayOrder ?? $0.offset }.max().map { $0 + 1 } ?? 0
     }
 
@@ -1434,6 +1597,13 @@ final class CaptureSetupViewModel: ObservableObject {
         } catch {
             statusMessage = "Could not save zoomPlan.json: \(error.localizedDescription)"
         }
+    }
+
+    private func nextEffectMarkerID(from markers: [EffectPlanItem]) -> String {
+        let maxIndex = markers.compactMap { marker in
+            Int(marker.id.replacingOccurrences(of: "effect-", with: ""))
+        }.max() ?? 0
+        return String(format: "effect-%04d", maxIndex + 1)
     }
 
     private func syncMarkerTiming(_ marker: inout ZoomPlanItem) {
@@ -1752,6 +1922,7 @@ final class CaptureSetupViewModel: ObservableObject {
         }
 
         updateSelectedMarkerForTime(currentTime)
+        updateSelectedEffectMarkerForTime(currentTime)
     }
 
     private func updatePreviewPlaybackTime() {
@@ -1774,6 +1945,7 @@ final class CaptureSetupViewModel: ObservableObject {
         }
 
         updateSelectedMarkerForTime(currentTime)
+        updateSelectedEffectMarkerForTime(currentTime)
     }
 
     private func updateSelectedMarkerForTime(_ currentTime: Double) {
@@ -1807,6 +1979,34 @@ final class CaptureSetupViewModel: ObservableObject {
 
         if selectedZoomMarkerID != markerID {
             selectedZoomMarkerID = markerID
+        }
+    }
+
+    private func updateSelectedEffectMarkerForTime(_ currentTime: Double) {
+        guard let summary = recordingSummary, !summary.effectMarkers.isEmpty else {
+            selectedEffectMarkerID = nil
+            return
+        }
+
+        let eligibleMarkers = summary.effectMarkers.filter { $0.enabled }
+        let markers = (eligibleMarkers.isEmpty ? summary.effectMarkers : eligibleMarkers)
+            .sorted { lhs, rhs in
+                if lhs.startTime == rhs.startTime {
+                    if lhs.sourceEventTimestamp == rhs.sourceEventTimestamp {
+                        return lhs.id < rhs.id
+                    }
+                    return lhs.sourceEventTimestamp < rhs.sourceEventTimestamp
+                }
+                return lhs.startTime < rhs.startTime
+            }
+
+        guard let markerID = markers.last(where: { currentTime >= $0.startTime && currentTime <= $0.endTime })?.id else {
+            selectedEffectMarkerID = nil
+            return
+        }
+
+        if selectedEffectMarkerID != markerID {
+            selectedEffectMarkerID = markerID
         }
     }
 }

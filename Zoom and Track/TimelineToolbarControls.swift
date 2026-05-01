@@ -141,6 +141,68 @@ struct TimelineToolbarView: View {
     }
 }
 
+struct EffectsTimelineToolbarView: View {
+    let hasSelectedMarker: Bool
+    let selectedMarker: EffectPlanItem?
+    let isDrawingFocusRegion: Bool
+    let onAddMarker: () -> Void
+    let onDeleteSelectedMarker: () -> Void
+    let onToggleFocusRegion: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("effects")
+                .font(.system(size: 10, weight: .light))
+                .foregroundStyle(Color.accentColor)
+
+            TimelineGadgetButton(
+                systemName: "plus",
+                isActive: false,
+                isEnabled: true,
+                help: "Add Effect Marker",
+                action: onAddMarker
+            )
+
+            if hasSelectedMarker {
+                TimelineGadgetButton(
+                    systemName: "minus",
+                    isActive: false,
+                    isEnabled: true,
+                    help: "Delete Selected Effect Marker",
+                    action: onDeleteSelectedMarker
+                )
+            }
+
+            if selectedMarker != nil {
+                Divider()
+                    .frame(height: 14)
+
+                Text("region")
+                    .font(.system(size: 10, weight: .light))
+                    .foregroundStyle(Color.accentColor)
+
+                TimelineGadgetButton(
+                    systemName: isDrawingFocusRegion ? "checkmark" : "viewfinder.rectangular",
+                    isActive: isDrawingFocusRegion,
+                    isEnabled: true,
+                    help: isDrawingFocusRegion ? "Save Effect Focus Region" : "Draw Effect Focus Region",
+                    action: onToggleFocusRegion
+                )
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.secondary.opacity(0.08))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+        )
+    }
+}
+
 struct TimelineGadgetButton: View {
     let systemName: String
     let isActive: Bool

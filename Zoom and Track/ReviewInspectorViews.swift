@@ -44,22 +44,25 @@ struct EffectsInspectorPlaceholderView: View {
     }
 }
 
-struct ReviewInspectorCard<PrimaryContent: View>: View {
+struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
     let editorMode: ReviewEditorMode
     @Binding var inspectorMode: EditInspectorMode
     let effectMarkerCount: Int
     @ViewBuilder let primaryContent: PrimaryContent
+    @ViewBuilder let effectsContent: EffectsContent
 
     init(
         editorMode: ReviewEditorMode,
         inspectorMode: Binding<EditInspectorMode>,
         effectMarkerCount: Int,
-        @ViewBuilder primaryContent: () -> PrimaryContent
+        @ViewBuilder primaryContent: () -> PrimaryContent,
+        @ViewBuilder effectsContent: () -> EffectsContent
     ) {
         self.editorMode = editorMode
         self._inspectorMode = inspectorMode
         self.effectMarkerCount = effectMarkerCount
         self.primaryContent = primaryContent()
+        self.effectsContent = effectsContent()
     }
 
     var body: some View {
@@ -68,7 +71,7 @@ struct ReviewInspectorCard<PrimaryContent: View>: View {
                 .font(.system(size: 16, weight: .semibold))
 
             if editorMode == .effects {
-                EffectsInspectorPlaceholderView(effectMarkerCount: effectMarkerCount)
+                effectsContent
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     InspectorSectionHeaderView(title: "Mode")
