@@ -76,6 +76,7 @@ struct ContentView: View {
         let intensity: Double
         let cornerRadius: CGFloat
         let feather: CGFloat
+        let tintColor: Color
     }
 
     private enum EffectRegionHandle: Hashable {
@@ -1938,7 +1939,8 @@ private enum MarkerTimingPhase: String {
             region: region,
             intensity: intensity,
             cornerRadius: CGFloat(max(marker.cornerRadius, 0)),
-            feather: CGFloat(max(marker.feather, 0))
+            feather: CGFloat(max(marker.feather, 0)),
+            tintColor: color(for: marker.tintColor)
         )
     }
 
@@ -2050,10 +2052,37 @@ private enum MarkerTimingPhase: String {
         case .blurDarken:
             return Color.black.opacity(0.54 * effectState.intensity)
         case .tint:
-            return accentTint.opacity(0.42 * effectState.intensity)
+            return effectState.tintColor.opacity(0.42 * effectState.intensity)
         case .blur:
             return .clear
         }
+    }
+
+    private func color(for tintColor: EffectTintColor) -> Color {
+        Color(
+            .sRGB,
+            red: min(max(tintColor.red, 0), 1),
+            green: min(max(tintColor.green, 0), 1),
+            blue: min(max(tintColor.blue, 0), 1),
+            opacity: min(max(tintColor.alpha, 0), 1)
+        )
+    }
+
+    private func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
+        Binding(
+            get: { color(for: marker.tintColor) },
+            set: { newColor in
+                let nsColor = NSColor(newColor).usingColorSpace(.deviceRGB) ?? .controlAccentColor
+                viewModel.setSelectedEffectTintColor(
+                    EffectTintColor(
+                        red: Double(nsColor.redComponent),
+                        green: Double(nsColor.greenComponent),
+                        blue: Double(nsColor.blueComponent),
+                        alpha: Double(nsColor.alphaComponent)
+                    )
+                )
+            }
+        )
     }
 
     private func transformedOverlayRect(
@@ -4907,6 +4936,15 @@ private enum MarkerTimingPhase: String {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
+
+                    if marker.style == .tint {
+                        ColorPicker(
+                            "Tint Color",
+                            selection: effectTintColorBinding(for: marker),
+                            supportsOpacity: false
+                        )
+                        .font(.system(size: 12, weight: .semibold))
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 6) {

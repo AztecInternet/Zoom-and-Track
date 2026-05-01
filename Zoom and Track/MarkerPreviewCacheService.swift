@@ -230,6 +230,7 @@ final class MarkerPreviewCacheService {
             "amount=\(marker.amount)",
             "cornerRadius=\(marker.cornerRadius)",
             "feather=\(marker.feather)",
+            "tintColor=\(marker.tintColor.red),\(marker.tintColor.green),\(marker.tintColor.blue),\(marker.tintColor.alpha)",
             "focusRegion=\(marker.focusRegion.map { "\($0.centerX),\($0.centerY),\($0.width),\($0.height)" } ?? "none")",
             "renderWidth=\(renderSize.width)",
             "renderHeight=\(renderSize.height)",
@@ -267,6 +268,7 @@ final class MarkerPreviewCacheService {
                     String(marker.amount),
                     String(marker.cornerRadius),
                     String(marker.feather),
+                    "\(marker.tintColor.red),\(marker.tintColor.green),\(marker.tintColor.blue),\(marker.tintColor.alpha)",
                     marker.focusRegion.map { region in
                         "\(region.centerX),\(region.centerY),\(region.width),\(region.height)"
                     } ?? "none"

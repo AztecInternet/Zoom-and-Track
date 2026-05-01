@@ -926,6 +926,7 @@ private struct EffectRenderState {
     let intensity: Double
     let cornerRadius: CGFloat
     let feather: CGFloat
+    let tintColor: NSColor
 }
 
 private func makeClickPulseOverlay(
@@ -1113,7 +1114,13 @@ private func activeEffectRenderState(
         region: region,
         intensity: intensity,
         cornerRadius: CGFloat(max(marker.cornerRadius, 0)),
-        feather: CGFloat(max(marker.feather, 0))
+        feather: CGFloat(max(marker.feather, 0)),
+        tintColor: NSColor(
+            red: CGFloat(min(max(marker.tintColor.red, 0), 1)),
+            green: CGFloat(min(max(marker.tintColor.green, 0), 1)),
+            blue: CGFloat(min(max(marker.tintColor.blue, 0), 1)),
+            alpha: CGFloat(min(max(marker.tintColor.alpha, 0), 1))
+        )
     )
 }
 
@@ -1124,7 +1131,7 @@ private func effectOverlayColor(for state: EffectRenderState) -> NSColor {
     case .blurDarken:
         return NSColor.black.withAlphaComponent(0.54 * state.intensity)
     case .tint:
-        return NSColor.controlAccentColor.withAlphaComponent(0.42 * state.intensity)
+        return state.tintColor.withAlphaComponent(0.42 * state.intensity)
     case .blur:
         return .clear
     }

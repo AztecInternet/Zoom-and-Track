@@ -1121,6 +1121,12 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    func setSelectedEffectTintColor(_ tintColor: EffectTintColor) {
+        updateSelectedEffectMarker { marker in
+            marker.tintColor = tintColor
+        }
+    }
+
     func addEffectMarker(at timestamp: Double? = nil) {
         guard let summary = recordingSummary else { return }
 
@@ -1145,6 +1151,7 @@ final class CaptureSetupViewModel: ObservableObject {
             amount: 0.55,
             cornerRadius: 18,
             feather: 0,
+            tintColor: .defaultTint,
             focusRegion: nil
         )
         effectMarkers.append(marker)

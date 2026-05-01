@@ -479,6 +479,15 @@ struct EffectFocusRegion: Codable, Equatable {
     var height: Double
 }
 
+struct EffectTintColor: Codable, Equatable {
+    var red: Double
+    var green: Double
+    var blue: Double
+    var alpha: Double
+
+    static let defaultTint = EffectTintColor(red: 0.22, green: 0.48, blue: 0.96, alpha: 1)
+}
+
 struct EffectPlanItem: Codable, Identifiable, Equatable {
     var id: String
     var markerName: String?
@@ -493,6 +502,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
     var amount: Double
     var cornerRadius: Double
     var feather: Double
+    var tintColor: EffectTintColor
     var focusRegion: EffectFocusRegion?
 
     private enum CodingKeys: String, CodingKey {
@@ -509,6 +519,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         case amount
         case cornerRadius
         case feather
+        case tintColor
         case focusRegion
     }
 
@@ -526,6 +537,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         amount: Double,
         cornerRadius: Double,
         feather: Double,
+        tintColor: EffectTintColor,
         focusRegion: EffectFocusRegion?
     ) {
         self.id = id
@@ -541,6 +553,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         self.amount = amount
         self.cornerRadius = cornerRadius
         self.feather = feather
+        self.tintColor = tintColor
         self.focusRegion = focusRegion
     }
 
@@ -559,6 +572,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         amount = try container.decode(Double.self, forKey: .amount)
         cornerRadius = try container.decode(Double.self, forKey: .cornerRadius)
         feather = try container.decodeIfPresent(Double.self, forKey: .feather) ?? 0
+        tintColor = try container.decodeIfPresent(EffectTintColor.self, forKey: .tintColor) ?? .defaultTint
         focusRegion = try container.decodeIfPresent(EffectFocusRegion.self, forKey: .focusRegion)
     }
 }
