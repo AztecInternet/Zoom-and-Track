@@ -89,6 +89,8 @@ final class CaptureSetupViewModel: ObservableObject {
     private var manualSelectionSuppressionUntil: Date?
     private var previewMarkerID: String?
     private var previewEndTime: Double?
+    private var previewEffectMarkerID: String?
+    private var previewEffectEndTime: Double?
     private var wasPlayingBeforeTimelineScrub = false
     private var isTimelineScrubbing = false
     private var markerPreviewRenderTask: Task<Void, Never>?
@@ -98,6 +100,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private var activeRenderedPreviewShouldDelete = false
     private var renderedPreviewSourceStartTime: Double?
     private var renderingPreviewMarkerID: String?
+    private var renderingPreviewEffectMarkerID: String?
     private var exportTask: Task<Void, Never>?
     private var targetRefreshTask: Task<Void, Never>?
     private var metadataSaveTask: Task<Void, Never>?
@@ -768,6 +771,42 @@ final class CaptureSetupViewModel: ObservableObject {
         )
     }
 
+    func nudgeSelectedEffectTimelineMarker(by delta: Double) {
+        guard let summary = recordingSummary,
+              let markerID = selectedEffectMarkerID,
+              let index = summary.effectMarkers.firstIndex(where: { $0.id == markerID }) else { return }
+
+        cancelPendingMarkerPreviewRender()
+        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+            playbackTransitionPlateState = .hidden
+            playbackPresentationMode = .normal
+        }
+        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
+        cancelPreviewMode()
+        mainPlayer?.pause()
+        publishOnNextRunLoop { [weak self] in
+            self?.isPlaybackActive = false
+        }
+
+        let maxDuration = max(summary.duration ?? 0, 0)
+        let currentMarker = summary.effectMarkers[index]
+        let timelineOffsetToStart = currentMarker.startTime - currentMarker.sourceEventTimestamp
+        let timelineOffsetToEnd = currentMarker.endTime - currentMarker.sourceEventTimestamp
+        let targetTimestamp = min(
+            max(currentMarker.sourceEventTimestamp + (delta * timelineMarkerNudgeInterval), 0),
+            maxDuration
+        )
+
+        var effectMarkers = summary.effectMarkers
+        effectMarkers[index].sourceEventTimestamp = targetTimestamp
+        effectMarkers[index].startTime = max(0, targetTimestamp + timelineOffsetToStart)
+        effectMarkers[index].endTime = max(effectMarkers[index].startTime + 0.05, min(maxDuration, targetTimestamp + timelineOffsetToEnd))
+
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(0.2)
+        saveEffectMarkers(effectMarkers, basedOn: summary)
+        seekPlayback(to: effectMarkers[index].sourceEventTimestamp)
+    }
+
     func setSelectedMarkerEnabled(_ enabled: Bool) {
         updateSelectedMarker { marker in
             marker.enabled = enabled
@@ -895,6 +934,132 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    func previewEffectMarker(_ markerID: String) {
+        guard let summary = recordingSummary,
+              let marker = summary.effectMarkers.first(where: { $0.id == markerID }),
+              let player = mainPlayer else {
+            return
+        }
+
+        cancelPendingMarkerPreviewRender()
+        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
+        cancelPreviewMode()
+        playbackTransitionPlateState = .hidden
+        playbackPresentationMode = .normal
+
+        selectedEffectMarkerID = markerID
+        previewEffectMarkerID = markerID
+        previewEffectEndTime = marker.endTime
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(max(marker.endTime - marker.startTime, 0.35) + 0.15)
+        seekPlayback(to: marker.startTime)
+        player.play()
+        isPlaybackActive = true
+    }
+
+    func startEffectMarkerPreview(_ markerID: String) {
+        guard canTriggerMarkerPreview else {
+            return
+        }
+        guard let summary = recordingSummary,
+              let marker = summary.effectMarkers.first(where: { $0.id == markerID }),
+              mainPlayer != nil else {
+            return
+        }
+        guard marker.enabled else {
+            selectedEffectMarkerID = markerID
+            return
+        }
+
+        cancelPendingMarkerPreviewRender()
+        cancelPreviewSurfaceTeardown()
+        cancelPreviewMode()
+        if previewPlayer != nil {
+            previewPlayer?.pause()
+            removePreviewPlaybackObserver()
+            previewPlayer = nil
+            renderedPreviewSourceStartTime = nil
+            cleanupRenderedPreviewFile()
+            isPlaybackActive = false
+        }
+        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: true)
+        selectedEffectMarkerID = markerID
+        renderingPreviewEffectMarkerID = markerID
+        isRenderingMarkerPreview = false
+        markerPreviewStatusMessage = nil
+        playbackPresentationMode = .renderingPreview
+        showPlaybackTransitionPlateImmediately()
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(2.0)
+        seekMainPlayback(to: max(0, marker.startTime))
+
+        markerPreviewRenderTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                if let cachedPreview = try await markerPreviewCacheService.cachedEffectPreview(
+                    for: summary.recordingURL,
+                    summary: summary,
+                    marker: marker
+                ) {
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        guard self.renderingPreviewEffectMarkerID == markerID else { return }
+                        self.isRenderingMarkerPreview = false
+                        self.markerPreviewStatusMessage = nil
+                        self.playRenderedEffectPreview(cachedPreview, markerID: markerID)
+                    }
+                    return
+                }
+
+                await MainActor.run {
+                    guard self.renderingPreviewEffectMarkerID == markerID else { return }
+                    self.isRenderingMarkerPreview = true
+                    self.markerPreviewStatusMessage = "Rendering preview…"
+                    self.playbackPresentationMode = .renderingPreview
+                    self.showPlaybackTransitionPlateImmediately()
+                }
+
+                let renderedPreview = try await markerPreviewRenderService.renderEffectPreview(
+                    recordingURL: summary.recordingURL,
+                    summary: summary,
+                    selectedMarker: marker
+                )
+                let cachedPreview = try await markerPreviewCacheService.storeEffectPreview(
+                    renderedPreview,
+                    for: summary.recordingURL,
+                    summary: summary,
+                    marker: marker
+                )
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard self.renderingPreviewEffectMarkerID == markerID else { return }
+                    self.isRenderingMarkerPreview = false
+                    self.markerPreviewStatusMessage = nil
+                    self.playRenderedEffectPreview(cachedPreview, markerID: markerID)
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    if self.renderingPreviewEffectMarkerID == markerID {
+                        self.isRenderingMarkerPreview = false
+                        self.markerPreviewStatusMessage = nil
+                        self.renderingPreviewEffectMarkerID = nil
+                        self.playbackPresentationMode = .normal
+                        self.playbackTransitionPlateState = .hidden
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    guard self.renderingPreviewEffectMarkerID == markerID else { return }
+                    self.isRenderingMarkerPreview = false
+                    self.markerPreviewStatusMessage = nil
+                    self.playbackPresentationMode = .normal
+                    self.playbackTransitionPlateState = .hidden
+                    self.statusMessage = "Rendered preview failed. Using live preview."
+                    self.previewEffectMarker(markerID)
+                }
+            }
+        }
+    }
+
     func setSelectedEffectMarkerEnabled(_ enabled: Bool) {
         updateSelectedEffectMarker { marker in
             marker.enabled = enabled
@@ -938,9 +1103,21 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    func setSelectedEffectHoldDuration(_ duration: Double) {
+        updateSelectedEffectMarker { marker in
+            marker.endTime = max(marker.sourceEventTimestamp + min(max(duration, 0.05), 10.0), marker.startTime + 0.05)
+        }
+    }
+
     func setSelectedEffectCornerRadius(_ radius: Double) {
         updateSelectedEffectMarker { marker in
             marker.cornerRadius = min(max(radius, 0), 80)
+        }
+    }
+
+    func setSelectedEffectFeather(_ feather: Double) {
+        updateSelectedEffectMarker { marker in
+            marker.feather = min(max(feather, 0), 60)
         }
     }
 
@@ -967,6 +1144,7 @@ final class CaptureSetupViewModel: ObservableObject {
             style: .blurDarken,
             amount: 0.55,
             cornerRadius: 18,
+            feather: 0,
             focusRegion: nil
         )
         effectMarkers.append(marker)
@@ -1658,6 +1836,8 @@ final class CaptureSetupViewModel: ObservableObject {
     private func cancelPreviewMode() {
         previewMarkerID = nil
         previewEndTime = nil
+        previewEffectMarkerID = nil
+        previewEffectEndTime = nil
     }
 
     private func cancelPendingMarkerPreviewRender() {
@@ -1668,6 +1848,7 @@ final class CaptureSetupViewModel: ObservableObject {
             self?.markerPreviewStatusMessage = nil
         }
         renderingPreviewMarkerID = nil
+        renderingPreviewEffectMarkerID = nil
     }
 
     private func publishOnNextRunLoop(_ action: @escaping @MainActor () -> Void) {
@@ -1708,6 +1889,55 @@ final class CaptureSetupViewModel: ObservableObject {
         previewMarkerID = markerID
         previewEndTime = renderedPreview.sourceEndTime
         renderingPreviewMarkerID = nil
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(
+            max(renderedPreview.sourceEndTime - renderedPreview.sourceStartTime, 0.35) + 0.15
+        )
+        showPlaybackTransitionPlateImmediately()
+        mainPlayer.pause()
+        currentPlaybackTime = renderedPreview.sourceStartTime
+        let player = AVPlayer(playerItem: AVPlayerItem(url: renderedPreview.outputURL))
+        player.actionAtItemEnd = .pause
+        previewPlayer = player
+        installPreviewPlaybackObserver()
+        playbackPresentationMode = .playingRenderedPreview
+        player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+        isPlaybackActive = false
+        playbackTransitionTask = Task { [weak self, weak player] in
+            try? await Task.sleep(for: .seconds(self?.previewTransitionHoldDuration ?? 1.0))
+            await MainActor.run {
+                guard let self, let player else { return }
+                if self.playbackTransitionPlateState != .hidden {
+                    self.playbackTransitionPlateState = .fadingOut
+                }
+                player.play()
+                self.isPlaybackActive = true
+            }
+            try? await Task.sleep(for: .seconds(self?.previewTransitionFadeOutDuration ?? 0.16))
+            await MainActor.run {
+                guard let self, self.playbackTransitionPlateState == .fadingOut else { return }
+                self.playbackTransitionPlateState = .hidden
+                self.playbackTransitionTask = nil
+            }
+        }
+    }
+
+    private func playRenderedEffectPreview(_ renderedPreview: RenderedMarkerPreview, markerID: String) {
+        cancelPreviewSurfaceTeardown()
+        cancelPlaybackTransitionTask()
+        guard previewPlayer == nil else {
+            stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: true)
+            playRenderedEffectPreview(renderedPreview, markerID: markerID)
+            return
+        }
+        guard let mainPlayer else { return }
+        cleanupRenderedPreviewFile()
+        activeRenderedPreviewURL = renderedPreview.outputURL
+        activeRenderedPreviewShouldDelete = renderedPreview.deleteWhenFinished
+        renderedPreviewSourceStartTime = renderedPreview.sourceStartTime
+        selectedEffectMarkerID = markerID
+        previewEffectMarkerID = markerID
+        previewEffectEndTime = renderedPreview.sourceEndTime
+        renderingPreviewEffectMarkerID = nil
         manualSelectionSuppressionUntil = Date().addingTimeInterval(
             max(renderedPreview.sourceEndTime - renderedPreview.sourceStartTime, 0.35) + 0.15
         )
@@ -1917,7 +2147,22 @@ final class CaptureSetupViewModel: ObservableObject {
             return
         }
 
+        if isRenderingMarkerPreview, let renderingPreviewEffectMarkerID {
+            selectedEffectMarkerID = renderingPreviewEffectMarkerID
+            return
+        }
+
         guard playbackPresentationMode == .normal else {
+            return
+        }
+
+        if let previewEffectEndTime, let previewEffectMarkerID {
+            selectedEffectMarkerID = previewEffectMarkerID
+            if currentTime >= previewEffectEndTime - 0.02 {
+                player.pause()
+                isPlaybackActive = false
+                cancelPreviewMode()
+            }
             return
         }
 
@@ -1940,6 +2185,17 @@ final class CaptureSetupViewModel: ObservableObject {
                 isPlaybackActive = false
                 cancelPreviewMode()
                 stopPreviewPlayback(seekMainTo: previewEndTime, retainSlate: true)
+            }
+            return
+        }
+
+        if let previewEffectEndTime, let previewEffectMarkerID {
+            selectedEffectMarkerID = previewEffectMarkerID
+            if currentTime >= previewEffectEndTime - 0.02 {
+                player.pause()
+                isPlaybackActive = false
+                cancelPreviewMode()
+                stopPreviewPlayback(seekMainTo: previewEffectEndTime, retainSlate: true)
             }
             return
         }

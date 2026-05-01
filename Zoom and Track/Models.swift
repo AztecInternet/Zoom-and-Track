@@ -492,7 +492,75 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
     var style: EffectStyle
     var amount: Double
     var cornerRadius: Double
+    var feather: Double
     var focusRegion: EffectFocusRegion?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case markerName
+        case sourceEventTimestamp
+        case startTime
+        case endTime
+        case fadeInDuration
+        case fadeOutDuration
+        case enabled
+        case displayOrder
+        case style
+        case amount
+        case cornerRadius
+        case feather
+        case focusRegion
+    }
+
+    init(
+        id: String,
+        markerName: String?,
+        sourceEventTimestamp: Double,
+        startTime: Double,
+        endTime: Double,
+        fadeInDuration: Double,
+        fadeOutDuration: Double,
+        enabled: Bool,
+        displayOrder: Int?,
+        style: EffectStyle,
+        amount: Double,
+        cornerRadius: Double,
+        feather: Double,
+        focusRegion: EffectFocusRegion?
+    ) {
+        self.id = id
+        self.markerName = markerName
+        self.sourceEventTimestamp = sourceEventTimestamp
+        self.startTime = startTime
+        self.endTime = endTime
+        self.fadeInDuration = fadeInDuration
+        self.fadeOutDuration = fadeOutDuration
+        self.enabled = enabled
+        self.displayOrder = displayOrder
+        self.style = style
+        self.amount = amount
+        self.cornerRadius = cornerRadius
+        self.feather = feather
+        self.focusRegion = focusRegion
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        markerName = try container.decodeIfPresent(String.self, forKey: .markerName)
+        sourceEventTimestamp = try container.decode(Double.self, forKey: .sourceEventTimestamp)
+        startTime = try container.decode(Double.self, forKey: .startTime)
+        endTime = try container.decode(Double.self, forKey: .endTime)
+        fadeInDuration = try container.decode(Double.self, forKey: .fadeInDuration)
+        fadeOutDuration = try container.decode(Double.self, forKey: .fadeOutDuration)
+        enabled = try container.decode(Bool.self, forKey: .enabled)
+        displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
+        style = try container.decode(EffectStyle.self, forKey: .style)
+        amount = try container.decode(Double.self, forKey: .amount)
+        cornerRadius = try container.decode(Double.self, forKey: .cornerRadius)
+        feather = try container.decodeIfPresent(Double.self, forKey: .feather) ?? 0
+        focusRegion = try container.decodeIfPresent(EffectFocusRegion.self, forKey: .focusRegion)
+    }
 }
 
 enum ZoomMarkerKind: String, Codable {

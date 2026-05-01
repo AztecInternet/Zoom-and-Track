@@ -70,6 +70,14 @@ struct ContentView: View {
         let normalizedPoint: CGPoint
     }
 
+    private struct EffectPreviewState {
+        let style: EffectStyle
+        let region: EffectFocusRegion
+        let intensity: Double
+        let cornerRadius: CGFloat
+        let feather: CGFloat
+    }
+
     private enum EffectRegionHandle: Hashable {
         case topLeading
         case topCenter
@@ -512,6 +520,7 @@ private enum MarkerTimingPhase: String {
                                 selectedEffectMarker: editorMode == .effects ? viewModel.selectedEffectMarker : nil,
                                 contentCoordinateSize: summary.contentCoordinateSize,
                                 zoomMarkers: summary.zoomMarkers,
+                                effectMarkers: summary.effectMarkers,
                                 currentTime: viewModel.currentPlaybackTime,
                                 isRenderedPreviewActive: viewModel.isRenderedPreviewActive,
                                 renderingStatusMessage: viewModel.markerPreviewStatusMessage,
@@ -1230,6 +1239,7 @@ private enum MarkerTimingPhase: String {
         selectedEffectMarker: EffectPlanItem?,
         contentCoordinateSize: CGSize,
         zoomMarkers: [ZoomPlanItem],
+        effectMarkers: [EffectPlanItem],
         currentTime: Double,
         isRenderedPreviewActive: Bool,
         renderingStatusMessage: String?,
@@ -1270,6 +1280,14 @@ private enum MarkerTimingPhase: String {
                         zoomMarkers: zoomMarkers,
                         contentCoordinateSize: contentCoordinateSize
                     )
+                let activeEffectState = isRenderedPreviewActive
+                    ? nil
+                    : isEffectRegionDrawActive
+                    ? nil
+                    : activeEffectPreviewState(
+                        at: currentTime,
+                        effectMarkers: effectMarkers
+                    )
 
                 ZStack {
                     PlaybackVideoSurface(player: mainPlayer)
@@ -1278,11 +1296,43 @@ private enum MarkerTimingPhase: String {
                         .offset(zoomPreviewOffset(for: previewState, in: fittedRect))
                         .blur(radius: playbackVideoHeightDragOrigin == nil ? 0 : 4)
 
+                    if let activeEffectState,
+                       activeEffectState.style == .blur || activeEffectState.style == .blurDarken,
+                       let overlayRect = overlayRect(
+                        for: activeEffectState.region,
+                        contentCoordinateSize: contentCoordinateSize,
+                        in: geometry.size,
+                        videoAspectRatio: safeAspectRatio
+                    ) {
+                        effectBlurLayer(
+                            mainPlayer: mainPlayer,
+                            effectState: activeEffectState,
+                            overlayRect: overlayRect,
+                            fittedRect: fittedRect,
+                            previewState: previewState
+                        )
+                    }
+
                     if let previewPlayer {
                         PlaybackVideoSurface(player: previewPlayer)
                             .frame(width: fittedRect.width, height: fittedRect.height)
                             .opacity(playbackPresentationMode == .playingRenderedPreview ? 1 : 0)
                             .animation(.easeInOut(duration: 0.16), value: playbackPresentationMode == .playingRenderedPreview)
+                    }
+
+                    if let activeEffectState,
+                       let overlayRect = overlayRect(
+                        for: activeEffectState.region,
+                        contentCoordinateSize: contentCoordinateSize,
+                        in: geometry.size,
+                        videoAspectRatio: safeAspectRatio
+                    ) {
+                        effectPreviewOverlay(
+                            effectState: activeEffectState,
+                            overlayRect: overlayRect,
+                            fittedRect: fittedRect,
+                            previewState: previewState
+                        )
                     }
                 }
                 .frame(width: fittedRect.width, height: fittedRect.height)
@@ -1846,6 +1896,193 @@ private enum MarkerTimingPhase: String {
         return ZoomPreviewState(scale: state.scale, normalizedPoint: state.normalizedPoint)
     }
 
+    private func activeEffectPreviewState(
+        at currentTime: Double,
+        effectMarkers: [EffectPlanItem]
+    ) -> EffectPreviewState? {
+        let eligibleMarkers = effectMarkers
+            .filter { $0.enabled && $0.focusRegion != nil && currentTime >= $0.startTime && currentTime <= $0.endTime }
+            .sorted { lhs, rhs in
+                if lhs.startTime == rhs.startTime {
+                    return lhs.sourceEventTimestamp < rhs.sourceEventTimestamp
+                }
+                return lhs.startTime < rhs.startTime
+            }
+
+        guard let marker = eligibleMarkers.last,
+              let region = marker.focusRegion else {
+            return nil
+        }
+
+        let fadeInDuration = max(marker.fadeInDuration, 0)
+        let fadeOutDuration = max(marker.fadeOutDuration, 0)
+        let fadeInProgress: Double
+        if fadeInDuration <= 0.0001 {
+            fadeInProgress = 1
+        } else {
+            fadeInProgress = min(max((currentTime - marker.startTime) / fadeInDuration, 0), 1)
+        }
+
+        let fadeOutProgress: Double
+        if fadeOutDuration <= 0.0001 {
+            fadeOutProgress = 1
+        } else {
+            fadeOutProgress = min(max((marker.endTime - currentTime) / fadeOutDuration, 0), 1)
+        }
+
+        let intensity = min(fadeInProgress, fadeOutProgress) * min(max(marker.amount, 0), 1)
+        guard intensity > 0 else { return nil }
+
+        return EffectPreviewState(
+            style: marker.style,
+            region: region,
+            intensity: intensity,
+            cornerRadius: CGFloat(max(marker.cornerRadius, 0)),
+            feather: CGFloat(max(marker.feather, 0))
+        )
+    }
+
+    private func effectPreviewOverlay(
+        effectState: EffectPreviewState,
+        overlayRect: CGRect,
+        fittedRect: CGRect,
+        previewState: ZoomPreviewState?
+    ) -> some View {
+        let overlayColor = effectPreviewOverlayColor(for: effectState)
+        guard overlayColor != .clear else {
+            return AnyView(EmptyView())
+        }
+        let transformedRect = transformedOverlayRect(
+            overlayRect,
+            in: fittedRect,
+            previewState: previewState
+        )
+        let cornerRadii = overflowRegionCornerRadii(
+            for: transformedRect,
+            within: fittedRect,
+            baseRadius: effectState.cornerRadius
+        )
+        let localOverlayRect = CGRect(
+            x: transformedRect.minX - fittedRect.minX,
+            y: transformedRect.minY - fittedRect.minY,
+            width: transformedRect.width,
+            height: transformedRect.height
+        )
+        return AnyView(
+            Rectangle()
+                .fill(overlayColor)
+                .mask {
+                    effectOutsideMask(
+                        localOverlayRect: localOverlayRect,
+                        cornerRadii: cornerRadii,
+                        canvasSize: fittedRect.size,
+                        feather: effectState.feather
+                    )
+                }
+            .frame(width: fittedRect.width, height: fittedRect.height)
+        )
+    }
+
+    private func effectBlurLayer(
+        mainPlayer: AVPlayer,
+        effectState: EffectPreviewState,
+        overlayRect: CGRect,
+        fittedRect: CGRect,
+        previewState: ZoomPreviewState?
+    ) -> some View {
+        let transformedRect = transformedOverlayRect(
+            overlayRect,
+            in: fittedRect,
+            previewState: previewState
+        )
+        let cornerRadii = overflowRegionCornerRadii(
+            for: transformedRect,
+            within: fittedRect,
+            baseRadius: effectState.cornerRadius
+        )
+        let localOverlayRect = CGRect(
+            x: transformedRect.minX - fittedRect.minX,
+            y: transformedRect.minY - fittedRect.minY,
+            width: transformedRect.width,
+            height: transformedRect.height
+        )
+
+        return AnyView(PlaybackVideoLayerSurface(player: mainPlayer)
+            .frame(width: fittedRect.width, height: fittedRect.height)
+            .scaleEffect(previewState?.scale ?? 1, anchor: .topLeading)
+            .offset(zoomPreviewOffset(for: previewState, in: fittedRect))
+            .blur(radius: 28 * effectState.intensity)
+            .mask {
+                effectOutsideMask(
+                    localOverlayRect: localOverlayRect,
+                    cornerRadii: cornerRadii,
+                    canvasSize: fittedRect.size,
+                    feather: effectState.feather
+                )
+            })
+    }
+
+    private func effectOutsideMask(
+        localOverlayRect: CGRect,
+        cornerRadii: RectangleCornerRadii,
+        canvasSize: CGSize,
+        feather: CGFloat
+    ) -> some View {
+        Rectangle()
+            .fill(Color.white)
+            .overlay {
+                UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
+                    .fill(Color.white)
+                    .frame(width: localOverlayRect.width, height: localOverlayRect.height)
+                    .position(x: localOverlayRect.midX, y: localOverlayRect.midY)
+                    .blur(radius: max(feather, 0))
+                    .blendMode(.destinationOut)
+            }
+            .compositingGroup()
+            .frame(width: canvasSize.width, height: canvasSize.height)
+            .clipped()
+    }
+
+    private func effectPreviewOverlayColor(for effectState: EffectPreviewState) -> Color {
+        switch effectState.style {
+        case .darken:
+            return Color.black.opacity(0.72 * effectState.intensity)
+        case .blurDarken:
+            return Color.black.opacity(0.54 * effectState.intensity)
+        case .tint:
+            return accentTint.opacity(0.42 * effectState.intensity)
+        case .blur:
+            return .clear
+        }
+    }
+
+    private func transformedOverlayRect(
+        _ rect: CGRect,
+        in fittedRect: CGRect,
+        previewState: ZoomPreviewState?
+    ) -> CGRect {
+        guard let previewState else { return rect }
+
+        let topLeft = transformedOverlayPoint(
+            CGPoint(x: rect.minX, y: rect.minY),
+            in: fittedRect,
+            previewState: previewState
+        )
+        let bottomRight = transformedOverlayPoint(
+            CGPoint(x: rect.maxX, y: rect.maxY),
+            in: fittedRect,
+            previewState: previewState
+        )
+
+        return CGRect(
+            x: topLeft.x,
+            y: topLeft.y,
+            width: bottomRight.x - topLeft.x,
+            height: bottomRight.y - topLeft.y
+        ).standardized
+    }
+
+
     private func zoomPreviewOffset(for previewState: ZoomPreviewState?, in fittedRect: CGRect) -> CGSize {
         guard let previewState, fittedRect.width > 0, fittedRect.height > 0 else {
             return .zero
@@ -2384,6 +2621,13 @@ private enum MarkerTimingPhase: String {
         .focusable(interactions: .edit)
         .focusEffectDisabled()
         .focused($isTimelineKeyboardFocused)
+        .onKeyPress(.space) {
+            guard viewModel.canUsePlaybackTransport || viewModel.isRenderedPreviewActive || viewModel.playbackPresentationMode == .previewCompletedSlate else {
+                return .ignored
+            }
+            viewModel.togglePlayback()
+            return .handled
+        }
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { keyPress in
             if editorMode == .effects,
                let selectedMarker = viewModel.selectedEffectMarker,
@@ -2408,6 +2652,20 @@ private enum MarkerTimingPhase: String {
                     return .handled
                 }
                 return .ignored
+            }
+
+            if editorMode == .effects {
+                guard viewModel.selectedEffectMarkerID != nil else { return .ignored }
+                switch keyPress.key {
+                case .leftArrow:
+                    viewModel.nudgeSelectedEffectTimelineMarker(by: -1)
+                    return .handled
+                case .rightArrow:
+                    viewModel.nudgeSelectedEffectTimelineMarker(by: 1)
+                    return .handled
+                default:
+                    return .ignored
+                }
             }
 
             guard editorMode == .zoomAndClicks else { return .ignored }
@@ -3877,7 +4135,7 @@ private enum MarkerTimingPhase: String {
                         selectedMarkerID: viewModel.selectedEffectMarkerID,
                         onSelectMarker: { markerID in
                             guard renamingEffectMarkerID == nil else { return }
-                            viewModel.selectEffectMarker(markerID, seekPlaybackHead: false)
+                            viewModel.startEffectMarkerPreview(markerID)
                         },
                         onToggleMarkerEnabled: viewModel.toggleEffectMarkerEnabled(_:),
                         onReorderMarkers: viewModel.reorderEffectMarkerList(to:),
@@ -4615,6 +4873,13 @@ private enum MarkerTimingPhase: String {
                 VStack(alignment: .leading, spacing: 6) {
                     InspectorSectionHeaderView(title: "Timing")
                     timingSliderRow(
+                        title: "Hold",
+                        value: max(marker.endTime - marker.sourceEventTimestamp, 0.05),
+                        range: 0.05...10,
+                        phase: .hold,
+                        action: viewModel.setSelectedEffectHoldDuration
+                    )
+                    timingSliderRow(
                         title: "Fade In",
                         value: marker.fadeInDuration,
                         range: 0.05...3,
@@ -4657,6 +4922,25 @@ private enum MarkerTimingPhase: String {
                             in: 0...80
                         )
                         Text(String(format: "%.0f", marker.cornerRadius))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 36, alignment: .trailing)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Feather")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Slider(
+                            value: Binding(
+                                get: { marker.feather },
+                                set: { viewModel.setSelectedEffectFeather($0) }
+                            ),
+                            in: 0...60
+                        )
+                        Text(String(format: "%.0f", marker.feather))
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundStyle(.secondary)
                             .frame(width: 36, alignment: .trailing)

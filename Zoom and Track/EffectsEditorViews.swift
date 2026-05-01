@@ -259,7 +259,7 @@ struct EffectListTableView: NSViewRepresentable {
             let entryIDs = parent.entries.map(\.id)
             let selectionID = parent.selectedMarkerID
             let highlightSignature = parent.entries.map {
-                "\($0.id):\($0.isSelected):\($0.isPlaybackHighlighted):\($0.marker.markerName ?? ""):\($0.marker.enabled):\($0.marker.style.rawValue):\($0.marker.amount):\($0.marker.fadeInDuration):\($0.marker.fadeOutDuration):\($0.marker.cornerRadius)"
+                "\($0.id):\($0.isSelected):\($0.isPlaybackHighlighted):\($0.marker.markerName ?? ""):\($0.marker.enabled):\($0.marker.style.rawValue):\($0.marker.amount):\($0.marker.fadeInDuration):\($0.marker.fadeOutDuration):\($0.marker.cornerRadius):\($0.marker.feather)"
             }.joined(separator: "|")
             let renamingMarkerID = parent.renamingMarkerID
 
@@ -399,10 +399,24 @@ private struct EffectListCellContent: View {
                     }
 
                     Label {
+                        Text(String(format: "%.2fs", max(marker.endTime - marker.sourceEventTimestamp, 0.05)))
+                            .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    } icon: {
+                        Image(systemName: "pause.rectangle")
+                    }
+
+                    Label {
                         Text(String(format: "%.0f", marker.cornerRadius))
                             .font(.system(size: 11, weight: .regular, design: .monospaced))
                     } icon: {
                         Image(systemName: "roundedcorners")
+                    }
+
+                    Label {
+                        Text(String(format: "%.0f", marker.feather))
+                            .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    } icon: {
+                        Image(systemName: "drop.degreesign")
                     }
                 }
                 .font(.system(size: 11))

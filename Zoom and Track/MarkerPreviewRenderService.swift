@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import AppKit
 import CoreGraphics
 import CoreImage
 import Foundation
@@ -87,6 +88,7 @@ final class MarkerPreviewRenderService {
         let outputRect = CGRect(origin: .zero, size: outputSize)
         let baseScale = outputSize.width / orientedSize.width
         let markers = summary.zoomMarkers
+        let effectMarkers = summary.effectMarkers
         let contentCoordinateSize = summary.contentCoordinateSize
         logRenderedPreviewDebug(
             marker: selectedMarker,
@@ -119,14 +121,26 @@ final class MarkerPreviewRenderService {
                 outputSize: outputSize,
                 previewState: previewState
             )
-
             if let previewState {
                 let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
                 image = image.transformed(by: CGAffineTransform(scaleX: previewState.scale, y: previewState.scale))
                 image = image.transformed(by: CGAffineTransform(translationX: offset.width, y: offset.height))
             }
 
+            let effectImage = makeEffectOverlay(
+                at: sourceTime,
+                effectMarkers: effectMarkers,
+                contentCoordinateSize: contentCoordinateSize,
+                orientedVideoSize: orientedSize,
+                outputSize: outputSize,
+                previewState: previewState,
+                sourceImage: image.cropped(to: outputRect)
+            )
+
             var outputImage = image.cropped(to: outputRect)
+            if let effectImage {
+                outputImage = effectImage.cropped(to: outputRect)
+            }
             if let pulseImage {
                 outputImage = pulseImage.cropped(to: outputRect).composited(over: outputImage)
             }
@@ -143,6 +157,167 @@ final class MarkerPreviewRenderService {
             throw NSError(
                 domain: "MarkerPreviewRenderService",
                 code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "Could not create an export session."]
+            )
+        }
+
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mov
+        exportSession.shouldOptimizeForNetworkUse = false
+        exportSession.videoComposition = videoComposition
+        exportSession.timeRange = CMTimeRange(start: .zero, duration: sourceTimeRange.duration)
+
+        do {
+            try await export(exportSession, to: outputURL, fileType: .mov)
+        } catch {
+            try? FileManager.default.removeItem(at: outputURL)
+            throw error
+        }
+
+        return RenderedMarkerPreview(
+            outputURL: outputURL,
+            sourceStartTime: sourceStartTime,
+            sourceEndTime: sourceEndTime,
+            deleteWhenFinished: true
+        )
+    }
+
+    func renderEffectPreview(
+        recordingURL: URL,
+        summary: RecordingInspectionSummary,
+        selectedMarker: EffectPlanItem
+    ) async throws -> RenderedMarkerPreview {
+        let asset = AVURLAsset(url: recordingURL)
+        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+        guard let sourceVideoTrack = videoTracks.first else {
+            throw NSError(
+                domain: "MarkerPreviewRenderService",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: "The recording is missing a video track."]
+            )
+        }
+
+        let audioTrack = try await asset.loadTracks(withMediaType: .audio).first
+        let naturalSize = try await sourceVideoTrack.load(.naturalSize)
+        let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+        let nominalFrameRate = try await sourceVideoTrack.load(.nominalFrameRate)
+        let assetDuration = try await asset.load(.duration).seconds
+
+        let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+        let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+        guard orientedSize.width > 0, orientedSize.height > 0 else {
+            throw NSError(
+                domain: "MarkerPreviewRenderService",
+                code: 7,
+                userInfo: [NSLocalizedDescriptionKey: "The recording has an invalid video size."]
+            )
+        }
+
+        let baseOrientationTransform = preferredTransform.concatenating(
+            CGAffineTransform(translationX: -orientedRect.origin.x, y: -orientedRect.origin.y)
+        )
+        let outputSize = cappedRenderSize(for: orientedSize, maxWidth: 1440)
+        let previewBounds = effectPreviewBounds(for: selectedMarker)
+        let sourceStartTime = max(0, previewBounds.startTime - previewPaddingBefore)
+        let sourceEndTime = min(
+            max(previewBounds.endTime + previewPaddingAfter, sourceStartTime + 0.05),
+            max(assetDuration, sourceStartTime + 0.05)
+        )
+        let sourceTimeRange = CMTimeRange(
+            start: CMTime(seconds: sourceStartTime, preferredTimescale: 600),
+            end: CMTime(seconds: sourceEndTime, preferredTimescale: 600)
+        )
+
+        let composition = AVMutableComposition()
+        guard let compositionVideoTrack = composition.addMutableTrack(
+            withMediaType: .video,
+            preferredTrackID: kCMPersistentTrackID_Invalid
+        ) else {
+            throw NSError(
+                domain: "MarkerPreviewRenderService",
+                code: 8,
+                userInfo: [NSLocalizedDescriptionKey: "Could not create a composition video track."]
+            )
+        }
+        try compositionVideoTrack.insertTimeRange(sourceTimeRange, of: sourceVideoTrack, at: .zero)
+
+        if let audioTrack,
+           let compositionAudioTrack = composition.addMutableTrack(
+                withMediaType: .audio,
+                preferredTrackID: kCMPersistentTrackID_Invalid
+           ) {
+            try? compositionAudioTrack.insertTimeRange(sourceTimeRange, of: audioTrack, at: .zero)
+        }
+
+        let frameRate = max(nominalFrameRate.isFinite && nominalFrameRate > 0 ? nominalFrameRate : 30, 30)
+        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(frameRate.rounded()))
+        let outputRect = CGRect(origin: .zero, size: outputSize)
+        let baseScale = outputSize.width / orientedSize.width
+        let markers = summary.zoomMarkers
+        let effectMarkers = summary.effectMarkers
+        let contentCoordinateSize = summary.contentCoordinateSize
+
+        let videoComposition = try await AVVideoComposition.videoComposition(with: composition) { [weak self] request in
+            guard let self else {
+                request.finish(with: NSError(domain: "MarkerPreviewRenderService", code: 9))
+                return
+            }
+
+            let sourceTime = sourceStartTime + request.compositionTime.seconds
+            let previewState = SharedMotionEngine.activeZoomState(
+                at: sourceTime,
+                zoomMarkers: markers,
+                contentCoordinateSize: contentCoordinateSize,
+                coordinateSpace: .bottomLeft
+            )
+
+            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+            image = image.transformed(by: CGAffineTransform(scaleX: baseScale, y: baseScale))
+
+            let pulseImage = makeClickPulseOverlay(
+                at: sourceTime,
+                markers: markers,
+                contentCoordinateSize: contentCoordinateSize,
+                orientedVideoSize: orientedSize,
+                outputSize: outputSize,
+                previewState: previewState
+            )
+            if let previewState {
+                let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
+                image = image.transformed(by: CGAffineTransform(scaleX: previewState.scale, y: previewState.scale))
+                image = image.transformed(by: CGAffineTransform(translationX: offset.width, y: offset.height))
+            }
+
+            let effectImage = makeEffectOverlay(
+                at: sourceTime,
+                effectMarkers: effectMarkers,
+                contentCoordinateSize: contentCoordinateSize,
+                orientedVideoSize: orientedSize,
+                outputSize: outputSize,
+                previewState: previewState,
+                sourceImage: image.cropped(to: outputRect)
+            )
+
+            var outputImage = image.cropped(to: outputRect)
+            if let effectImage {
+                outputImage = effectImage.cropped(to: outputRect)
+            }
+            if let pulseImage {
+                outputImage = pulseImage.cropped(to: outputRect).composited(over: outputImage)
+            }
+            request.finish(with: outputImage, context: self.ciContext)
+        }
+        configureVideoComposition(videoComposition, renderSize: outputSize, frameDuration: frameDuration)
+
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("effect-preview-\(UUID().uuidString)")
+            .appendingPathExtension("mov")
+        try? FileManager.default.removeItem(at: outputURL)
+
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            throw NSError(
+                domain: "MarkerPreviewRenderService",
+                code: 10,
                 userInfo: [NSLocalizedDescriptionKey: "Could not create an export session."]
             )
         }
@@ -190,6 +365,13 @@ final class MarkerPreviewRenderService {
         case .inOnly, .noZoom:
             return (startTime, max(marker.holdUntil, marker.sourceEventTimestamp))
         }
+    }
+
+    private func effectPreviewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
+        (
+            startTime: max(0, marker.startTime),
+            endTime: max(marker.endTime, marker.startTime + 0.05)
+        )
     }
 
     private func activeZoomPreviewState(
@@ -548,6 +730,7 @@ final class ExportRenderService {
         )
         let outputSize = stabilizedRenderSize(for: orientedSize)
         let markers = summary.zoomMarkers.filter(\.enabled)
+        let effectMarkers = summary.effectMarkers
 
         let composition = AVMutableComposition()
         guard let compositionVideoTrack = composition.addMutableTrack(
@@ -608,14 +791,26 @@ final class ExportRenderService {
                 outputSize: outputSize,
                 previewState: previewState
             )
-
             if let previewState {
                 let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
                 image = image.transformed(by: CGAffineTransform(scaleX: previewState.scale, y: previewState.scale))
                 image = image.transformed(by: CGAffineTransform(translationX: offset.width, y: offset.height))
             }
 
+            let effectImage = makeEffectOverlay(
+                at: sourceTime,
+                effectMarkers: effectMarkers,
+                contentCoordinateSize: summary.contentCoordinateSize,
+                orientedVideoSize: orientedSize,
+                outputSize: outputSize,
+                previewState: previewState,
+                sourceImage: image.cropped(to: outputRect)
+            )
+
             var outputImage = image.cropped(to: outputRect)
+            if let effectImage {
+                outputImage = effectImage.cropped(to: outputRect)
+            }
             if let pulseImage {
                 outputImage = pulseImage.cropped(to: outputRect).composited(over: outputImage)
             }
@@ -725,6 +920,14 @@ private enum MotionTuning {
     static let panBounceInfluence = 0.18
 }
 
+private struct EffectRenderState {
+    let style: EffectStyle
+    let region: EffectFocusRegion
+    let intensity: Double
+    let cornerRadius: CGFloat
+    let feather: CGFloat
+}
+
 private func makeClickPulseOverlay(
     at currentTime: Double,
     markers: [ZoomPlanItem],
@@ -780,6 +983,211 @@ private func makeClickPulseOverlay(
 
     guard let cgImage = context.makeImage() else { return nil }
     return CIImage(cgImage: cgImage)
+}
+
+private func makeEffectOverlay(
+    at currentTime: Double,
+    effectMarkers: [EffectPlanItem],
+    contentCoordinateSize: CGSize,
+    orientedVideoSize: CGSize,
+    outputSize: CGSize,
+    previewState: SharedMotionEngine.PreviewState?,
+    sourceImage: CIImage? = nil
+) -> CIImage? {
+    guard let effectState = activeEffectRenderState(at: currentTime, effectMarkers: effectMarkers),
+          contentCoordinateSize.width > 0,
+          contentCoordinateSize.height > 0,
+          outputSize.width > 0,
+          outputSize.height > 0 else {
+        return nil
+    }
+
+    let sourceRect = CGRect(
+        x: (effectState.region.centerX - (effectState.region.width / 2)) * contentCoordinateSize.width,
+        y: (effectState.region.centerY - (effectState.region.height / 2)) * contentCoordinateSize.height,
+        width: effectState.region.width * contentCoordinateSize.width,
+        height: effectState.region.height * contentCoordinateSize.height
+    )
+
+    let topLeft = SharedMotionEngine.resolveOverlayPoint(
+        contentPoint: CGPoint(x: sourceRect.minX, y: sourceRect.minY),
+        contentCoordinateSize: contentCoordinateSize,
+        orientedVideoSize: orientedVideoSize,
+        outputSize: outputSize,
+        previewState: previewState
+    )
+    let bottomRight = SharedMotionEngine.resolveOverlayPoint(
+        contentPoint: CGPoint(x: sourceRect.maxX, y: sourceRect.maxY),
+        contentCoordinateSize: contentCoordinateSize,
+        orientedVideoSize: orientedVideoSize,
+        outputSize: outputSize,
+        previewState: previewState
+    )
+
+    let transformedRect = CGRect(
+        x: topLeft.point.x,
+        y: topLeft.point.y,
+        width: bottomRight.point.x - topLeft.point.x,
+        height: bottomRight.point.y - topLeft.point.y
+    ).standardized
+
+    let outputRect = CGRect(origin: .zero, size: outputSize)
+    let radius = min(effectState.cornerRadius, min(transformedRect.width, transformedRect.height) / 2)
+
+    let maskImage = makeRoundedRectMaskImage(
+        outputSize: outputSize,
+        rect: transformedRect,
+        cornerRadius: radius,
+        feather: effectState.feather
+    )
+
+    var outputImage = sourceImage?.cropped(to: outputRect)
+
+    if effectState.style == .blur || effectState.style == .blurDarken,
+       let sourceImage {
+        let blurRadius = 28 * effectState.intensity
+        let blurredImage = sourceImage
+            .clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: blurRadius])
+            .cropped(to: outputRect)
+        outputImage = sourceImage
+            .cropped(to: outputRect)
+            .applyingFilter(
+                "CIBlendWithMask",
+                parameters: [
+                    kCIInputBackgroundImageKey: blurredImage,
+                    kCIInputMaskImageKey: maskImage
+                ]
+            )
+            .cropped(to: outputRect)
+    }
+
+    let overlayColor = effectOverlayColor(for: effectState)
+    if overlayColor.alphaComponent > 0.001 {
+        let overlayImage = makeOutsideRegionOverlayImage(
+            outputSize: outputSize,
+            maskImage: maskImage,
+            overlayColor: overlayColor
+        )
+        if let outputImage {
+            return overlayImage.composited(over: outputImage).cropped(to: outputRect)
+        }
+        return overlayImage
+    }
+
+    return outputImage
+}
+
+private func activeEffectRenderState(
+    at currentTime: Double,
+    effectMarkers: [EffectPlanItem]
+) -> EffectRenderState? {
+    let eligibleMarkers = effectMarkers
+        .filter { $0.enabled && $0.focusRegion != nil && currentTime >= $0.startTime && currentTime <= $0.endTime }
+        .sorted { lhs, rhs in
+            if lhs.startTime == rhs.startTime {
+                return lhs.sourceEventTimestamp < rhs.sourceEventTimestamp
+            }
+            return lhs.startTime < rhs.startTime
+        }
+
+    guard let marker = eligibleMarkers.last,
+          let region = marker.focusRegion else {
+        return nil
+    }
+
+    let fadeInDuration = max(marker.fadeInDuration, 0)
+    let fadeOutDuration = max(marker.fadeOutDuration, 0)
+    let fadeInProgress = fadeInDuration <= 0.0001
+        ? 1.0
+        : min(max((currentTime - marker.startTime) / fadeInDuration, 0), 1)
+    let fadeOutProgress = fadeOutDuration <= 0.0001
+        ? 1.0
+        : min(max((marker.endTime - currentTime) / fadeOutDuration, 0), 1)
+    let intensity = min(fadeInProgress, fadeOutProgress) * min(max(marker.amount, 0), 1)
+
+    guard intensity > 0 else { return nil }
+
+    return EffectRenderState(
+        style: marker.style,
+        region: region,
+        intensity: intensity,
+        cornerRadius: CGFloat(max(marker.cornerRadius, 0)),
+        feather: CGFloat(max(marker.feather, 0))
+    )
+}
+
+private func effectOverlayColor(for state: EffectRenderState) -> NSColor {
+    switch state.style {
+    case .darken:
+        return NSColor.black.withAlphaComponent(0.72 * state.intensity)
+    case .blurDarken:
+        return NSColor.black.withAlphaComponent(0.54 * state.intensity)
+    case .tint:
+        return NSColor.controlAccentColor.withAlphaComponent(0.42 * state.intensity)
+    case .blur:
+        return .clear
+    }
+}
+
+private func makeRoundedRectMaskImage(
+    outputSize: CGSize,
+    rect: CGRect,
+    cornerRadius: CGFloat,
+    feather: CGFloat
+) -> CIImage {
+    let width = max(Int(outputSize.width.rounded(.up)), 1)
+    let height = max(Int(outputSize.height.rounded(.up)), 1)
+    let context = CGContext(
+        data: nil,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceGray(),
+        bitmapInfo: CGImageAlphaInfo.none.rawValue
+    )!
+    context.setAllowsAntialiasing(true)
+    context.setShouldAntialias(true)
+    context.translateBy(x: 0, y: outputSize.height)
+    context.scaleBy(x: 1, y: -1)
+    context.setFillColor(gray: 0, alpha: 1)
+    context.fill(CGRect(origin: .zero, size: outputSize))
+    context.setFillColor(gray: 1, alpha: 1)
+    context.addPath(CGPath(roundedRect: rect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil))
+    context.fillPath()
+    let image = CIImage(cgImage: context.makeImage()!)
+    guard feather > 0.001 else {
+        return image
+    }
+
+    return image
+        .clampedToExtent()
+        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: feather])
+        .cropped(to: CGRect(origin: .zero, size: outputSize))
+}
+
+private func makeOutsideRegionOverlayImage(
+    outputSize: CGSize,
+    maskImage: CIImage,
+    overlayColor: NSColor
+) -> CIImage {
+    let outputRect = CGRect(origin: .zero, size: outputSize)
+    let overlayImage = CIImage(color: CIColor(cgColor: overlayColor.cgColor)).cropped(to: outputRect)
+    let clearImage = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0)).cropped(to: outputRect)
+    let outsideMask = maskImage
+        .applyingFilter("CIColorInvert")
+        .cropped(to: outputRect)
+
+    return overlayImage
+        .applyingFilter(
+            "CIBlendWithMask",
+            parameters: [
+                kCIInputBackgroundImageKey: clearImage,
+                kCIInputMaskImageKey: outsideMask
+            ]
+        )
+        .cropped(to: outputRect)
 }
 
 private func drawClickPulse(
