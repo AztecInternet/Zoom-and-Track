@@ -40,6 +40,8 @@ struct ContentView: View {
     @State private var isDrawingEffectFocusRegion = false
     @State private var pendingEffectFocusRegion: EffectFocusRegion?
     @State private var effectFocusRegionInteractionBase: EffectFocusRegion?
+    @State private var activeEffectRegionPrecisionPoint: CGPoint?
+    @State private var activeEffectRegionHandle: EffectRegionHandle?
     @State private var activeTimelineMarkerDragID: String?
     @State private var activeTimelineMarkerDragStartTime: Double?
     @State private var librarySearchText = ""
@@ -70,8 +72,12 @@ struct ContentView: View {
 
     private enum EffectRegionHandle: Hashable {
         case topLeading
+        case topCenter
         case topTrailing
+        case centerLeading
+        case centerTrailing
         case bottomLeading
+        case bottomCenter
         case bottomTrailing
     }
 
@@ -572,6 +578,8 @@ private enum MarkerTimingPhase: String {
                         isDrawingEffectFocusRegion = false
                         pendingEffectFocusRegion = nil
                         effectFocusRegionInteractionBase = nil
+                        activeEffectRegionPrecisionPoint = nil
+                        activeEffectRegionHandle = nil
                         activeTimelineMarkerDragID = nil
                         activeTimelineMarkerDragStartTime = nil
                         renamingEffectMarkerID = nil
@@ -1514,6 +1522,11 @@ private enum MarkerTimingPhase: String {
                                                     if effectFocusRegionInteractionBase == nil {
                                                         effectFocusRegionInteractionBase = baseRegion
                                                     }
+                                                    activeEffectRegionHandle = nil
+                                                    activeEffectRegionPrecisionPoint = CGPoint(
+                                                        x: overlayRect.midX + value.translation.width,
+                                                        y: overlayRect.midY + value.translation.height
+                                                    )
                                                     let deltaX = (value.translation.width / max(fittedRect.width, 1)) * contentCoordinateSize.width
                                                     let deltaY = (value.translation.height / max(fittedRect.height, 1)) * contentCoordinateSize.height
                                                     updateEffectFocusRegionAction(
@@ -1527,6 +1540,11 @@ private enum MarkerTimingPhase: String {
                                                 }
                                                 .onEnded { value in
                                                     let baseRegion = effectFocusRegionInteractionBase ?? region
+                                                    activeEffectRegionHandle = nil
+                                                    activeEffectRegionPrecisionPoint = CGPoint(
+                                                        x: overlayRect.midX + value.translation.width,
+                                                        y: overlayRect.midY + value.translation.height
+                                                    )
                                                     let deltaX = (value.translation.width / max(fittedRect.width, 1)) * contentCoordinateSize.width
                                                     let deltaY = (value.translation.height / max(fittedRect.height, 1)) * contentCoordinateSize.height
                                                     updateEffectFocusRegionAction(
@@ -1538,14 +1556,19 @@ private enum MarkerTimingPhase: String {
                                                         )
                                                     )
                                                     effectFocusRegionInteractionBase = nil
+                                                    activeEffectRegionPrecisionPoint = nil
                                                 }
                                         )
 
                                     ForEach(
                                         [
                                             EffectRegionHandle.topLeading,
+                                            .topCenter,
                                             .topTrailing,
+                                            .centerLeading,
+                                            .centerTrailing,
                                             .bottomLeading,
+                                            .bottomCenter,
                                             .bottomTrailing
                                         ],
                                         id: \.self
@@ -1567,14 +1590,17 @@ private enum MarkerTimingPhase: String {
                                                         if effectFocusRegionInteractionBase == nil {
                                                             effectFocusRegionInteractionBase = baseRegion
                                                         }
+                                                        activeEffectRegionHandle = handle
+                                                        activeEffectRegionPrecisionPoint = nil
+                                                        let resizePoint = CGPoint(
+                                                            x: value.location.x + fittedRect.minX,
+                                                            y: value.location.y + fittedRect.minY
+                                                        )
                                                         updateEffectFocusRegionAction(
                                                             resizedEffectFocusRegion(
                                                                 baseRegion,
                                                                 dragging: handle,
-                                                                to: CGPoint(
-                                                                    x: value.location.x + fittedRect.minX,
-                                                                    y: value.location.y + fittedRect.minY
-                                                                ),
+                                                                to: resizePoint,
                                                                 contentCoordinateSize: contentCoordinateSize,
                                                                 in: geometry.size,
                                                                 videoAspectRatio: safeAspectRatio
@@ -1583,20 +1609,24 @@ private enum MarkerTimingPhase: String {
                                                     }
                                                     .onEnded { value in
                                                         let baseRegion = effectFocusRegionInteractionBase ?? region
+                                                        activeEffectRegionHandle = nil
+                                                        activeEffectRegionPrecisionPoint = nil
+                                                        let resizePoint = CGPoint(
+                                                            x: value.location.x + fittedRect.minX,
+                                                            y: value.location.y + fittedRect.minY
+                                                        )
                                                         updateEffectFocusRegionAction(
                                                             resizedEffectFocusRegion(
                                                                 baseRegion,
                                                                 dragging: handle,
-                                                                to: CGPoint(
-                                                                    x: value.location.x + fittedRect.minX,
-                                                                    y: value.location.y + fittedRect.minY
-                                                                ),
+                                                                to: resizePoint,
                                                                 contentCoordinateSize: contentCoordinateSize,
                                                                 in: geometry.size,
                                                                 videoAspectRatio: safeAspectRatio
                                                             )
                                                         )
                                                         effectFocusRegionInteractionBase = nil
+                                                        activeEffectRegionPrecisionPoint = nil
                                                     }
                                             )
                                     }
@@ -1643,6 +1673,8 @@ private enum MarkerTimingPhase: String {
                                             contentCoordinateSize: contentCoordinateSize
                                         )
                                     )
+                                    activeEffectRegionHandle = nil
+                                    activeEffectRegionPrecisionPoint = value.location
                                 }
                                 .onEnded { value in
                                     guard let startSourcePoint = sourcePoint(
@@ -1666,8 +1698,35 @@ private enum MarkerTimingPhase: String {
                                         )
                                     )
                                     effectFocusRegionInteractionBase = nil
+                                    activeEffectRegionHandle = nil
+                                    activeEffectRegionPrecisionPoint = nil
                                 }
                         )
+                }
+
+                if isEffectRegionDrawActive,
+                   let focusPoint = {
+                       if let region = pendingEffectFocusRegion ?? selectedEffectMarker?.focusRegion,
+                          let overlayRect = overlayRect(
+                            for: region,
+                            contentCoordinateSize: contentCoordinateSize,
+                            in: geometry.size,
+                            videoAspectRatio: safeAspectRatio
+                          ),
+                          let activeEffectRegionHandle {
+                           return effectRegionHandlePoint(for: activeEffectRegionHandle, in: overlayRect)
+                       }
+                       return activeEffectRegionPrecisionPoint
+                   }() {
+                    effectRegionPrecisionLoupe(
+                        player: mainPlayer,
+                        fittedRect: fittedRect,
+                        focusPoint: focusPoint
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.top, 22)
+                    .padding(.trailing, 22)
+                    .allowsHitTesting(false)
                 }
             }
 
@@ -2057,6 +2116,8 @@ private enum MarkerTimingPhase: String {
                                 )
                                 isDrawingEffectFocusRegion = false
                                 effectFocusRegionInteractionBase = nil
+                                activeEffectRegionPrecisionPoint = nil
+                                activeEffectRegionHandle = nil
                             } else {
                                 viewModel.cancelPlaybackPreview()
                                 isPlacingClickFocus = false
@@ -2067,6 +2128,8 @@ private enum MarkerTimingPhase: String {
                                 isPlaybackInspectorVisible = true
                                 pendingEffectFocusRegion = selectedMarker.focusRegion
                                 effectFocusRegionInteractionBase = nil
+                                activeEffectRegionPrecisionPoint = nil
+                                activeEffectRegionHandle = nil
                                 isDrawingEffectFocusRegion = true
                                 isTimelineKeyboardFocused = true
                             }
@@ -3496,10 +3559,18 @@ private enum MarkerTimingPhase: String {
         switch handle {
         case .topLeading:
             return CGPoint(x: rect.minX, y: rect.minY)
+        case .topCenter:
+            return CGPoint(x: rect.midX, y: rect.minY)
         case .topTrailing:
             return CGPoint(x: rect.maxX, y: rect.minY)
+        case .centerLeading:
+            return CGPoint(x: rect.minX, y: rect.midY)
+        case .centerTrailing:
+            return CGPoint(x: rect.maxX, y: rect.midY)
         case .bottomLeading:
             return CGPoint(x: rect.minX, y: rect.maxY)
+        case .bottomCenter:
+            return CGPoint(x: rect.midX, y: rect.maxY)
         case .bottomTrailing:
             return CGPoint(x: rect.maxX, y: rect.maxY)
         }
@@ -3524,22 +3595,67 @@ private enum MarkerTimingPhase: String {
 
         let sourceRect = effectFocusSourceRect(for: region, contentCoordinateSize: contentCoordinateSize)
         let anchorPoint: CGPoint
+        let resizedRect: CGRect?
         switch handle {
         case .topLeading:
             anchorPoint = CGPoint(x: sourceRect.maxX, y: sourceRect.maxY)
+            resizedRect = freeformSourceRect(
+                from: anchorPoint,
+                to: currentPoint,
+                contentCoordinateSize: contentCoordinateSize
+            )
+        case .topCenter:
+            anchorPoint = CGPoint(x: sourceRect.midX, y: sourceRect.maxY)
+            resizedRect = freeformSourceRect(
+                from: CGPoint(x: sourceRect.minX, y: currentPoint.y),
+                to: CGPoint(x: sourceRect.maxX, y: anchorPoint.y),
+                contentCoordinateSize: contentCoordinateSize
+            )
         case .topTrailing:
             anchorPoint = CGPoint(x: sourceRect.minX, y: sourceRect.maxY)
+            resizedRect = freeformSourceRect(
+                from: anchorPoint,
+                to: currentPoint,
+                contentCoordinateSize: contentCoordinateSize
+            )
+        case .centerLeading:
+            anchorPoint = CGPoint(x: sourceRect.maxX, y: sourceRect.midY)
+            resizedRect = freeformSourceRect(
+                from: CGPoint(x: currentPoint.x, y: sourceRect.minY),
+                to: CGPoint(x: anchorPoint.x, y: sourceRect.maxY),
+                contentCoordinateSize: contentCoordinateSize
+            )
+        case .centerTrailing:
+            anchorPoint = CGPoint(x: sourceRect.minX, y: sourceRect.midY)
+            resizedRect = freeformSourceRect(
+                from: CGPoint(x: anchorPoint.x, y: sourceRect.minY),
+                to: CGPoint(x: currentPoint.x, y: sourceRect.maxY),
+                contentCoordinateSize: contentCoordinateSize
+            )
         case .bottomLeading:
             anchorPoint = CGPoint(x: sourceRect.maxX, y: sourceRect.minY)
+            resizedRect = freeformSourceRect(
+                from: anchorPoint,
+                to: currentPoint,
+                contentCoordinateSize: contentCoordinateSize
+            )
+        case .bottomCenter:
+            anchorPoint = CGPoint(x: sourceRect.midX, y: sourceRect.minY)
+            resizedRect = freeformSourceRect(
+                from: CGPoint(x: sourceRect.minX, y: anchorPoint.y),
+                to: CGPoint(x: sourceRect.maxX, y: currentPoint.y),
+                contentCoordinateSize: contentCoordinateSize
+            )
         case .bottomTrailing:
             anchorPoint = CGPoint(x: sourceRect.minX, y: sourceRect.minY)
+            resizedRect = freeformSourceRect(
+                from: anchorPoint,
+                to: currentPoint,
+                contentCoordinateSize: contentCoordinateSize
+            )
         }
 
-        guard let resizedRect = freeformSourceRect(
-            from: anchorPoint,
-            to: currentPoint,
-            contentCoordinateSize: contentCoordinateSize
-        ) else {
+        guard let resizedRect else {
             return nil
         }
 
@@ -3561,6 +3677,64 @@ private enum MarkerTimingPhase: String {
             let originY = (containerSize.height - height) / 2
             return CGRect(x: 0, y: originY, width: width, height: height)
         }
+    }
+
+    private func effectRegionPrecisionLoupe(
+        player: AVPlayer,
+        fittedRect: CGRect,
+        focusPoint: CGPoint
+    ) -> some View {
+        let loupeSize = CGSize(width: 190, height: 132)
+        let loupeScale: CGFloat = 2.8
+        let clampedX = min(max(focusPoint.x, fittedRect.minX), fittedRect.maxX)
+        let clampedY = min(max(focusPoint.y, fittedRect.minY), fittedRect.maxY)
+        let localX = clampedX - fittedRect.minX
+        let localY = clampedY - fittedRect.minY
+
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("Precision")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.92))
+
+            PlaybackVideoLayerSurface(player: player)
+                .frame(width: fittedRect.width, height: fittedRect.height)
+                .scaleEffect(loupeScale, anchor: .topLeading)
+                .offset(
+                    x: (-localX * loupeScale) + (loupeSize.width / 2),
+                    y: (-localY * loupeScale) + (loupeSize.height / 2)
+                )
+                .frame(width: loupeSize.width, height: loupeSize.height, alignment: .topLeading)
+                .clipped()
+                .overlay {
+                    Rectangle()
+                        .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                        .frame(width: 22, height: 22)
+                }
+                .overlay {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.85))
+                        .frame(width: 1, height: loupeSize.height)
+                }
+                .overlay {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.85))
+                        .frame(width: loupeSize.width, height: 1)
+                }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.orange, lineWidth: 2)
+            )
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.black.opacity(0.64))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
     }
 
     private func transformedOverlayPoint(
@@ -5376,6 +5550,45 @@ private struct PlaybackVideoSurface: NSViewRepresentable {
         }
         nsView.controlsStyle = .none
         nsView.videoGravity = .resizeAspect
+    }
+}
+
+private struct PlaybackVideoLayerSurface: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> PlayerLayerHostView {
+        let view = PlayerLayerHostView()
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ nsView: PlayerLayerHostView, context: Context) {
+        nsView.player = player
+    }
+}
+
+private final class PlayerLayerHostView: NSView {
+    private let playerLayer = AVPlayerLayer()
+
+    var player: AVPlayer? {
+        get { playerLayer.player }
+        set { playerLayer.player = newValue }
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        playerLayer.videoGravity = .resizeAspect
+        layer?.addSublayer(playerLayer)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layout() {
+        super.layout()
+        playerLayer.frame = bounds
     }
 }
 private struct PrecisionTimeField: NSViewRepresentable {
