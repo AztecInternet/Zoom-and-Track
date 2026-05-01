@@ -259,7 +259,7 @@ struct EffectListTableView: NSViewRepresentable {
             let entryIDs = parent.entries.map(\.id)
             let selectionID = parent.selectedMarkerID
             let highlightSignature = parent.entries.map {
-                "\($0.id):\($0.isSelected):\($0.isPlaybackHighlighted):\($0.marker.markerName ?? ""):\($0.marker.enabled):\($0.marker.style.rawValue):\($0.marker.amount):\($0.marker.fadeInDuration):\($0.marker.fadeOutDuration):\($0.marker.cornerRadius):\($0.marker.feather)"
+                "\($0.id):\($0.isSelected):\($0.isPlaybackHighlighted):\($0.marker.markerName ?? ""):\($0.marker.enabled):\($0.marker.style.rawValue):\($0.marker.amount):\($0.marker.blurAmount):\($0.marker.darkenAmount):\($0.marker.tintAmount):\($0.marker.fadeInDuration):\($0.marker.fadeOutDuration):\($0.marker.cornerRadius):\($0.marker.feather)"
             }.joined(separator: "|")
             let renamingMarkerID = parent.renamingMarkerID
 
@@ -385,7 +385,7 @@ private struct EffectListCellContent: View {
 
                 HStack(spacing: 12) {
                     Label {
-                        Text(String(format: "%.0f%%", marker.amount * 100))
+                        Text(effectAmountSummary(for: marker))
                             .font(.system(size: 11, weight: .regular, design: .monospaced))
                     } icon: {
                         Image(systemName: "dial.medium")
@@ -481,6 +481,19 @@ private struct EffectListCellContent: View {
         let secs = (totalFrames / 30) % 60
         let frames = totalFrames % 30
         return String(format: "%02d:%02d:%02d:%02d", hours, minutes, secs, frames)
+    }
+
+    private func effectAmountSummary(for marker: EffectPlanItem) -> String {
+        switch marker.style {
+        case .blur:
+            return String(format: "B %.0f%%", marker.blurAmount * 100)
+        case .darken:
+            return String(format: "D %.0f%%", marker.darkenAmount * 100)
+        case .tint:
+            return String(format: "T %.0f%%", marker.tintAmount * 100)
+        case .blurDarken:
+            return String(format: "B %.0f%% D %.0f%%", marker.blurAmount * 100, marker.darkenAmount * 100)
+        }
     }
 }
 

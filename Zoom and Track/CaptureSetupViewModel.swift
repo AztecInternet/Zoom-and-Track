@@ -928,9 +928,9 @@ final class CaptureSetupViewModel: ObservableObject {
 
         selectedEffectMarkerID = markerID
         if seekPlaybackHead {
-            seekPlayback(to: marker.sourceEventTimestamp)
+            seekPlayback(to: marker.snapTime)
         } else {
-            currentPlaybackTime = marker.sourceEventTimestamp
+            currentPlaybackTime = marker.snapTime
         }
     }
 
@@ -1091,6 +1091,36 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    func setSelectedEffectBlurAmount(_ amount: Double) {
+        updateSelectedEffectMarker { marker in
+            let clampedAmount = min(max(amount, 0), 1)
+            marker.blurAmount = clampedAmount
+            if marker.style == .blur {
+                marker.amount = clampedAmount
+            }
+        }
+    }
+
+    func setSelectedEffectDarkenAmount(_ amount: Double) {
+        updateSelectedEffectMarker { marker in
+            let clampedAmount = min(max(amount, 0), 1)
+            marker.darkenAmount = clampedAmount
+            if marker.style == .darken {
+                marker.amount = clampedAmount
+            }
+        }
+    }
+
+    func setSelectedEffectTintAmount(_ amount: Double) {
+        updateSelectedEffectMarker { marker in
+            let clampedAmount = min(max(amount, 0), 1)
+            marker.tintAmount = clampedAmount
+            if marker.style == .tint {
+                marker.amount = clampedAmount
+            }
+        }
+    }
+
     func setSelectedEffectFadeInDuration(_ duration: Double) {
         updateSelectedEffectMarker { marker in
             marker.fadeInDuration = min(max(duration, 0.05), 3.0)
@@ -1149,6 +1179,9 @@ final class CaptureSetupViewModel: ObservableObject {
             displayOrder: nextEffectDisplayOrder(from: effectMarkers),
             style: .blurDarken,
             amount: 0.55,
+            blurAmount: 0.55,
+            darkenAmount: 0.55,
+            tintAmount: 0.55,
             cornerRadius: 18,
             feather: 0,
             tintColor: .defaultTint,

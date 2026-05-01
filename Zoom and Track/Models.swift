@@ -500,6 +500,9 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
     var displayOrder: Int?
     var style: EffectStyle
     var amount: Double
+    var blurAmount: Double
+    var darkenAmount: Double
+    var tintAmount: Double
     var cornerRadius: Double
     var feather: Double
     var tintColor: EffectTintColor
@@ -517,6 +520,9 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         case displayOrder
         case style
         case amount
+        case blurAmount
+        case darkenAmount
+        case tintAmount
         case cornerRadius
         case feather
         case tintColor
@@ -535,6 +541,9 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         displayOrder: Int?,
         style: EffectStyle,
         amount: Double,
+        blurAmount: Double,
+        darkenAmount: Double,
+        tintAmount: Double,
         cornerRadius: Double,
         feather: Double,
         tintColor: EffectTintColor,
@@ -551,6 +560,9 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         self.displayOrder = displayOrder
         self.style = style
         self.amount = amount
+        self.blurAmount = blurAmount
+        self.darkenAmount = darkenAmount
+        self.tintAmount = tintAmount
         self.cornerRadius = cornerRadius
         self.feather = feather
         self.tintColor = tintColor
@@ -570,10 +582,22 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
         style = try container.decode(EffectStyle.self, forKey: .style)
         amount = try container.decode(Double.self, forKey: .amount)
+        blurAmount = try container.decodeIfPresent(Double.self, forKey: .blurAmount) ?? amount
+        darkenAmount = try container.decodeIfPresent(Double.self, forKey: .darkenAmount) ?? amount
+        tintAmount = try container.decodeIfPresent(Double.self, forKey: .tintAmount) ?? amount
         cornerRadius = try container.decode(Double.self, forKey: .cornerRadius)
         feather = try container.decodeIfPresent(Double.self, forKey: .feather) ?? 0
         tintColor = try container.decodeIfPresent(EffectTintColor.self, forKey: .tintColor) ?? .defaultTint
         focusRegion = try container.decodeIfPresent(EffectFocusRegion.self, forKey: .focusRegion)
+    }
+
+    var snapTime: Double {
+        let fullyOnStart = min(max(startTime + max(fadeInDuration, 0), startTime), endTime)
+        let fullyOnEnd = max(min(endTime - max(fadeOutDuration, 0), endTime), startTime)
+        if fullyOnEnd > fullyOnStart {
+            return (fullyOnStart + fullyOnEnd) / 2
+        }
+        return (startTime + endTime) / 2
     }
 }
 

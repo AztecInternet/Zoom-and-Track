@@ -923,7 +923,9 @@ private enum MotionTuning {
 private struct EffectRenderState {
     let style: EffectStyle
     let region: EffectFocusRegion
-    let intensity: Double
+    let blurIntensity: Double
+    let darkenIntensity: Double
+    let tintIntensity: Double
     let cornerRadius: CGFloat
     let feather: CGFloat
     let tintColor: NSColor
@@ -1046,7 +1048,7 @@ private func makeEffectOverlay(
 
     if effectState.style == .blur || effectState.style == .blurDarken,
        let sourceImage {
-        let blurRadius = 28 * effectState.intensity
+        let blurRadius = 28 * effectState.blurIntensity
         let blurredImage = sourceImage
             .clampedToExtent()
             .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: blurRadius])
@@ -1105,14 +1107,19 @@ private func activeEffectRenderState(
     let fadeOutProgress = fadeOutDuration <= 0.0001
         ? 1.0
         : min(max((marker.endTime - currentTime) / fadeOutDuration, 0), 1)
-    let intensity = min(fadeInProgress, fadeOutProgress) * min(max(marker.amount, 0), 1)
+    let timingIntensity = min(fadeInProgress, fadeOutProgress)
+    let blurIntensity = timingIntensity * min(max(marker.blurAmount, 0), 1)
+    let darkenIntensity = timingIntensity * min(max(marker.darkenAmount, 0), 1)
+    let tintIntensity = timingIntensity * min(max(marker.tintAmount, 0), 1)
 
-    guard intensity > 0 else { return nil }
+    guard max(blurIntensity, darkenIntensity, tintIntensity) > 0 else { return nil }
 
     return EffectRenderState(
         style: marker.style,
         region: region,
-        intensity: intensity,
+        blurIntensity: blurIntensity,
+        darkenIntensity: darkenIntensity,
+        tintIntensity: tintIntensity,
         cornerRadius: CGFloat(max(marker.cornerRadius, 0)),
         feather: CGFloat(max(marker.feather, 0)),
         tintColor: NSColor(
@@ -1127,11 +1134,11 @@ private func activeEffectRenderState(
 private func effectOverlayColor(for state: EffectRenderState) -> NSColor {
     switch state.style {
     case .darken:
-        return NSColor.black.withAlphaComponent(0.72 * state.intensity)
+        return NSColor.black.withAlphaComponent(state.darkenIntensity)
     case .blurDarken:
-        return NSColor.black.withAlphaComponent(0.54 * state.intensity)
+        return NSColor.black.withAlphaComponent(state.darkenIntensity)
     case .tint:
-        return state.tintColor.withAlphaComponent(0.42 * state.intensity)
+        return state.tintColor.withAlphaComponent(0.42 * state.tintIntensity)
     case .blur:
         return .clear
     }

@@ -73,7 +73,9 @@ struct ContentView: View {
     private struct EffectPreviewState {
         let style: EffectStyle
         let region: EffectFocusRegion
-        let intensity: Double
+        let blurIntensity: Double
+        let darkenIntensity: Double
+        let tintIntensity: Double
         let cornerRadius: CGFloat
         let feather: CGFloat
         let tintColor: Color
@@ -1931,13 +1933,18 @@ private enum MarkerTimingPhase: String {
             fadeOutProgress = min(max((marker.endTime - currentTime) / fadeOutDuration, 0), 1)
         }
 
-        let intensity = min(fadeInProgress, fadeOutProgress) * min(max(marker.amount, 0), 1)
-        guard intensity > 0 else { return nil }
+        let timingIntensity = min(fadeInProgress, fadeOutProgress)
+        let blurIntensity = timingIntensity * min(max(marker.blurAmount, 0), 1)
+        let darkenIntensity = timingIntensity * min(max(marker.darkenAmount, 0), 1)
+        let tintIntensity = timingIntensity * min(max(marker.tintAmount, 0), 1)
+        guard max(blurIntensity, darkenIntensity, tintIntensity) > 0 else { return nil }
 
         return EffectPreviewState(
             style: marker.style,
             region: region,
-            intensity: intensity,
+            blurIntensity: blurIntensity,
+            darkenIntensity: darkenIntensity,
+            tintIntensity: tintIntensity,
             cornerRadius: CGFloat(max(marker.cornerRadius, 0)),
             feather: CGFloat(max(marker.feather, 0)),
             tintColor: color(for: marker.tintColor)
@@ -2013,7 +2020,7 @@ private enum MarkerTimingPhase: String {
             .frame(width: fittedRect.width, height: fittedRect.height)
             .scaleEffect(previewState?.scale ?? 1, anchor: .topLeading)
             .offset(zoomPreviewOffset(for: previewState, in: fittedRect))
-            .blur(radius: 28 * effectState.intensity)
+            .blur(radius: 28 * effectState.blurIntensity)
             .mask {
                 effectOutsideMask(
                     localOverlayRect: localOverlayRect,
@@ -2048,11 +2055,11 @@ private enum MarkerTimingPhase: String {
     private func effectPreviewOverlayColor(for effectState: EffectPreviewState) -> Color {
         switch effectState.style {
         case .darken:
-            return Color.black.opacity(0.72 * effectState.intensity)
+            return Color.black.opacity(effectState.darkenIntensity)
         case .blurDarken:
-            return Color.black.opacity(0.54 * effectState.intensity)
+            return Color.black.opacity(effectState.darkenIntensity)
         case .tint:
-            return effectState.tintColor.opacity(0.42 * effectState.intensity)
+            return effectState.tintColor.opacity(0.42 * effectState.tintIntensity)
         case .blur:
             return .clear
         }
@@ -3214,7 +3221,7 @@ private enum MarkerTimingPhase: String {
                 return $0.startTime < $1.startTime
             }
             .map { marker in
-                let eventRatio = min(max(marker.sourceEventTimestamp / safeDuration, 0), 1)
+                let eventRatio = min(max(marker.snapTime / safeDuration, 0), 1)
                 let startRatio = min(max(marker.startTime / safeDuration, 0), eventRatio)
                 let endRatio = min(max(marker.endTime / safeDuration, eventRatio), 1)
                 let lane = timelineLane(for: startRatio, endRatio: endRatio, laneEndRatios: &laneEndRatios)
@@ -4880,24 +4887,7 @@ private enum MarkerTimingPhase: String {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Amount")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        Slider(
-                            value: Binding(
-                                get: { marker.amount },
-                                set: { viewModel.setSelectedEffectAmount($0) }
-                            ),
-                            in: 0...1
-                        )
-                        Text(String(format: "%.0f%%", marker.amount * 100))
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 44, alignment: .trailing)
-                    }
-                }
+                effectAmountEditorSection(for: marker)
 
                 VStack(alignment: .leading, spacing: 6) {
                     InspectorSectionHeaderView(title: "Timing")
@@ -5034,6 +5024,64 @@ private enum MarkerTimingPhase: String {
                     inspectorFocusedTimingPhase = isEditing ? phase : (inspectorFocusedTimingPhase == phase ? nil : inspectorFocusedTimingPhase)
                 }
             )
+        }
+    }
+
+    @ViewBuilder
+    private func effectAmountEditorSection(for marker: EffectPlanItem) -> some View {
+        switch marker.style {
+        case .blur:
+            effectAmountSliderRow(
+                title: "Blur Amount",
+                value: marker.blurAmount,
+                action: viewModel.setSelectedEffectBlurAmount
+            )
+        case .darken:
+            effectAmountSliderRow(
+                title: "Darken Amount",
+                value: marker.darkenAmount,
+                action: viewModel.setSelectedEffectDarkenAmount
+            )
+        case .tint:
+            effectAmountSliderRow(
+                title: "Tint Amount",
+                value: marker.tintAmount,
+                action: viewModel.setSelectedEffectTintAmount
+            )
+        case .blurDarken:
+            VStack(alignment: .leading, spacing: 10) {
+                effectAmountSliderRow(
+                    title: "Blur Amount",
+                    value: marker.blurAmount,
+                    action: viewModel.setSelectedEffectBlurAmount
+                )
+                effectAmountSliderRow(
+                    title: "Darken Amount",
+                    value: marker.darkenAmount,
+                    action: viewModel.setSelectedEffectDarkenAmount
+                )
+            }
+        }
+    }
+
+    private func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            HStack {
+                Slider(
+                    value: Binding(
+                        get: { value },
+                        set: action
+                    ),
+                    in: 0...1
+                )
+                Text(String(format: "%.0f%%", value * 100))
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, alignment: .trailing)
+            }
         }
     }
 
