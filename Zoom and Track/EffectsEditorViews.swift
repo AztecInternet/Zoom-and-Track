@@ -1,6 +1,80 @@
 import AppKit
 import SwiftUI
 
+func effectTimelineSegmentLayouts(for markers: [EffectPlanItem], duration: Double) -> [EffectTimelineSegmentLayout] {
+    let safeDuration = max(duration, 0.001)
+    let maxLaneCount = 3
+    var laneEndRatios = Array(repeating: -Double.infinity, count: maxLaneCount)
+
+    return markers
+        .sorted {
+            if $0.startTime != $1.startTime {
+                return $0.startTime < $1.startTime
+            }
+            if $0.sourceEventTimestamp != $1.sourceEventTimestamp {
+                return $0.sourceEventTimestamp < $1.sourceEventTimestamp
+            }
+            return $0.id < $1.id
+        }
+        .map { marker in
+            let eventRatio = min(max(marker.snapTime / safeDuration, 0), 1)
+            let startRatio = min(max(marker.startTime / safeDuration, 0), eventRatio)
+            let endRatio = min(max(marker.endTime / safeDuration, eventRatio), 1)
+            let lane = effectTimelineLane(
+                for: startRatio,
+                endRatio: endRatio,
+                preferredLane: preferredEffectTimelineLane(for: marker.id, maxLaneCount: maxLaneCount),
+                laneEndRatios: &laneEndRatios
+            )
+
+            return EffectTimelineSegmentLayout(
+                marker: marker,
+                lane: lane,
+                startRatio: startRatio,
+                eventRatio: eventRatio,
+                endRatio: endRatio
+            )
+        }
+}
+
+private func effectTimelineLane(
+    for startRatio: Double,
+    endRatio: Double,
+    preferredLane: Int,
+    laneEndRatios: inout [Double]
+) -> Int {
+    let lanePadding = 0.008
+
+    if preferredLane >= 0,
+       preferredLane < laneEndRatios.count,
+       startRatio >= laneEndRatios[preferredLane] + lanePadding {
+        laneEndRatios[preferredLane] = endRatio
+        return preferredLane
+    }
+
+    for index in laneEndRatios.indices {
+        if startRatio >= laneEndRatios[index] + lanePadding {
+            laneEndRatios[index] = endRatio
+            return index
+        }
+    }
+
+    if let bestIndex = laneEndRatios.enumerated().min(by: { $0.element < $1.element })?.offset {
+        laneEndRatios[bestIndex] = endRatio
+        return bestIndex
+    }
+
+    return 0
+}
+
+private func preferredEffectTimelineLane(for markerID: String, maxLaneCount: Int) -> Int {
+    guard maxLaneCount > 0 else { return 0 }
+    let checksum = markerID.unicodeScalars.reduce(into: 0) { partialResult, scalar in
+        partialResult = (partialResult &* 31 &+ Int(scalar.value)) & 0x7fffffff
+    }
+    return checksum % maxLaneCount
+}
+
 struct EffectTimelineSegmentLayout: Identifiable {
     let marker: EffectPlanItem
     let lane: Int
@@ -16,8 +90,10 @@ struct EffectTimelineSegmentView: View {
     let width: CGFloat
     let verticalOrigin: CGFloat
     let isSelected: Bool
+    let isHovered: Bool
     let isEnabled: Bool
     let isPlaybackHighlighted: Bool
+    let onHoverChanged: (Bool, CGPoint?) -> Void
     let onSelect: () -> Void
 
     var body: some View {
@@ -32,28 +108,206 @@ struct EffectTimelineSegmentView: View {
             ? .accentColor
             : (isEnabled ? Color.orange.opacity(0.82) : Color.secondary.opacity(0.35))
         let barColor = isPlaybackHighlighted ? Color.accentColor : baseColor
+        let hoverHighlightColor = (isSelected ? Color.accentColor : baseColor).opacity(isHovered ? (isEnabled ? 0.22 : 0.12) : 0)
+        let hoverTargetHeight: CGFloat = laneHeight
+        let hoverAnchor = CGPoint(x: startX + (barWidth / 2), y: max(laneY - 20, 10))
+        let highlightedBarWidth = barWidth + 10
+        let localMinX = startX
+        let localWidth = max(barWidth, 18)
+        let localCenterX = localMinX + (localWidth / 2)
+        let localCenterY = hoverTargetHeight / 2
+        let localStartX = startX - localMinX
+        let localEventX = eventX - localMinX
+        let localBarCenterX = localStartX + (barWidth / 2)
 
         ZStack(alignment: .leading) {
             Capsule(style: .continuous)
                 .fill(barColor.opacity(isSelected ? 0.88 : 0.62))
                 .frame(width: barWidth, height: laneHeight)
-                .position(x: startX + (barWidth / 2), y: laneY)
+                .position(x: localBarCenterX, y: localCenterY)
 
             Capsule(style: .continuous)
                 .fill(barColor.opacity(isSelected ? 1 : 0.82))
                 .frame(width: isSelected ? 8 : 6, height: isSelected ? 18 : 14)
-                .position(x: eventX, y: laneY)
+                .position(x: localEventX, y: localCenterY)
 
             if isSelected {
                 Capsule(style: .continuous)
                     .stroke(Color.accentColor.opacity(0.35), lineWidth: 4)
                     .frame(width: 12, height: 22)
-                    .position(x: eventX, y: laneY)
+                    .position(x: localEventX, y: localCenterY)
+            }
+
+            if isHovered {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(hoverHighlightColor, lineWidth: 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(hoverHighlightColor.opacity(0.28))
+                    )
+                    .frame(width: highlightedBarWidth, height: 22)
+                    .position(x: localBarCenterX, y: localCenterY)
+                    .allowsHitTesting(false)
+            }
+
+            Capsule(style: .continuous)
+                .fill(Color.clear)
+                .frame(width: barWidth, height: hoverTargetHeight)
+                .position(x: localBarCenterX, y: localCenterY)
+                .contentShape(Capsule(style: .continuous))
+                .onHover { isHovering in
+                    onHoverChanged(isHovering, isHovering ? hoverAnchor : nil)
+                }
+                .onTapGesture(perform: onSelect)
+        }
+        .frame(width: localWidth, height: hoverTargetHeight)
+        .position(x: localCenterX, y: laneY)
+        .brightness(isHovered ? 0.06 : 0)
+    }
+}
+
+struct EffectsTimelineTrackView: View {
+    let effectLayouts: [EffectTimelineSegmentLayout]
+    let width: CGFloat
+    let verticalOrigin: CGFloat
+    let timelineInteractionSuppressed: Bool
+    let hoveredEffectTimelineMarkerID: String?
+    let selectedEffectMarkerID: String?
+    let hoveredTooltipMarker: EffectPlanItem?
+    let hoveredTooltipMarkerNumber: Int?
+    let hoveredTooltipAnchor: CGPoint?
+    let playbackHighlightProvider: (EffectPlanItem) -> Bool
+    let onHoverChanged: (String, Bool, CGPoint?) -> Void
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        ZStack {
+            ForEach(effectLayouts) { layout in
+                EffectTimelineSegmentView(
+                    layout: layout,
+                    width: width,
+                    verticalOrigin: verticalOrigin,
+                    isSelected: selectedEffectMarkerID == layout.marker.id,
+                    isHovered: !timelineInteractionSuppressed && hoveredEffectTimelineMarkerID == layout.marker.id,
+                    isEnabled: layout.marker.enabled,
+                    isPlaybackHighlighted: playbackHighlightProvider(layout.marker),
+                    onHoverChanged: { isHovering, anchor in
+                        onHoverChanged(layout.marker.id, isHovering, anchor)
+                    },
+                    onSelect: {
+                        onSelect(layout.marker.id)
+                    }
+                )
+            }
+
+            if effectLayouts.isEmpty {
+                Text("Effects bars will appear here")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
+            if !timelineInteractionSuppressed,
+               let hoveredTooltipMarker,
+               let hoveredTooltipMarkerNumber,
+               let hoveredTooltipAnchor {
+                effectTimelineTooltipOverlay(
+                    markerID: hoveredTooltipMarker.id,
+                    markerNumber: hoveredTooltipMarkerNumber,
+                    marker: hoveredTooltipMarker,
+                    hoveredEffectTimelineMarkerID: hoveredEffectTimelineMarkerID,
+                    anchor: hoveredTooltipAnchor,
+                    width: width
+                )
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onSelect)
     }
+}
+
+private func effectTimelineTooltipOverlay(
+    markerID: String,
+    markerNumber: Int,
+    marker: EffectPlanItem,
+    hoveredEffectTimelineMarkerID: String?,
+    anchor: CGPoint,
+    width: CGFloat
+) -> some View {
+    let tooltipWidth: CGFloat = 240
+    let tooltipHalfWidth = tooltipWidth / 2
+    let tooltipX = min(max(anchor.x, tooltipHalfWidth), max(width - tooltipHalfWidth, tooltipHalfWidth))
+    let tooltipY: CGFloat = -120
+
+    return VStack(alignment: .leading, spacing: 4) {
+        Text(marker.markerName?.isEmpty == false ? (marker.markerName ?? "Unnamed Effect") : "Unnamed Effect #\(markerNumber)")
+            .font(.system(size: 11, weight: .semibold))
+        Text(timecodeString(for: marker.snapTime))
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(.secondary)
+        Text(marker.style.displayName)
+            .font(.system(size: 11))
+        Text(effectTooltipAmountSummary(for: marker))
+            .font(.system(size: 11))
+        Text("Fade In \(String(format: "%.2fs", marker.fadeInDuration))")
+            .font(.system(size: 11))
+        Text("Fade Out \(String(format: "%.2fs", marker.fadeOutDuration))")
+            .font(.system(size: 11))
+        Text("Hold \(String(format: "%.2fs", max(marker.endTime - marker.sourceEventTimestamp, 0.05)))")
+            .font(.system(size: 11))
+        Text(marker.enabled ? "Enabled" : "Disabled")
+            .font(.system(size: 11))
+            .foregroundStyle(marker.enabled ? .primary : .secondary)
+        Divider()
+        Text("hoveredEffectTimelineMarkerID: \(hoveredEffectTimelineMarkerID ?? "nil")")
+            .font(.system(size: 10, design: .monospaced))
+            .foregroundStyle(.secondary)
+        Text("displayed marker id: \(markerID)")
+            .font(.system(size: 10, design: .monospaced))
+            .foregroundStyle(.secondary)
+        Text("displayed marker number: \(markerNumber)")
+            .font(.system(size: 10, design: .monospaced))
+            .foregroundStyle(.secondary)
+    }
+    .padding(.horizontal, 10)
+    .padding(.vertical, 8)
+    .fixedSize()
+    .frame(width: tooltipWidth, alignment: .leading)
+    .background(
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(0.97))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
+            )
+    )
+    .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 3)
+    .position(
+        x: tooltipX,
+        y: tooltipY
+    )
+    .allowsHitTesting(false)
+}
+
+private func effectTooltipAmountSummary(for marker: EffectPlanItem) -> String {
+    switch marker.style {
+    case .blur:
+        return String(format: "Blur %.0f%%", marker.blurAmount * 100)
+    case .darken:
+        return String(format: "Darken %.0f%%", marker.darkenAmount * 100)
+    case .tint:
+        return String(format: "Tint %.0f%%", marker.tintAmount * 100)
+    case .blurDarken:
+        return String(format: "Blur %.0f%% • Darken %.0f%%", marker.blurAmount * 100, marker.darkenAmount * 100)
+    }
+}
+
+private func timecodeString(for seconds: Double) -> String {
+    let safeSeconds = max(seconds, 0)
+    let totalCentiseconds = Int((safeSeconds * 100).rounded())
+    let hours = totalCentiseconds / 360000
+    let minutes = (totalCentiseconds / 6000) % 60
+    let secs = (totalCentiseconds / 100) % 60
+    let centiseconds = totalCentiseconds % 100
+    return String(format: "%02d:%02d:%02d:%02d", hours, minutes, secs, centiseconds)
 }
 
 struct EffectListEntry: Identifiable {

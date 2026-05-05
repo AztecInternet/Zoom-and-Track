@@ -67,8 +67,14 @@ struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Inspector")
-                .font(.system(size: 16, weight: .semibold))
+            if editorMode == .effects {
+                Text("Effects Inspector")
+                    .font(.system(size: 16, weight: .semibold))
+            } else {
+                Text("Zoom & Clicks Inspector")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+                
 
             if editorMode == .effects {
                 effectsContent

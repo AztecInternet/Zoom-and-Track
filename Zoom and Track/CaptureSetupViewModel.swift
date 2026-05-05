@@ -2284,6 +2284,10 @@ final class CaptureSetupViewModel: ObservableObject {
             return
         }
 
+        if let manualSelectionSuppressionUntil, Date() < manualSelectionSuppressionUntil {
+            return
+        }
+
         let eligibleMarkers = summary.effectMarkers.filter { $0.enabled }
         let markers = (eligibleMarkers.isEmpty ? summary.effectMarkers : eligibleMarkers)
             .sorted { lhs, rhs in
