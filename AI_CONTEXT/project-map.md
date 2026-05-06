@@ -1,28 +1,130 @@
 # Project Map
 
-Generated: 2026-05-06 17:58:47
+Generated: 2026-05-06 20:33:30
 
 ## Swift Files
 
-### Zoom and Track/CaptureInfoInspectorViews.swift
-- Lines: 292
+### App/ContentView.swift
+- Lines: 867
+- Imports:
+- import AppKit
+- import AVFoundation
+- import AVKit
+- import SwiftUI
+- import UniformTypeIdentifiers
+- Types:
+- Line 12:struct ContentView: View {
+- Line 61:    struct OverlayMapping {
+- Line 70:    struct ZoomPreviewState {
+- Line 75:    struct EffectPreviewState {
+- Line 86:    enum EffectRegionHandle: Hashable {
+- Line 97:    struct ZoomStateEvent {
+- Line 103:    enum MotionDirection {
+- Line 108:    struct MotionProgressSample {
+- Line 150:    enum CaptureInfoField: Hashable {
+- Line 156:    enum MotionTuning {
+- Line 164:    struct LibraryFilterOption: Identifiable {
+- Line 838:enum AppTab: String, CaseIterable, Identifiable {
+- Line 860:struct MarkerListEntry: Identifiable {
+- Functions / Vars:
+- Line 117:        var time: Double {
+- Line 124:        var zoomMarkerID: String? {
+- Line 133:        var effectMarkerID: String? {
+- Line 142:        var distance: CGFloat {
+- Line 168:        var id: String { label }
+- Line 171:    var body: some View {
+- Line 188:    private var sidebar: some View {
+- Line 208:    private var sidebarBrandHeader: some View {
+- Line 215:    private func sidebarTabRow(_ tab: AppTab) -> some View {
+- Line 242:    private var detailContent: some View {
+- Line 260:    private var reviewView: some View {
+- Line 426:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
+- Line 443:    private var exportProgressSheet: some View {
+- Line 494:    private var exportSheetTitle: String {
+- Line 513:    private var progressValueForDisplay: Double {
+- Line 525:    private func presentExportSharePicker() {
+- Line 542:    func mappedOverlayPoint(
+- Line 581:    func infoRow(title: String, value: String) -> some View {
+- Line 592:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
+- Line 604:    var cardBackground: some View {
+- Line 613:    private var detailBackground: some View {
+- Line 626:    private var accentTint: Color {
+- Line 631:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
+- Line 647:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
+- Line 654:    func clearTimelineHover() {
+- Line 663:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
+- Line 668:    func clearEffectTimelineHover() {
+- Line 673:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
+- Line 683:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
+- Line 692:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
+- Line 707:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
+- Line 719:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
+- Line 723:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
+- Line 744:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
+- Line 758:    private func timelinePhase(for marker: ZoomPlanItem, at currentTime: Double) -> MarkerTimingPhase? {
+- Line 803:    private func timelineMarkerTooltip(for marker: ZoomPlanItem, markerNumber: Int, isEnabled: Bool) -> String {
+- Line 819:    func makeNSView(context: Context) -> NSView {
+- Line 827:    func updateNSView(_ nsView: NSView, context: Context) {
+- Line 844:    var id: String { rawValue }
+- Line 846:    var systemImage: String {
+- Line 866:    var id: String { marker.id }
+- SwiftUI State / Bindings:
+- Line 13:    @Environment(\.colorScheme) var colorScheme
+- Line 14:    @StateObject var viewModel = CaptureSetupViewModel()
+- Line 15:    @State var selectedTab: AppTab? = .capture
+- Line 16:    @State private var playbackVideoHeightOverride: CGFloat?
+- Line 17:    @State var playbackVideoHeightDragOrigin: CGFloat?
+- Line 18:    @State var isPlaybackInspectorVisible = true
+- Line 19:    @State private var isPlaybackInfoPresented = false
+- Line 20:    @State private var playbackScrubTime = 0.0
+- Line 21:    @State private var isScrubbingPlayback = false
+- Line 22:    @State var suppressMarkerListAutoScrollUntil: Date?
+- Line 23:    @State private var draggedMarkerListID: String?
+- Line 24:    @State private var markerListDropTargetID: String?
+- Line 25:    @State private var markerListPreviewOrder: [String]?
+- Line 26:    @State var renamingMarkerID: String?
+- Line 27:    @State var markerNameDraft: String = ""
+- Line 28:    @State var renamingEffectMarkerID: String?
+- Line 29:    @State var effectMarkerNameDraft: String = ""
+- Line 30:    @State var hoveredTimelineMarkerID: String?
+- Line 31:    @State var hoveredEffectTimelineMarkerID: String?
+- Line 32:    @State var isDraggingTimeline = false
+- Line 33:    @State var inspectorFocusedTimingPhase: MarkerTimingPhase?
+- Line 34:    @State var hoveredTimelinePhase: MarkerTimingPhase?
+- Line 35:    @State var hoveredTimelineTooltipAnchor: CGPoint?
+- Line 36:    @State var hoveredEffectTimelineTooltipAnchor: CGPoint?
+- Line 37:    @State private var exportShareAnchorView: NSView?
+- Line 38:    @State var isPlacingClickFocus = false
+- Line 39:    @State var pendingMarkerDragSourcePoint: CGPoint?
+- Line 40:    @State var isDrawingNoZoomOverflowRegion = false
+- Line 41:    @State var pendingNoZoomOverflowRegion: NoZoomOverflowRegion?
+- Line 42:    @State var isDrawingEffectFocusRegion = false
+- Line 43:    @State var pendingEffectFocusRegion: EffectFocusRegion?
+- Line 44:    @State var effectFocusRegionInteractionBase: EffectFocusRegion?
+- Line 45:    @State var activeEffectRegionPrecisionPoint: CGPoint?
+- Line 46:    @State var activeEffectRegionHandle: EffectRegionHandle?
+- Line 47:    @State var activeTimelineMarkerDragID: String?
+- Line 48:    @State var activeTimelineMarkerDragStartTime: Double?
+- Line 49:    @State var librarySearchText = ""
+- Line 50:    @State var editorMode: ReviewEditorMode = .zoomAndClicks
+- Line 51:    @State var inspectorMode: EditInspectorMode = .markers
+- Line 52:    @State var selectedLibraryCollectionFilter: String?
+- Line 53:    @State var selectedLibraryProjectFilter: String?
+- Line 54:    @State var selectedLibraryTypeFilter: CaptureType?
+- Line 55:    @State var captureInfoTitleDraft = ""
+- Line 56:    @State var captureInfoCollectionDraft = ""
+- Line 57:    @State var captureInfoProjectDraft = ""
+
+### App/TutorialCaptureApp.swift
+- Lines: 15
 - Imports:
 - import SwiftUI
 - Types:
-- Line 3:extension ContentView {
+- Line 9:struct TutorialCaptureApp: App {
 - Functions / Vars:
-- Line 4:    func captureInfoInspector(_ summary: RecordingInspectionSummary) -> some View {
-- Line 145:    func syncCaptureInfoDrafts(from summary: RecordingInspectionSummary, force: Bool = false) {
-- Line 157:    var collectionAutocompleteSuggestions: [String] {
-- Line 166:    var projectAutocompleteSuggestions: [String] {
-- Line 191:        var combined = preferredProjects
-- Line 201:    func autocompleteSuggestions(from values: [String], matching query: String) -> [String] {
-- Line 222:    func selectCollectionSuggestion(_ suggestion: String) {
-- Line 228:    func selectProjectSuggestion(_ suggestion: String) {
-- Line 234:    func autocompleteSuggestionPanel(
-- Line 271:    func captureTypeChips(selectedType: CaptureType) -> some View {
+- Line 10:    var body: some Scene {
 
-### Zoom and Track/CaptureMetadataManager.swift
+### Managers/CaptureMetadataManager.swift
 - Lines: 43
 - Imports:
 - import Foundation
@@ -31,7 +133,446 @@ Generated: 2026-05-06 17:58:47
 - Line 16:    func scheduleSave(
 - Line 39:    func cancelPendingSave() {
 
-### Zoom and Track/CaptureSetupViewModel.swift
+### Managers/CaptureTargetManager.swift
+- Lines: 69
+- Imports:
+- import Foundation
+- Types:
+- Line 8:struct CaptureTargetRefreshResult {
+- Line 16:struct CapturePermissionResult {
+- Line 21:struct CaptureTargetManager {
+- Functions / Vars:
+- Line 33:    func loadTargets(selectedTargetID: String?, silent: Bool) async throws -> CaptureTargetRefreshResult {
+- Line 53:    func requestScreenRecordingPermission() -> CapturePermissionResult {
+- Line 64:    private func defaultTargetStatusMessage(hasScreenRecordingPermission: Bool) -> String {
+
+### Managers/ExportManager.swift
+- Lines: 88
+- Imports:
+- import AppKit
+- import Foundation
+- import UniformTypeIdentifiers
+- Types:
+- Line 7:    enum Outcome {
+- Functions / Vars:
+- Line 14:    private var exportTask: Task<Void, Never>?
+- Line 15:    private var activeExportOperationID = UUID()
+- Line 17:    var hasActiveExport: Bool {
+- Line 21:    func chooseExportDestination(defaultName: String) -> URL? {
+- Line 32:    func exportRecording(
+- Line 77:    func cancelExport() {
+- Line 82:    func reset() {
+
+### Managers/LibraryManager.swift
+- Lines: 14
+- Imports:
+- import Foundation
+- Types:
+- Line 3:struct LibraryManager {
+- Functions / Vars:
+- Line 6:    func loadLibrarySnapshot() async throws -> CaptureLibrarySnapshot {
+- Line 10:    func bundleURL(for item: CaptureLibraryItem) throws -> URL {
+
+### Models/Models.swift
+- Lines: 1504
+- Imports:
+- import CoreGraphics
+- import Foundation
+- Types:
+- Line 9:enum CaptureTargetKind: String, Codable {
+- Line 14:struct ShareableCaptureTarget: Identifiable, Equatable {
+- Line 42:enum RecordingSessionState: Equatable {
+- Line 52:struct CaptureSource: Codable {
+- Line 66:struct ProjectManifest: Codable {
+- Line 152:struct CaptureMetadata: Equatable {
+- Line 174:enum CaptureType: String, Codable, CaseIterable, Identifiable {
+- Line 205:struct CaptureLibraryItem: Codable, Identifiable, Equatable {
+- Line 289:enum CaptureLibraryItemStatus: String, Codable {
+- Line 315:struct CaptureLibraryIndex: Codable {
+- Line 320:struct CaptureLibrarySnapshot {
+- Line 325:struct RecordingWorkspace {
+- Line 333:enum RecordedEventType: String, Codable {
+- Line 341:struct RecordedEvent: Codable {
+- Line 348:struct RecordedEventEnvelope: Codable {
+- Line 354:struct ZoomPlanEnvelope: Codable {
+- Line 383:enum ZoomEaseStyle: String, Codable, CaseIterable, Identifiable {
+- Line 408:enum ZoomType: String, Codable, CaseIterable, Identifiable {
+- Line 430:enum NoZoomFallbackMode: String, Codable, CaseIterable, Identifiable {
+- Line 446:struct NoZoomOverflowRegion: Codable, Equatable {
+- Line 453:enum EffectStyle: String, Codable, CaseIterable, Identifiable {
+- Line 475:struct EffectFocusRegion: Codable, Equatable {
+- Line 482:struct EffectTintColor: Codable, Equatable {
+- Line 491:struct EffectPlanItem: Codable, Identifiable, Equatable {
+- Line 604:enum ZoomMarkerKind: String, Codable {
+- Line 608:enum ClickPulsePreset: String, Codable, CaseIterable, Identifiable {
+- Line 633:struct ClickPulseConfiguration: Codable, Equatable {
+- Line 654:struct ZoomPlanItem: Codable, Identifiable {
+- Line 863:struct RecordingInspectionSummary {
+- Line 899:enum SharedMotionEngine {
+- Line 900:    enum CoordinateSpace {
+- Line 905:    struct PreviewState {
+- Line 910:    struct ClickPulseRenderState {
+- Line 915:    struct OverlayGeometryResolution {
+- Line 921:    struct Timeline {
+- Functions / Vars:
+- Line 31:    var displayTitle: String {
+- Line 136:    func encode(to encoder: Encoder) throws {
+- Line 137:        var container = encoder.container(keyedBy: CodingKeys.self)
+- Line 153:    var collectionName: String
+- Line 154:    var projectName: String
+- Line 155:    var captureType: CaptureType
+- Line 156:    var captureTitle: String
+- Line 158:    var resolvedCollectionName: String {
+- Line 163:    var resolvedProjectName: String {
+- Line 168:    var resolvedCaptureTitle: String {
+- Line 183:    var id: String { rawValue }
+- Line 185:    var displayName: String {
+- Line 244:    var id: UUID { captureID }
+- Line 246:    var isAvailable: Bool {
+- Line 250:    var canOpenInEditor: Bool {
+- Line 297:    var displayName: String {
+- Line 390:    var id: String { rawValue }
+- Line 392:    var displayName: String {
+- Line 414:    var id: String { rawValue }
+- Line 416:    var displayName: String {
+- Line 434:    var id: String { rawValue }
+- Line 436:    var displayName: String {
+- Line 447:    var centerX: Double
+- Line 448:    var centerY: Double
+- Line 449:    var width: Double
+- Line 450:    var height: Double
+- Line 459:    var id: String { rawValue }
+- Line 461:    var displayName: String {
+- Line 476:    var centerX: Double
+- Line 477:    var centerY: Double
+- Line 478:    var width: Double
+- Line 479:    var height: Double
+- Line 483:    var red: Double
+- Line 484:    var green: Double
+- Line 485:    var blue: Double
+- Line 486:    var alpha: Double
+- Line 492:    var id: String
+- Line 493:    var markerName: String?
+- Line 494:    var sourceEventTimestamp: Double
+- Line 495:    var startTime: Double
+- Line 496:    var endTime: Double
+- Line 497:    var fadeInDuration: Double
+- Line 498:    var fadeOutDuration: Double
+- Line 499:    var enabled: Bool
+- Line 500:    var displayOrder: Int?
+- Line 501:    var style: EffectStyle
+- Line 502:    var amount: Double
+- Line 503:    var blurAmount: Double
+- Line 504:    var darkenAmount: Double
+- Line 505:    var tintAmount: Double
+- Line 506:    var cornerRadius: Double
+- Line 507:    var feather: Double
+- Line 508:    var tintColor: EffectTintColor
+- Line 509:    var focusRegion: EffectFocusRegion?
+- Line 594:    var snapTime: Double {
+- Line 615:    var id: String { rawValue }
+- Line 617:    var displayName: String {
+- Line 634:    var preset: ClickPulsePreset
+- Line 638:    var duration: Double {
+- Line 655:    var id: String
+- Line 656:    var type: String
+- Line 657:    var markerName: String?
+- Line 658:    var markerKind: ZoomMarkerKind
+- Line 659:    var sourceEventTimestamp: Double
+- Line 660:    var rawX: Double?
+- Line 661:    var rawY: Double?
+- Line 662:    var centerX: Double
+- Line 663:    var centerY: Double
+- Line 664:    var zoomScale: Double
+- Line 665:    var startTime: Double
+- Line 666:    var holdUntil: Double
+- Line 667:    var endTime: Double
+- Line 668:    var leadInTime: Double
+- Line 669:    var zoomInDuration: Double
+- Line 670:    var holdDuration: Double
+- Line 671:    var zoomOutDuration: Double
+- Line 672:    var enabled: Bool
+- Line 673:    var duration: Double
+- Line 674:    var easeStyle: ZoomEaseStyle
+- Line 675:    var zoomType: ZoomType
+- Line 676:    var bounceAmount: Double
+- Line 677:    var clickPulse: ClickPulseConfiguration?
+- Line 678:    var noZoomFallbackMode: NoZoomFallbackMode
+- Line 679:    var noZoomOverflowRegion: NoZoomOverflowRegion?
+- Line 680:    var displayOrder: Int?
+- Line 810:    var totalSegmentDuration: Double {
+- Line 823:    var isClickFocus: Bool {
+- Line 827:    var isClickPulseEnabled: Bool {
+- Line 831:    static func legacyPhaseTiming(totalDuration: Double) -> (leadInTime: Double, zoomInDuration: Double, holdDuration: Double, zoomOutDuration: Double) {
+- Line 890:    var displayTitle: String {
+- Line 894:    var displaySubtitle: String {
+- Line 947:    static func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 958:    static func zoomTimeline(for marker: ZoomPlanItem) -> Timeline {
+- Line 991:    static func activeZoomState(
+- Line 1008:        var currentState = PreviewState(scale: 1, normalizedPoint: CGPoint(x: 0.5, y: 0.5))
+- Line 1009:        var restingState = currentState
+- Line 1084:    static func previewOffset(for previewState: PreviewState, outputSize: CGSize) -> CGSize {
+- Line 1100:    static func resolveOverlayPoint(
+- Line 1128:        var point = basePoint
+- Line 1156:    static func clickPulseRenderState(
+- Line 1173:    private static func normalizedPoint(
+- Line 1184:    private static func inOutPreviewState(
+- Line 1229:    private static func inOnlyPreviewState(
+- Line 1256:    private static func outOnlyPreviewState(
+- Line 1281:    private static func noZoomPreviewState(
+- Line 1305:    private static func noZoomTargetState(
+- Line 1350:    private static func visibleRect(for state: PreviewState) -> CGRect {
+- Line 1358:    private static func rect(for region: NoZoomOverflowRegion) -> CGRect {
+- Line 1367:    private static func fittedScale(for region: NoZoomOverflowRegion) -> CGFloat {
+- Line 1373:    private static func clampedTargetCenter(target: CGPoint, scale: CGFloat) -> CGPoint {
+- Line 1382:    private static func centeredPanTarget(from state: PreviewState, toward targetPoint: CGPoint) -> CGPoint {
+- Line 1387:        var minX = targetPoint.x - (viewportWidth / 2)
+- Line 1390:        var minY = targetPoint.y - (viewportHeight / 2)
+- Line 1399:    private static func maximumVisibleScale(for targetPoint: CGPoint, anchoredTo state: PreviewState) -> CGFloat {
+- Line 1404:        var low: CGFloat = 1
+- Line 1405:        var high = max(state.scale, 1)
+- Line 1418:    private static func normalizedRegion(
+- Line 1438:    private static func normalizedProgress(_ value: Double, start: Double, end: Double) -> Double {
+- Line 1443:    private static func interpolate(from: CGFloat, to: CGFloat, progress: Double) -> CGFloat {
+- Line 1447:    private static func motionProgress(
+
+### Services/InputEventCaptureService.swift
+- Lines: 141
+- Imports:
+- import AppKit
+- import CoreMedia
+- import Foundation
+- Functions / Vars:
+- Line 21:    private var leftMouseDownMonitor: Any?
+- Line 22:    private var leftMouseUpMonitor: Any?
+- Line 23:    private var rightMouseDownMonitor: Any?
+- Line 24:    private var rightMouseUpMonitor: Any?
+- Line 25:    private var cursorTimer: Timer?
+- Line 27:    private var pendingEvents: [PendingEvent] = []
+- Line 28:    private var lastCursorPosition: CGPoint?
+- Line 29:    private var sessionStartUptime: TimeInterval?
+- Line 31:    func start() {
+- Line 70:    func setSessionStart(videoTimestamp: CMTime, uptime: TimeInterval) {
+- Line 75:    func stop() {
+- Line 89:    func finish() -> [RecordedEvent] {
+- Line 100:    func cancel() {
+- Line 107:    private func recordMouseEvent(type: RecordedEventType, event: NSEvent) {
+- Line 111:    private func recordCursorMoveIfNeeded(at location: CGPoint, uptime: TimeInterval) {
+- Line 117:    private func appendPendingEvent(type: RecordedEventType, location: CGPoint, uptime: TimeInterval) {
+- Line 128:    private func makeRecordedEvent(from pendingEvent: PendingEvent) -> RecordedEvent? {
+
+### Services/MarkerPreviewCacheService.swift
+- Lines: 375
+- Imports:
+- import AVFoundation
+- import CryptoKit
+- import Foundation
+- Functions / Vars:
+- Line 10:    func cachedPreview(
+- Line 34:    func cachedEffectPreview(
+- Line 58:    func storePreview(
+- Line 78:    func storeEffectPreview(
+- Line 98:    func pruneStaleFiles() {
+- Line 123:    private var cacheDirectoryURL: URL {
+- Line 130:    private func ensureCacheDirectoryExists() throws {
+- Line 134:    private func cacheURL(
+- Line 146:    private func effectCacheURL(
+- Line 158:    private func cacheKey(
+- Line 205:    private func effectCacheKey(
+- Line 251:    private func effectCacheSignature(for effectMarkers: [EffectPlanItem]) -> String {
+- Line 286:    private func zoomCacheSignature(for zoomMarkers: [ZoomPlanItem]) -> String {
+- Line 321:    private func renderSize(for recordingURL: URL) async throws -> CGSize {
+- Line 345:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
+- Line 351:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 361:    private func previewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 368:    private func isPlayablePreview(at url: URL) async throws -> Bool {
+
+### Services/MarkerPreviewRenderService.swift
+- Lines: 1029
+- Imports:
+- import AppKit
+- import CoreGraphics
+- import CoreImage
+- import Foundation
+- Types:
+- Line 7:struct RenderedMarkerPreview {
+- Line 406:enum ExportRenderPhase {
+- Line 412:struct ExportRenderResult {
+- Functions / Vars:
+- Line 19:    func renderPreview(
+- Line 113:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+- Line 140:            var outputImage = image.cropped(to: outputRect)
+- Line 185:    func renderEffectPreview(
+- Line 274:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+- Line 301:            var outputImage = image.cropped(to: outputRect)
+- Line 346:    private func export(
+- Line 354:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
+- Line 360:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 370:    private func effectPreviewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 377:    private func normalizedRenderY(for marker: ZoomPlanItem, contentCoordinateSize: CGSize) -> CGFloat {
+- Line 382:    private func logRenderedPreviewDebug(
+- Line 420:    private var activeExportSession: AVAssetExportSession?
+- Line 422:    func cancelExport() {
+- Line 426:    func exportRecording(
+- Line 515:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+- Line 542:            var outputImage = image.cropped(to: outputRect)
+- Line 590:    private func export(
+- Line 612:    private func stabilizedRenderSize(for sourceSize: CGSize) -> CGSize {
+- Line 636:private func makeClickPulseOverlay(
+- Line 693:private func makeEffectOverlay(
+- Line 749:    var outputImage = sourceImage?.cropped(to: outputRect)
+- Line 786:private func activeEffectRenderState(
+- Line 836:private func effectOverlayColor(for state: EffectRenderState) -> NSColor {
+- Line 849:private func makeRoundedRectMaskImage(
+- Line 886:private func makeOutsideRegionOverlayImage(
+- Line 909:private func drawClickPulse(
+- Line 993:private func strokeCircle(
+- Line 1008:private func fillCircle(
+- Line 1021:private func configureVideoComposition(
+
+### Services/MediaWriterService.swift
+- Lines: 111
+- Imports:
+- import CoreMedia
+- import ScreenCaptureKit
+- Functions / Vars:
+- Line 11:    private var writer: AVAssetWriter?
+- Line 12:    private var writerInput: AVAssetWriterInput?
+- Line 13:    private var adaptor: AVAssetWriterInputPixelBufferAdaptor?
+- Line 14:    private var didStartSession = false
+- Line 16:    var onSessionStart: ((CMTime, TimeInterval) -> Void)?
+- Line 18:    func startWriting(to url: URL, width: Int, height: Int) throws {
+- Line 55:    func append(sampleBuffer: CMSampleBuffer) throws {
+- Line 78:    func finishWriting() async throws {
+- Line 88:    func cancelWriting() {
+- Line 99:    private func isCompleteFrame(_ sampleBuffer: CMSampleBuffer) -> Bool {
+
+### Services/PermissionsService.swift
+- Lines: 17
+- Imports:
+- import CoreGraphics
+- import Foundation
+- Types:
+- Line 9:struct PermissionsService {
+- Functions / Vars:
+- Line 10:    func hasScreenRecordingPermission() -> Bool {
+- Line 14:    func requestScreenRecordingPermission() -> Bool {
+
+### Services/ProjectBundleService.swift
+- Lines: 987
+- Imports:
+- import AppKit
+- import AVFoundation
+- import CoreGraphics
+- import Foundation
+- Types:
+- Line 11:struct ProjectBundleService {
+- Line 19:    enum OutputDirectoryResolution {
+- Line 25:    enum RecordingBundleResolution {
+- Functions / Vars:
+- Line 31:    func createWorkspace(outputDirectory: URL? = nil, captureMetadata: CaptureMetadata) throws -> RecordingWorkspace {
+- Line 89:    func finalizeWorkspace(_ workspace: RecordingWorkspace, manifest: ProjectManifest, events: [RecordedEvent]) throws -> URL {
+- Line 123:    func cleanupWorkspace(_ workspace: RecordingWorkspace?) {
+- Line 132:    func chooseOutputDirectory() -> URL? {
+- Line 152:    func resolvedSelectedOutputDirectory() -> URL? {
+- Line 161:    func resolveSelectedOutputDirectory() -> OutputDirectoryResolution {
+- Line 166:        var isStale = false
+- Line 196:    func openRecordingBundle() -> URL? {
+- Line 215:    func loadRecordingInspection(from bundleURL: URL) async throws -> RecordingInspectionSummary {
+- Line 279:    func persistLastRecordingBundle(_ url: URL) -> Bool {
+- Line 287:    func resolveLastRecordingBundle() -> RecordingBundleResolution {
+- Line 309:    func beginPlaybackAccess(for bundleURL: URL) throws -> URL? {
+- Line 329:    func endPlaybackAccess(_ url: URL?) {
+- Line 333:    func saveZoomPlan(_ zoomPlan: ZoomPlanEnvelope, in bundleURL: URL) throws {
+- Line 344:    func updateCaptureMetadata(
+- Line 380:    func libraryRootURL() throws -> URL {
+- Line 387:    func loadLibrarySnapshot() async throws -> CaptureLibrarySnapshot {
+- Line 395:        var notices: [String] = []
+- Line 419:    func registerCaptureInLibrary(_ summary: RecordingInspectionSummary) throws {
+- Line 442:        var items: [CaptureLibraryItem] = []
+- Line 451:    private func moviesDirectory() throws -> URL {
+- Line 458:    private func defaultLibraryRootURL() throws -> URL {
+- Line 462:    private func libraryCapturesDirectory(libraryRoot: URL, collectionName: String, projectName: String) throws -> URL {
+- Line 472:    private func uniqueProjectURL(baseDirectory: URL, projectName: String) -> URL {
+- Line 473:        var candidate = baseDirectory.appendingPathComponent("\(projectName).captureproj", isDirectory: true)
+- Line 474:        var suffix = 2
+- Line 484:    private func sanitizedProjectName(from title: String) -> String {
+- Line 496:    private func relativeBundlePath(for bundleURL: URL, libraryRoot: URL) -> String {
+- Line 505:    private func persistLibraryIndex(_ items: [CaptureLibraryItem], libraryRoot: URL) throws {
+- Line 512:    private func validateIndexedItems(
+- Line 517:        var validatedItems: [CaptureLibraryItem] = []
+- Line 518:        var removedCount = 0
+- Line 538:    private func mergeLibraryItems(
+- Line 543:        var mergedByPath = Dictionary(uniqueKeysWithValues: indexItems.map { ($0.bundleRelativePath, $0) })
+- Line 544:        var restoredCount = 0
+- Line 561:    private func scanLibraryItems(libraryRoot: URL) async throws -> [CaptureLibraryItem] {
+- Line 573:        var items: [CaptureLibraryItem] = []
+- Line 582:    private func loadManifest(from bundleURL: URL) throws -> ProjectManifest {
+- Line 588:    private func resolveManifestURL(in bundleURL: URL) throws -> URL {
+- Line 602:    private func validatedLibraryItem(
+- Line 677:    private func libraryItem(
+- Line 700:    private func fallbackLibraryItem(
+- Line 737:    private func loadRecordingDuration(for bundleURL: URL, recordingFileName: String) async throws -> Double? {
+- Line 744:    private func removeIfExists(_ url: URL) throws {
+- Line 749:    private func loadEventsEnvelope(from url: URL) -> RecordedEventEnvelope {
+- Line 758:    private func loadOrCreateZoomPlan(from url: URL, events: [RecordedEvent], captureSource: CaptureSource) throws -> ZoomPlanEnvelope {
+- Line 771:    private func generateZoomPlan(from events: [RecordedEvent], captureSource: CaptureSource) -> ZoomPlanEnvelope {
+- Line 773:        var zoomItems: [ZoomPlanItem] = []
+- Line 774:        var lastIncludedTimestamp: Double?
+- Line 828:    private func normalizeToVideoCoordinates(event: RecordedEvent, captureSource: CaptureSource) -> CGPoint {
+- Line 852:    private func loadVideoAspectRatio(from asset: AVURLAsset) async throws -> CGFloat {
+- Line 861:    private func loadVideoPixelSize(from asset: AVURLAsset) async throws -> CGSize {
+- Line 880:    private func persistOutputDirectory(_ url: URL) -> Bool {
+- Line 884:    private func persistSecurityScopedURL(_ url: URL, key: String) -> Bool {
+- Line 894:    private func resolveSecurityScopedURL(forKey key: String, invalidMessage: String) -> RecordingBundleResolution {
+- Line 899:        var isStale = false
+- Line 923:    private func defaultOutputDirectorySuggestion() -> URL? {
+- Line 927:    private func stopScopedAccess(for url: URL?) {
+- Line 931:    private func withScopedAccess<T>(to url: URL, required: Bool, operation: () throws -> T) throws -> T {
+
+### Services/RecordingCoordinator.swift
+- Lines: 190
+- Imports:
+- import Foundation
+- Functions / Vars:
+- Line 10:    var onStateChange: ((RecordingSessionState, String) -> Void)?
+- Line 11:    var onSummaryAvailable: ((RecordingInspectionSummary) -> Void)?
+- Line 12:    var onPlaybackLoadFailure: ((String) -> Void)?
+- Line 19:    private var workspace: RecordingWorkspace?
+- Line 20:    private var currentTarget: ShareableCaptureTarget?
+- Line 21:    private var currentCaptureMetadata: CaptureMetadata?
+- Line 22:    private var isStopping = false
+- Line 36:    func startRecording(target: ShareableCaptureTarget, outputDirectory: URL?, captureMetadata: CaptureMetadata) async {
+- Line 85:    func stopRecording() async {
+- Line 106:    private func finalizeProject() async throws -> URL {
+- Line 153:    private func handleStreamError(_ error: Error) async {
+- Line 164:    private func handleFailure(_ error: Error, overrideMessage: String? = nil) async {
+- Line 179:    private func reset() {
+- Line 187:    private func update(_ state: RecordingSessionState, message: String) {
+
+### Services/ScreenCaptureService.swift
+- Lines: 191
+- Imports:
+- import AppKit
+- import CoreMedia
+- import ScreenCaptureKit
+- Types:
+- Line 182:extension ScreenCaptureService: SCStreamOutput, SCStreamDelegate {
+- Functions / Vars:
+- Line 20:    private var stream: SCStream?
+- Line 21:    private var onSampleBuffer: ((CMSampleBuffer) -> Void)?
+- Line 22:    private var onStreamStop: ((Error?) -> Void)?
+- Line 24:    func fetchTargets() async throws -> (displays: [ShareableCaptureTarget], windows: [ShareableCaptureTarget]) {
+- Line 108:    func startCapture(
+- Line 133:    func stopCapture() async throws {
+- Line 141:    private func makeFilter(for target: ShareableCaptureTarget, content: SCShareableContent) throws -> SCContentFilter {
+- Line 157:    private func shouldIncludeDisplayTarget(named title: String) -> Bool {
+- Line 162:    private func shouldIncludeWindowTarget(named title: String, ownerName: String?) -> Bool {
+- Line 177:    private func normalizedTargetName(_ title: String) -> String {
+- Line 183:    func stream(_ stream: SCStream, didStopWithError error: any Error) {
+- Line 187:    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
+
+### ViewModels/CaptureSetupViewModel.swift
 - Lines: 2283
 - Imports:
 - import Combine
@@ -197,7 +738,7 @@ Generated: 2026-05-06 17:58:47
 - Line 82:    @Published private(set) var exportedRecordingURL: URL?
 - Line 83:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
 
-### Zoom and Track/CaptureSetupViews.swift
+### Views/Capture/CaptureSetupViews.swift
 - Lines: 287
 - Imports:
 - import SwiftUI
@@ -211,133 +752,55 @@ Generated: 2026-05-06 17:58:47
 - Line 223:    func targetSection(title: String, targets: [ShareableCaptureTarget]) -> some View {
 - Line 241:    func targetRow(_ target: ShareableCaptureTarget) -> some View {
 
-### Zoom and Track/CaptureTargetManager.swift
-- Lines: 69
+### Views/Library/LibraryViews.swift
+- Lines: 479
 - Imports:
-- import Foundation
-- Types:
-- Line 8:struct CaptureTargetRefreshResult {
-- Line 16:struct CapturePermissionResult {
-- Line 21:struct CaptureTargetManager {
-- Functions / Vars:
-- Line 33:    func loadTargets(selectedTargetID: String?, silent: Bool) async throws -> CaptureTargetRefreshResult {
-- Line 53:    func requestScreenRecordingPermission() -> CapturePermissionResult {
-- Line 64:    private func defaultTargetStatusMessage(hasScreenRecordingPermission: Bool) -> String {
-
-### Zoom and Track/ContentView.swift
-- Lines: 886
-- Imports:
-- import AppKit
-- import AVFoundation
-- import AVKit
 - import SwiftUI
-- import UniformTypeIdentifiers
 - Types:
-- Line 12:struct ContentView: View {
-- Line 61:    struct OverlayMapping {
-- Line 70:    struct ZoomPreviewState {
-- Line 75:    struct EffectPreviewState {
-- Line 86:    enum EffectRegionHandle: Hashable {
-- Line 97:    struct ZoomStateEvent {
-- Line 103:    enum MotionDirection {
-- Line 108:    struct MotionProgressSample {
-- Line 150:    enum CaptureInfoField: Hashable {
-- Line 156:    enum MotionTuning {
-- Line 164:    struct LibraryFilterOption: Identifiable {
-- Line 857:enum AppTab: String, CaseIterable, Identifiable {
-- Line 879:struct MarkerListEntry: Identifiable {
+- Line 3:extension ContentView {
 - Functions / Vars:
-- Line 117:        var time: Double {
-- Line 124:        var zoomMarkerID: String? {
-- Line 133:        var effectMarkerID: String? {
-- Line 142:        var distance: CGFloat {
-- Line 168:        var id: String { label }
-- Line 171:    var body: some View {
-- Line 188:    private var sidebar: some View {
-- Line 208:    private var sidebarBrandHeader: some View {
-- Line 215:    private func sidebarTabRow(_ tab: AppTab) -> some View {
-- Line 242:    private var detailContent: some View {
-- Line 260:    private var reviewView: some View {
-- Line 426:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
-- Line 443:    private var exportProgressSheet: some View {
-- Line 494:    private var exportSheetTitle: String {
-- Line 513:    private var progressValueForDisplay: Double {
-- Line 525:    private func presentExportSharePicker() {
-- Line 542:    func mappedOverlayPoint(
-- Line 581:    func infoRow(title: String, value: String) -> some View {
-- Line 592:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
-- Line 604:    var cardBackground: some View {
-- Line 613:    private var detailBackground: some View {
-- Line 626:    private var accentTint: Color {
-- Line 631:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
-- Line 647:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
-- Line 654:    func clearTimelineHover() {
-- Line 663:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
-- Line 668:    func clearEffectTimelineHover() {
-- Line 673:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
-- Line 683:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
-- Line 692:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
-- Line 707:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
-- Line 719:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
-- Line 723:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
-- Line 744:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
-- Line 758:    private func timelinePhase(for marker: ZoomPlanItem, at currentTime: Double) -> MarkerTimingPhase? {
-- Line 803:    private func timelineMarkerTooltip(for marker: ZoomPlanItem, markerNumber: Int, isEnabled: Bool) -> String {
-- Line 814:    func timecodeString(since start: Date, now: Date) -> String {
-- Line 824:    func timecodeString(for seconds: Double) -> String {
-- Line 838:    func makeNSView(context: Context) -> NSView {
-- Line 846:    func updateNSView(_ nsView: NSView, context: Context) {
-- Line 863:    var id: String { rawValue }
-- Line 865:    var systemImage: String {
-- Line 885:    var id: String { marker.id }
-- SwiftUI State / Bindings:
-- Line 13:    @Environment(\.colorScheme) var colorScheme
-- Line 14:    @StateObject var viewModel = CaptureSetupViewModel()
-- Line 15:    @State var selectedTab: AppTab? = .capture
-- Line 16:    @State private var playbackVideoHeightOverride: CGFloat?
-- Line 17:    @State var playbackVideoHeightDragOrigin: CGFloat?
-- Line 18:    @State var isPlaybackInspectorVisible = true
-- Line 19:    @State private var isPlaybackInfoPresented = false
-- Line 20:    @State private var playbackScrubTime = 0.0
-- Line 21:    @State private var isScrubbingPlayback = false
-- Line 22:    @State var suppressMarkerListAutoScrollUntil: Date?
-- Line 23:    @State private var draggedMarkerListID: String?
-- Line 24:    @State private var markerListDropTargetID: String?
-- Line 25:    @State private var markerListPreviewOrder: [String]?
-- Line 26:    @State var renamingMarkerID: String?
-- Line 27:    @State var markerNameDraft: String = ""
-- Line 28:    @State var renamingEffectMarkerID: String?
-- Line 29:    @State var effectMarkerNameDraft: String = ""
-- Line 30:    @State var hoveredTimelineMarkerID: String?
-- Line 31:    @State var hoveredEffectTimelineMarkerID: String?
-- Line 32:    @State var isDraggingTimeline = false
-- Line 33:    @State var inspectorFocusedTimingPhase: MarkerTimingPhase?
-- Line 34:    @State var hoveredTimelinePhase: MarkerTimingPhase?
-- Line 35:    @State var hoveredTimelineTooltipAnchor: CGPoint?
-- Line 36:    @State var hoveredEffectTimelineTooltipAnchor: CGPoint?
-- Line 37:    @State private var exportShareAnchorView: NSView?
-- Line 38:    @State var isPlacingClickFocus = false
-- Line 39:    @State var pendingMarkerDragSourcePoint: CGPoint?
-- Line 40:    @State var isDrawingNoZoomOverflowRegion = false
-- Line 41:    @State var pendingNoZoomOverflowRegion: NoZoomOverflowRegion?
-- Line 42:    @State var isDrawingEffectFocusRegion = false
-- Line 43:    @State var pendingEffectFocusRegion: EffectFocusRegion?
-- Line 44:    @State var effectFocusRegionInteractionBase: EffectFocusRegion?
-- Line 45:    @State var activeEffectRegionPrecisionPoint: CGPoint?
-- Line 46:    @State var activeEffectRegionHandle: EffectRegionHandle?
-- Line 47:    @State var activeTimelineMarkerDragID: String?
-- Line 48:    @State var activeTimelineMarkerDragStartTime: Double?
-- Line 49:    @State var librarySearchText = ""
-- Line 50:    @State var editorMode: ReviewEditorMode = .zoomAndClicks
-- Line 51:    @State var inspectorMode: EditInspectorMode = .markers
-- Line 52:    @State var selectedLibraryCollectionFilter: String?
-- Line 53:    @State var selectedLibraryProjectFilter: String?
-- Line 54:    @State var selectedLibraryTypeFilter: CaptureType?
-- Line 55:    @State var captureInfoTitleDraft = ""
-- Line 56:    @State var captureInfoCollectionDraft = ""
-- Line 57:    @State var captureInfoProjectDraft = ""
+- Line 4:    var libraryView: some View {
+- Line 94:    var filteredLibraryItems: [CaptureLibraryItem] {
+- Line 103:    func libraryCaptureRow(_ item: CaptureLibraryItem) -> some View {
+- Line 185:    var librarySearchField: some View {
+- Line 219:    func libraryMetadataPill(text: String, systemName: String) -> some View {
+- Line 231:    var hasActiveLibraryFilters: Bool {
+- Line 235:    func matchesLibrarySearch(_ item: CaptureLibraryItem) -> Bool {
+- Line 247:    func matchesLibraryCollectionFilter(_ item: CaptureLibraryItem) -> Bool {
+- Line 252:    func matchesLibraryProjectFilter(_ item: CaptureLibraryItem) -> Bool {
+- Line 257:    func matchesLibraryTypeFilter(_ item: CaptureLibraryItem) -> Bool {
+- Line 262:    var libraryFilterRail: some View {
+- Line 300:    var libraryCollectionOptions: [LibraryFilterOption] {
+- Line 311:    var libraryProjectOptions: [LibraryFilterOption] {
+- Line 322:    var libraryTypeOptions: [CaptureType: Int] {
+- Line 331:    func buildLibraryFilterOptions(
+- Line 341:    func libraryFilterSection(
+- Line 391:    var libraryTypeSection: some View {
+- Line 426:    func activeLibraryFilterChip(title: String, removeAction: @escaping () -> Void) -> some View {
+- Line 450:    func toggleLibraryCollectionFilter(_ collectionName: String) {
+- Line 462:    func toggleLibraryProjectFilter(_ projectName: String) {
+- Line 470:    func toggleLibraryTypeFilter(_ type: CaptureType) {
+- Line 474:    func clearLibraryFilters() {
 
-### Zoom and Track/EffectsEditorViews.swift
+### Views/Review/CaptureInfoInspectorViews.swift
+- Lines: 292
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:extension ContentView {
+- Functions / Vars:
+- Line 4:    func captureInfoInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 145:    func syncCaptureInfoDrafts(from summary: RecordingInspectionSummary, force: Bool = false) {
+- Line 157:    var collectionAutocompleteSuggestions: [String] {
+- Line 166:    var projectAutocompleteSuggestions: [String] {
+- Line 191:        var combined = preferredProjects
+- Line 201:    func autocompleteSuggestions(from values: [String], matching query: String) -> [String] {
+- Line 222:    func selectCollectionSuggestion(_ suggestion: String) {
+- Line 228:    func selectProjectSuggestion(_ suggestion: String) {
+- Line 234:    func autocompleteSuggestionPanel(
+- Line 271:    func captureTypeChips(selectedType: CaptureType) -> some View {
+
+### Views/Review/EffectsEditorViews.swift
 - Lines: 789
 - Imports:
 - import AppKit
@@ -393,89 +856,7 @@ Generated: 2026-05-06 17:58:47
 - Line 546:    @Binding var markerNameDraft: String
 - Line 551:    @State private var isRenameButtonHovered = false
 
-### Zoom and Track/ExportManager.swift
-- Lines: 88
-- Imports:
-- import AppKit
-- import Foundation
-- import UniformTypeIdentifiers
-- Types:
-- Line 7:    enum Outcome {
-- Functions / Vars:
-- Line 14:    private var exportTask: Task<Void, Never>?
-- Line 15:    private var activeExportOperationID = UUID()
-- Line 17:    var hasActiveExport: Bool {
-- Line 21:    func chooseExportDestination(defaultName: String) -> URL? {
-- Line 32:    func exportRecording(
-- Line 77:    func cancelExport() {
-- Line 82:    func reset() {
-
-### Zoom and Track/InputEventCaptureService.swift
-- Lines: 141
-- Imports:
-- import AppKit
-- import CoreMedia
-- import Foundation
-- Functions / Vars:
-- Line 21:    private var leftMouseDownMonitor: Any?
-- Line 22:    private var leftMouseUpMonitor: Any?
-- Line 23:    private var rightMouseDownMonitor: Any?
-- Line 24:    private var rightMouseUpMonitor: Any?
-- Line 25:    private var cursorTimer: Timer?
-- Line 27:    private var pendingEvents: [PendingEvent] = []
-- Line 28:    private var lastCursorPosition: CGPoint?
-- Line 29:    private var sessionStartUptime: TimeInterval?
-- Line 31:    func start() {
-- Line 70:    func setSessionStart(videoTimestamp: CMTime, uptime: TimeInterval) {
-- Line 75:    func stop() {
-- Line 89:    func finish() -> [RecordedEvent] {
-- Line 100:    func cancel() {
-- Line 107:    private func recordMouseEvent(type: RecordedEventType, event: NSEvent) {
-- Line 111:    private func recordCursorMoveIfNeeded(at location: CGPoint, uptime: TimeInterval) {
-- Line 117:    private func appendPendingEvent(type: RecordedEventType, location: CGPoint, uptime: TimeInterval) {
-- Line 128:    private func makeRecordedEvent(from pendingEvent: PendingEvent) -> RecordedEvent? {
-
-### Zoom and Track/LibraryManager.swift
-- Lines: 14
-- Imports:
-- import Foundation
-- Types:
-- Line 3:struct LibraryManager {
-- Functions / Vars:
-- Line 6:    func loadLibrarySnapshot() async throws -> CaptureLibrarySnapshot {
-- Line 10:    func bundleURL(for item: CaptureLibraryItem) throws -> URL {
-
-### Zoom and Track/LibraryViews.swift
-- Lines: 479
-- Imports:
-- import SwiftUI
-- Types:
-- Line 3:extension ContentView {
-- Functions / Vars:
-- Line 4:    var libraryView: some View {
-- Line 94:    var filteredLibraryItems: [CaptureLibraryItem] {
-- Line 103:    func libraryCaptureRow(_ item: CaptureLibraryItem) -> some View {
-- Line 185:    var librarySearchField: some View {
-- Line 219:    func libraryMetadataPill(text: String, systemName: String) -> some View {
-- Line 231:    var hasActiveLibraryFilters: Bool {
-- Line 235:    func matchesLibrarySearch(_ item: CaptureLibraryItem) -> Bool {
-- Line 247:    func matchesLibraryCollectionFilter(_ item: CaptureLibraryItem) -> Bool {
-- Line 252:    func matchesLibraryProjectFilter(_ item: CaptureLibraryItem) -> Bool {
-- Line 257:    func matchesLibraryTypeFilter(_ item: CaptureLibraryItem) -> Bool {
-- Line 262:    var libraryFilterRail: some View {
-- Line 300:    var libraryCollectionOptions: [LibraryFilterOption] {
-- Line 311:    var libraryProjectOptions: [LibraryFilterOption] {
-- Line 322:    var libraryTypeOptions: [CaptureType: Int] {
-- Line 331:    func buildLibraryFilterOptions(
-- Line 341:    func libraryFilterSection(
-- Line 391:    var libraryTypeSection: some View {
-- Line 426:    func activeLibraryFilterChip(title: String, removeAction: @escaping () -> Void) -> some View {
-- Line 450:    func toggleLibraryCollectionFilter(_ collectionName: String) {
-- Line 462:    func toggleLibraryProjectFilter(_ projectName: String) {
-- Line 470:    func toggleLibraryTypeFilter(_ type: CaptureType) {
-- Line 474:    func clearLibraryFilters() {
-
-### Zoom and Track/MarkerListTableViews.swift
+### Views/Review/MarkerListTableViews.swift
 - Lines: 490
 - Imports:
 - import AppKit
@@ -524,359 +905,7 @@ Generated: 2026-05-06 17:58:47
 - Line 434:    @Binding var draggedMarkerID: String?
 - Line 435:    @Binding var dropTargetMarkerID: String?
 
-### Zoom and Track/MarkerPreviewCacheService.swift
-- Lines: 375
-- Imports:
-- import AVFoundation
-- import CryptoKit
-- import Foundation
-- Functions / Vars:
-- Line 10:    func cachedPreview(
-- Line 34:    func cachedEffectPreview(
-- Line 58:    func storePreview(
-- Line 78:    func storeEffectPreview(
-- Line 98:    func pruneStaleFiles() {
-- Line 123:    private var cacheDirectoryURL: URL {
-- Line 130:    private func ensureCacheDirectoryExists() throws {
-- Line 134:    private func cacheURL(
-- Line 146:    private func effectCacheURL(
-- Line 158:    private func cacheKey(
-- Line 205:    private func effectCacheKey(
-- Line 251:    private func effectCacheSignature(for effectMarkers: [EffectPlanItem]) -> String {
-- Line 286:    private func zoomCacheSignature(for zoomMarkers: [ZoomPlanItem]) -> String {
-- Line 321:    private func renderSize(for recordingURL: URL) async throws -> CGSize {
-- Line 345:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
-- Line 351:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 361:    private func previewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 368:    private func isPlayablePreview(at url: URL) async throws -> Bool {
-
-### Zoom and Track/MarkerPreviewRenderService.swift
-- Lines: 1029
-- Imports:
-- import AppKit
-- import CoreGraphics
-- import CoreImage
-- import Foundation
-- Types:
-- Line 7:struct RenderedMarkerPreview {
-- Line 406:enum ExportRenderPhase {
-- Line 412:struct ExportRenderResult {
-- Functions / Vars:
-- Line 19:    func renderPreview(
-- Line 113:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
-- Line 140:            var outputImage = image.cropped(to: outputRect)
-- Line 185:    func renderEffectPreview(
-- Line 274:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
-- Line 301:            var outputImage = image.cropped(to: outputRect)
-- Line 346:    private func export(
-- Line 354:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
-- Line 360:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 370:    private func effectPreviewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 377:    private func normalizedRenderY(for marker: ZoomPlanItem, contentCoordinateSize: CGSize) -> CGFloat {
-- Line 382:    private func logRenderedPreviewDebug(
-- Line 420:    private var activeExportSession: AVAssetExportSession?
-- Line 422:    func cancelExport() {
-- Line 426:    func exportRecording(
-- Line 515:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
-- Line 542:            var outputImage = image.cropped(to: outputRect)
-- Line 590:    private func export(
-- Line 612:    private func stabilizedRenderSize(for sourceSize: CGSize) -> CGSize {
-- Line 636:private func makeClickPulseOverlay(
-- Line 693:private func makeEffectOverlay(
-- Line 749:    var outputImage = sourceImage?.cropped(to: outputRect)
-- Line 786:private func activeEffectRenderState(
-- Line 836:private func effectOverlayColor(for state: EffectRenderState) -> NSColor {
-- Line 849:private func makeRoundedRectMaskImage(
-- Line 886:private func makeOutsideRegionOverlayImage(
-- Line 909:private func drawClickPulse(
-- Line 993:private func strokeCircle(
-- Line 1008:private func fillCircle(
-- Line 1021:private func configureVideoComposition(
-
-### Zoom and Track/MediaWriterService.swift
-- Lines: 111
-- Imports:
-- import CoreMedia
-- import ScreenCaptureKit
-- Functions / Vars:
-- Line 11:    private var writer: AVAssetWriter?
-- Line 12:    private var writerInput: AVAssetWriterInput?
-- Line 13:    private var adaptor: AVAssetWriterInputPixelBufferAdaptor?
-- Line 14:    private var didStartSession = false
-- Line 16:    var onSessionStart: ((CMTime, TimeInterval) -> Void)?
-- Line 18:    func startWriting(to url: URL, width: Int, height: Int) throws {
-- Line 55:    func append(sampleBuffer: CMSampleBuffer) throws {
-- Line 78:    func finishWriting() async throws {
-- Line 88:    func cancelWriting() {
-- Line 99:    private func isCompleteFrame(_ sampleBuffer: CMSampleBuffer) -> Bool {
-
-### Zoom and Track/Models.swift
-- Lines: 1504
-- Imports:
-- import CoreGraphics
-- import Foundation
-- Types:
-- Line 9:enum CaptureTargetKind: String, Codable {
-- Line 14:struct ShareableCaptureTarget: Identifiable, Equatable {
-- Line 42:enum RecordingSessionState: Equatable {
-- Line 52:struct CaptureSource: Codable {
-- Line 66:struct ProjectManifest: Codable {
-- Line 152:struct CaptureMetadata: Equatable {
-- Line 174:enum CaptureType: String, Codable, CaseIterable, Identifiable {
-- Line 205:struct CaptureLibraryItem: Codable, Identifiable, Equatable {
-- Line 289:enum CaptureLibraryItemStatus: String, Codable {
-- Line 315:struct CaptureLibraryIndex: Codable {
-- Line 320:struct CaptureLibrarySnapshot {
-- Line 325:struct RecordingWorkspace {
-- Line 333:enum RecordedEventType: String, Codable {
-- Line 341:struct RecordedEvent: Codable {
-- Line 348:struct RecordedEventEnvelope: Codable {
-- Line 354:struct ZoomPlanEnvelope: Codable {
-- Line 383:enum ZoomEaseStyle: String, Codable, CaseIterable, Identifiable {
-- Line 408:enum ZoomType: String, Codable, CaseIterable, Identifiable {
-- Line 430:enum NoZoomFallbackMode: String, Codable, CaseIterable, Identifiable {
-- Line 446:struct NoZoomOverflowRegion: Codable, Equatable {
-- Line 453:enum EffectStyle: String, Codable, CaseIterable, Identifiable {
-- Line 475:struct EffectFocusRegion: Codable, Equatable {
-- Line 482:struct EffectTintColor: Codable, Equatable {
-- Line 491:struct EffectPlanItem: Codable, Identifiable, Equatable {
-- Line 604:enum ZoomMarkerKind: String, Codable {
-- Line 608:enum ClickPulsePreset: String, Codable, CaseIterable, Identifiable {
-- Line 633:struct ClickPulseConfiguration: Codable, Equatable {
-- Line 654:struct ZoomPlanItem: Codable, Identifiable {
-- Line 863:struct RecordingInspectionSummary {
-- Line 899:enum SharedMotionEngine {
-- Line 900:    enum CoordinateSpace {
-- Line 905:    struct PreviewState {
-- Line 910:    struct ClickPulseRenderState {
-- Line 915:    struct OverlayGeometryResolution {
-- Line 921:    struct Timeline {
-- Functions / Vars:
-- Line 31:    var displayTitle: String {
-- Line 136:    func encode(to encoder: Encoder) throws {
-- Line 137:        var container = encoder.container(keyedBy: CodingKeys.self)
-- Line 153:    var collectionName: String
-- Line 154:    var projectName: String
-- Line 155:    var captureType: CaptureType
-- Line 156:    var captureTitle: String
-- Line 158:    var resolvedCollectionName: String {
-- Line 163:    var resolvedProjectName: String {
-- Line 168:    var resolvedCaptureTitle: String {
-- Line 183:    var id: String { rawValue }
-- Line 185:    var displayName: String {
-- Line 244:    var id: UUID { captureID }
-- Line 246:    var isAvailable: Bool {
-- Line 250:    var canOpenInEditor: Bool {
-- Line 297:    var displayName: String {
-- Line 390:    var id: String { rawValue }
-- Line 392:    var displayName: String {
-- Line 414:    var id: String { rawValue }
-- Line 416:    var displayName: String {
-- Line 434:    var id: String { rawValue }
-- Line 436:    var displayName: String {
-- Line 447:    var centerX: Double
-- Line 448:    var centerY: Double
-- Line 449:    var width: Double
-- Line 450:    var height: Double
-- Line 459:    var id: String { rawValue }
-- Line 461:    var displayName: String {
-- Line 476:    var centerX: Double
-- Line 477:    var centerY: Double
-- Line 478:    var width: Double
-- Line 479:    var height: Double
-- Line 483:    var red: Double
-- Line 484:    var green: Double
-- Line 485:    var blue: Double
-- Line 486:    var alpha: Double
-- Line 492:    var id: String
-- Line 493:    var markerName: String?
-- Line 494:    var sourceEventTimestamp: Double
-- Line 495:    var startTime: Double
-- Line 496:    var endTime: Double
-- Line 497:    var fadeInDuration: Double
-- Line 498:    var fadeOutDuration: Double
-- Line 499:    var enabled: Bool
-- Line 500:    var displayOrder: Int?
-- Line 501:    var style: EffectStyle
-- Line 502:    var amount: Double
-- Line 503:    var blurAmount: Double
-- Line 504:    var darkenAmount: Double
-- Line 505:    var tintAmount: Double
-- Line 506:    var cornerRadius: Double
-- Line 507:    var feather: Double
-- Line 508:    var tintColor: EffectTintColor
-- Line 509:    var focusRegion: EffectFocusRegion?
-- Line 594:    var snapTime: Double {
-- Line 615:    var id: String { rawValue }
-- Line 617:    var displayName: String {
-- Line 634:    var preset: ClickPulsePreset
-- Line 638:    var duration: Double {
-- Line 655:    var id: String
-- Line 656:    var type: String
-- Line 657:    var markerName: String?
-- Line 658:    var markerKind: ZoomMarkerKind
-- Line 659:    var sourceEventTimestamp: Double
-- Line 660:    var rawX: Double?
-- Line 661:    var rawY: Double?
-- Line 662:    var centerX: Double
-- Line 663:    var centerY: Double
-- Line 664:    var zoomScale: Double
-- Line 665:    var startTime: Double
-- Line 666:    var holdUntil: Double
-- Line 667:    var endTime: Double
-- Line 668:    var leadInTime: Double
-- Line 669:    var zoomInDuration: Double
-- Line 670:    var holdDuration: Double
-- Line 671:    var zoomOutDuration: Double
-- Line 672:    var enabled: Bool
-- Line 673:    var duration: Double
-- Line 674:    var easeStyle: ZoomEaseStyle
-- Line 675:    var zoomType: ZoomType
-- Line 676:    var bounceAmount: Double
-- Line 677:    var clickPulse: ClickPulseConfiguration?
-- Line 678:    var noZoomFallbackMode: NoZoomFallbackMode
-- Line 679:    var noZoomOverflowRegion: NoZoomOverflowRegion?
-- Line 680:    var displayOrder: Int?
-- Line 810:    var totalSegmentDuration: Double {
-- Line 823:    var isClickFocus: Bool {
-- Line 827:    var isClickPulseEnabled: Bool {
-- Line 831:    static func legacyPhaseTiming(totalDuration: Double) -> (leadInTime: Double, zoomInDuration: Double, holdDuration: Double, zoomOutDuration: Double) {
-- Line 890:    var displayTitle: String {
-- Line 894:    var displaySubtitle: String {
-- Line 947:    static func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 958:    static func zoomTimeline(for marker: ZoomPlanItem) -> Timeline {
-- Line 991:    static func activeZoomState(
-- Line 1008:        var currentState = PreviewState(scale: 1, normalizedPoint: CGPoint(x: 0.5, y: 0.5))
-- Line 1009:        var restingState = currentState
-- Line 1084:    static func previewOffset(for previewState: PreviewState, outputSize: CGSize) -> CGSize {
-- Line 1100:    static func resolveOverlayPoint(
-- Line 1128:        var point = basePoint
-- Line 1156:    static func clickPulseRenderState(
-- Line 1173:    private static func normalizedPoint(
-- Line 1184:    private static func inOutPreviewState(
-- Line 1229:    private static func inOnlyPreviewState(
-- Line 1256:    private static func outOnlyPreviewState(
-- Line 1281:    private static func noZoomPreviewState(
-- Line 1305:    private static func noZoomTargetState(
-- Line 1350:    private static func visibleRect(for state: PreviewState) -> CGRect {
-- Line 1358:    private static func rect(for region: NoZoomOverflowRegion) -> CGRect {
-- Line 1367:    private static func fittedScale(for region: NoZoomOverflowRegion) -> CGFloat {
-- Line 1373:    private static func clampedTargetCenter(target: CGPoint, scale: CGFloat) -> CGPoint {
-- Line 1382:    private static func centeredPanTarget(from state: PreviewState, toward targetPoint: CGPoint) -> CGPoint {
-- Line 1387:        var minX = targetPoint.x - (viewportWidth / 2)
-- Line 1390:        var minY = targetPoint.y - (viewportHeight / 2)
-- Line 1399:    private static func maximumVisibleScale(for targetPoint: CGPoint, anchoredTo state: PreviewState) -> CGFloat {
-- Line 1404:        var low: CGFloat = 1
-- Line 1405:        var high = max(state.scale, 1)
-- Line 1418:    private static func normalizedRegion(
-- Line 1438:    private static func normalizedProgress(_ value: Double, start: Double, end: Double) -> Double {
-- Line 1443:    private static func interpolate(from: CGFloat, to: CGFloat, progress: Double) -> CGFloat {
-- Line 1447:    private static func motionProgress(
-
-### Zoom and Track/PermissionsService.swift
-- Lines: 17
-- Imports:
-- import CoreGraphics
-- import Foundation
-- Types:
-- Line 9:struct PermissionsService {
-- Functions / Vars:
-- Line 10:    func hasScreenRecordingPermission() -> Bool {
-- Line 14:    func requestScreenRecordingPermission() -> Bool {
-
-### Zoom and Track/ProjectBundleService.swift
-- Lines: 987
-- Imports:
-- import AppKit
-- import AVFoundation
-- import CoreGraphics
-- import Foundation
-- Types:
-- Line 11:struct ProjectBundleService {
-- Line 19:    enum OutputDirectoryResolution {
-- Line 25:    enum RecordingBundleResolution {
-- Functions / Vars:
-- Line 31:    func createWorkspace(outputDirectory: URL? = nil, captureMetadata: CaptureMetadata) throws -> RecordingWorkspace {
-- Line 89:    func finalizeWorkspace(_ workspace: RecordingWorkspace, manifest: ProjectManifest, events: [RecordedEvent]) throws -> URL {
-- Line 123:    func cleanupWorkspace(_ workspace: RecordingWorkspace?) {
-- Line 132:    func chooseOutputDirectory() -> URL? {
-- Line 152:    func resolvedSelectedOutputDirectory() -> URL? {
-- Line 161:    func resolveSelectedOutputDirectory() -> OutputDirectoryResolution {
-- Line 166:        var isStale = false
-- Line 196:    func openRecordingBundle() -> URL? {
-- Line 215:    func loadRecordingInspection(from bundleURL: URL) async throws -> RecordingInspectionSummary {
-- Line 279:    func persistLastRecordingBundle(_ url: URL) -> Bool {
-- Line 287:    func resolveLastRecordingBundle() -> RecordingBundleResolution {
-- Line 309:    func beginPlaybackAccess(for bundleURL: URL) throws -> URL? {
-- Line 329:    func endPlaybackAccess(_ url: URL?) {
-- Line 333:    func saveZoomPlan(_ zoomPlan: ZoomPlanEnvelope, in bundleURL: URL) throws {
-- Line 344:    func updateCaptureMetadata(
-- Line 380:    func libraryRootURL() throws -> URL {
-- Line 387:    func loadLibrarySnapshot() async throws -> CaptureLibrarySnapshot {
-- Line 395:        var notices: [String] = []
-- Line 419:    func registerCaptureInLibrary(_ summary: RecordingInspectionSummary) throws {
-- Line 442:        var items: [CaptureLibraryItem] = []
-- Line 451:    private func moviesDirectory() throws -> URL {
-- Line 458:    private func defaultLibraryRootURL() throws -> URL {
-- Line 462:    private func libraryCapturesDirectory(libraryRoot: URL, collectionName: String, projectName: String) throws -> URL {
-- Line 472:    private func uniqueProjectURL(baseDirectory: URL, projectName: String) -> URL {
-- Line 473:        var candidate = baseDirectory.appendingPathComponent("\(projectName).captureproj", isDirectory: true)
-- Line 474:        var suffix = 2
-- Line 484:    private func sanitizedProjectName(from title: String) -> String {
-- Line 496:    private func relativeBundlePath(for bundleURL: URL, libraryRoot: URL) -> String {
-- Line 505:    private func persistLibraryIndex(_ items: [CaptureLibraryItem], libraryRoot: URL) throws {
-- Line 512:    private func validateIndexedItems(
-- Line 517:        var validatedItems: [CaptureLibraryItem] = []
-- Line 518:        var removedCount = 0
-- Line 538:    private func mergeLibraryItems(
-- Line 543:        var mergedByPath = Dictionary(uniqueKeysWithValues: indexItems.map { ($0.bundleRelativePath, $0) })
-- Line 544:        var restoredCount = 0
-- Line 561:    private func scanLibraryItems(libraryRoot: URL) async throws -> [CaptureLibraryItem] {
-- Line 573:        var items: [CaptureLibraryItem] = []
-- Line 582:    private func loadManifest(from bundleURL: URL) throws -> ProjectManifest {
-- Line 588:    private func resolveManifestURL(in bundleURL: URL) throws -> URL {
-- Line 602:    private func validatedLibraryItem(
-- Line 677:    private func libraryItem(
-- Line 700:    private func fallbackLibraryItem(
-- Line 737:    private func loadRecordingDuration(for bundleURL: URL, recordingFileName: String) async throws -> Double? {
-- Line 744:    private func removeIfExists(_ url: URL) throws {
-- Line 749:    private func loadEventsEnvelope(from url: URL) -> RecordedEventEnvelope {
-- Line 758:    private func loadOrCreateZoomPlan(from url: URL, events: [RecordedEvent], captureSource: CaptureSource) throws -> ZoomPlanEnvelope {
-- Line 771:    private func generateZoomPlan(from events: [RecordedEvent], captureSource: CaptureSource) -> ZoomPlanEnvelope {
-- Line 773:        var zoomItems: [ZoomPlanItem] = []
-- Line 774:        var lastIncludedTimestamp: Double?
-- Line 828:    private func normalizeToVideoCoordinates(event: RecordedEvent, captureSource: CaptureSource) -> CGPoint {
-- Line 852:    private func loadVideoAspectRatio(from asset: AVURLAsset) async throws -> CGFloat {
-- Line 861:    private func loadVideoPixelSize(from asset: AVURLAsset) async throws -> CGSize {
-- Line 880:    private func persistOutputDirectory(_ url: URL) -> Bool {
-- Line 884:    private func persistSecurityScopedURL(_ url: URL, key: String) -> Bool {
-- Line 894:    private func resolveSecurityScopedURL(forKey key: String, invalidMessage: String) -> RecordingBundleResolution {
-- Line 899:        var isStale = false
-- Line 923:    private func defaultOutputDirectorySuggestion() -> URL? {
-- Line 927:    private func stopScopedAccess(for url: URL?) {
-- Line 931:    private func withScopedAccess<T>(to url: URL, required: Bool, operation: () throws -> T) throws -> T {
-
-### Zoom and Track/RecordingCoordinator.swift
-- Lines: 190
-- Imports:
-- import Foundation
-- Functions / Vars:
-- Line 10:    var onStateChange: ((RecordingSessionState, String) -> Void)?
-- Line 11:    var onSummaryAvailable: ((RecordingInspectionSummary) -> Void)?
-- Line 12:    var onPlaybackLoadFailure: ((String) -> Void)?
-- Line 19:    private var workspace: RecordingWorkspace?
-- Line 20:    private var currentTarget: ShareableCaptureTarget?
-- Line 21:    private var currentCaptureMetadata: CaptureMetadata?
-- Line 22:    private var isStopping = false
-- Line 36:    func startRecording(target: ShareableCaptureTarget, outputDirectory: URL?, captureMetadata: CaptureMetadata) async {
-- Line 85:    func stopRecording() async {
-- Line 106:    private func finalizeProject() async throws -> URL {
-- Line 153:    private func handleStreamError(_ error: Error) async {
-- Line 164:    private func handleFailure(_ error: Error, overrideMessage: String? = nil) async {
-- Line 179:    private func reset() {
-- Line 187:    private func update(_ state: RecordingSessionState, message: String) {
-
-### Zoom and Track/ReviewEditorControls.swift
+### Views/Review/ReviewEditorControls.swift
 - Lines: 127
 - Imports:
 - import SwiftUI
@@ -892,7 +921,7 @@ Generated: 2026-05-06 17:58:47
 - Line 119:func segmentedPillBackgroundColor(isSelected: Bool) -> Color {
 - Line 123:func accentContrastingTextColor() -> Color {
 
-### Zoom and Track/ReviewInspectorViews.swift
+### Views/Review/ReviewInspectorViews.swift
 - Lines: 99
 - Imports:
 - import SwiftUI
@@ -909,7 +938,7 @@ Generated: 2026-05-06 17:58:47
 - SwiftUI State / Bindings:
 - Line 49:    @Binding var inspectorMode: EditInspectorMode
 
-### Zoom and Track/ReviewMarkerInspectorViews.swift
+### Views/Review/ReviewMarkerInspectorViews.swift
 - Lines: 690
 - Imports:
 - import AppKit
@@ -930,7 +959,7 @@ Generated: 2026-05-06 17:58:47
 - Line 657:    func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
 - Line 678:    func markerTypeSymbol(for zoomType: ZoomType) -> String {
 
-### Zoom and Track/ReviewPlaybackMainViews.swift
+### Views/Review/ReviewPlaybackMainViews.swift
 - Lines: 1043
 - Imports:
 - import AVFoundation
@@ -942,7 +971,7 @@ Generated: 2026-05-06 17:58:47
 - Line 628:    func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
 - Line 1014:    func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {
 
-### Zoom and Track/ReviewPlaybackPreviewViews.swift
+### Views/Review/ReviewPlaybackPreviewViews.swift
 - Lines: 794
 - Imports:
 - import AppKit
@@ -983,7 +1012,7 @@ Generated: 2026-05-06 17:58:47
 - Line 722:    func effectRegionPrecisionLoupe(
 - Line 780:    func transformedOverlayPoint(
 
-### Zoom and Track/ReviewSupportViews.swift
+### Views/Review/ReviewSupportViews.swift
 - Lines: 177
 - Imports:
 - import AppKit
@@ -1016,7 +1045,7 @@ Generated: 2026-05-06 17:58:47
 - Line 168:        func displayString(for value: Double) -> String {
 - Line 172:        private func parsedValue(from string: String) -> Double? {
 
-### Zoom and Track/ReviewTimelineInteractionViews.swift
+### Views/Review/ReviewTimelineInteractionViews.swift
 - Lines: 246
 - Imports:
 - import SwiftUI
@@ -1028,7 +1057,7 @@ Generated: 2026-05-06 17:58:47
 - Line 183:    func timelinePlayheadView(
 - Line 216:    func timelineFooterView(
 
-### Zoom and Track/ReviewTimelineViews.swift
+### Views/Review/ReviewTimelineViews.swift
 - Lines: 135
 - Imports:
 - import SwiftUI
@@ -1043,39 +1072,7 @@ Generated: 2026-05-06 17:58:47
 - Line 96:    func timelineSnapTarget(
 - Line 116:    func effectTimelineSnapTarget(
 
-### Zoom and Track/ScreenCaptureService.swift
-- Lines: 191
-- Imports:
-- import AppKit
-- import CoreMedia
-- import ScreenCaptureKit
-- Types:
-- Line 182:extension ScreenCaptureService: SCStreamOutput, SCStreamDelegate {
-- Functions / Vars:
-- Line 20:    private var stream: SCStream?
-- Line 21:    private var onSampleBuffer: ((CMSampleBuffer) -> Void)?
-- Line 22:    private var onStreamStop: ((Error?) -> Void)?
-- Line 24:    func fetchTargets() async throws -> (displays: [ShareableCaptureTarget], windows: [ShareableCaptureTarget]) {
-- Line 108:    func startCapture(
-- Line 133:    func stopCapture() async throws {
-- Line 141:    private func makeFilter(for target: ShareableCaptureTarget, content: SCShareableContent) throws -> SCContentFilter {
-- Line 157:    private func shouldIncludeDisplayTarget(named title: String) -> Bool {
-- Line 162:    private func shouldIncludeWindowTarget(named title: String, ownerName: String?) -> Bool {
-- Line 177:    private func normalizedTargetName(_ title: String) -> String {
-- Line 183:    func stream(_ stream: SCStream, didStopWithError error: any Error) {
-- Line 187:    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
-
-### Zoom and Track/SettingsViews.swift
-- Lines: 86
-- Imports:
-- import SwiftUI
-- Types:
-- Line 3:extension ContentView {
-- Functions / Vars:
-- Line 4:    var settingsView: some View {
-- Line 76:    func settingsCard(title: String, body: AnyView) -> some View {
-
-### Zoom and Track/TimelineToolbarControls.swift
+### Views/Review/TimelineToolbarControls.swift
 - Lines: 280
 - Imports:
 - import SwiftUI
@@ -1089,16 +1086,7 @@ Generated: 2026-05-06 17:58:47
 - Line 236:    var body: some View {
 - Line 259:private func gadgetForegroundColor(
 
-### Zoom and Track/TutorialCaptureApp.swift
-- Lines: 15
-- Imports:
-- import SwiftUI
-- Types:
-- Line 9:struct TutorialCaptureApp: App {
-- Functions / Vars:
-- Line 10:    var body: some Scene {
-
-### Zoom and Track/ZoomAndClicksEditorViews.swift
+### Views/Review/ZoomAndClicksEditorViews.swift
 - Lines: 635
 - Imports:
 - import AppKit
@@ -1128,4 +1116,24 @@ Generated: 2026-05-06 17:58:47
 - Line 578:private func zoomTimeline(for marker: ZoomPlanItem) -> (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double) {
 - Line 614:private func markerTypeSymbol(for zoomType: ZoomType) -> String {
 - Line 627:private func timecodeString(for seconds: Double) -> String {
+
+### Views/Settings/SettingsViews.swift
+- Lines: 86
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:extension ContentView {
+- Functions / Vars:
+- Line 4:    var settingsView: some View {
+- Line 76:    func settingsCard(title: String, body: AnyView) -> some View {
+
+### Views/Shared/TimecodeFormatting.swift
+- Lines: 23
+- Imports:
+- import Foundation
+- Types:
+- Line 3:extension ContentView {
+- Functions / Vars:
+- Line 4:    func timecodeString(since start: Date, now: Date) -> String {
+- Line 14:    func timecodeString(for seconds: Double) -> String {
 

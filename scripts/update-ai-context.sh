@@ -4,10 +4,25 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONTEXT_DIR="$PROJECT_ROOT/AI_CONTEXT"
 OUTPUT_FILE="$CONTEXT_DIR/project-map.md"
 SYMBOLS_FILE="$CONTEXT_DIR/swift-symbols.md"
+SOURCE_DIRS=(
+  "$PROJECT_ROOT/App"
+  "$PROJECT_ROOT/Models"
+  "$PROJECT_ROOT/ViewModels"
+  "$PROJECT_ROOT/Managers"
+  "$PROJECT_ROOT/Services"
+  "$PROJECT_ROOT/Views"
+)
 
 mkdir -p "$CONTEXT_DIR"
 
 DATE_NOW="$(date '+%Y-%m-%d %H:%M:%S')"
+
+swift_files() {
+  for dir in "${SOURCE_DIRS[@]}"; do
+    [ -d "$dir" ] || continue
+    find "$dir" -name "*.swift" -type f -print
+  done | sort
+}
 
 {
   echo "# Project Map"
@@ -17,13 +32,7 @@ DATE_NOW="$(date '+%Y-%m-%d %H:%M:%S')"
   echo "## Swift Files"
   echo
 
-  find "$PROJECT_ROOT" \
-    -path "$PROJECT_ROOT/.git" -prune -o \
-    -path "$PROJECT_ROOT/AI_CONTEXT" -prune -o \
-    -path "$PROJECT_ROOT/DerivedData" -prune -o \
-    -name "*.swift" -type f -print \
-  | sort \
-  | while read -r file; do
+  while read -r file; do
       rel="${file#$PROJECT_ROOT/}"
       lines=$(wc -l < "$file" | tr -d ' ')
       echo "### $rel"
@@ -54,7 +63,7 @@ DATE_NOW="$(date '+%Y-%m-%d %H:%M:%S')"
       fi
 
       echo
-    done
+    done < <(swift_files)
 } > "$OUTPUT_FILE"
 
 {
@@ -63,13 +72,7 @@ DATE_NOW="$(date '+%Y-%m-%d %H:%M:%S')"
   echo "Generated: $DATE_NOW"
   echo
 
-  find "$PROJECT_ROOT" \
-    -path "$PROJECT_ROOT/.git" -prune -o \
-    -path "$PROJECT_ROOT/AI_CONTEXT" -prune -o \
-    -path "$PROJECT_ROOT/DerivedData" -prune -o \
-    -name "*.swift" -type f -print \
-  | sort \
-  | while read -r file; do
+  while read -r file; do
       rel="${file#$PROJECT_ROOT/}"
       echo "## $rel"
       echo
@@ -78,7 +81,7 @@ DATE_NOW="$(date '+%Y-%m-%d %H:%M:%S')"
         | sed 's/^/- Line /'
 
       echo
-    done
+    done < <(swift_files)
 } > "$SYMBOLS_FILE"
 
 echo "Updated AI context:"

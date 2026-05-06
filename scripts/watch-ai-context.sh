@@ -12,17 +12,25 @@ fi
 echo $$ > "$PID_FILE"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WATCH_DIRS=(
+  "$PROJECT_ROOT/App"
+  "$PROJECT_ROOT/Models"
+  "$PROJECT_ROOT/ViewModels"
+  "$PROJECT_ROOT/Managers"
+  "$PROJECT_ROOT/Services"
+  "$PROJECT_ROOT/Views"
+)
 
 echo "Watching Swift files in:"
-echo "$PROJECT_ROOT"
+for dir in "${WATCH_DIRS[@]}"; do
+  [ -d "$dir" ] || continue
+  echo "$dir"
+done
 echo
 echo "Press CTRL+C to stop."
 
 fswatch -o \
-  --exclude "$PROJECT_ROOT/.git" \
-  --exclude "$PROJECT_ROOT/AI_CONTEXT" \
-  --exclude "$PROJECT_ROOT/DerivedData" \
-  "$PROJECT_ROOT" \
+  "${WATCH_DIRS[@]}" \
 | while read -r change; do
     "$PROJECT_ROOT/scripts/update-ai-context.sh"
   done
