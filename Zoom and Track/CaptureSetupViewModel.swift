@@ -101,21 +101,24 @@ final class CaptureSetupViewModel: ObservableObject {
     private var renderedPreviewSourceStartTime: Double?
     private var renderingPreviewMarkerID: String?
     private var renderingPreviewEffectMarkerID: String?
-    private var exportTask: Task<Void, Never>?
     private var targetRefreshTask: Task<Void, Never>?
-    private var metadataSaveTask: Task<Void, Never>?
     private var wasPlayingBeforeMarkerTimelineMove = false
-    private var activeExportOperationID = UUID()
     private let timelineMarkerNudgeInterval = 0.1
 
     private let permissionsService = PermissionsService()
     private let screenCaptureService = ScreenCaptureService()
     private let mediaWriterService = MediaWriterService()
     private let projectBundleService = ProjectBundleService()
+    private lazy var libraryManager = LibraryManager(projectBundleService: projectBundleService)
+    private lazy var captureTargetManager = CaptureTargetManager(
+        permissionsService: permissionsService,
+        screenCaptureService: screenCaptureService
+    )
+    nonisolated(unsafe) private let captureMetadataManager: CaptureMetadataManager
     private let inputEventCaptureService = InputEventCaptureService()
     private let markerPreviewRenderService = MarkerPreviewRenderService()
     private let markerPreviewCacheService = MarkerPreviewCacheService()
-    private let exportRenderService = ExportRenderService()
+    private let exportManager = ExportManager()
     private let previewTransitionFadeInDuration: TimeInterval = 0.12
     private let previewTransitionHoldDuration: TimeInterval = 1.0
     private let previewTransitionFadeOutDuration: TimeInterval = 0.16
@@ -131,6 +134,7 @@ final class CaptureSetupViewModel: ObservableObject {
     )
 
     init() {
+        self.captureMetadataManager = CaptureMetadataManager(projectBundleService: projectBundleService)
         restoreLastUsedCaptureMetadata()
         recordingCoordinator.onStateChange = { [weak self] state, message in
             guard let self else { return }
@@ -158,7 +162,7 @@ final class CaptureSetupViewModel: ObservableObject {
 
     deinit {
         targetRefreshTask?.cancel()
-        metadataSaveTask?.cancel()
+        captureMetadataManager.cancelPendingSave()
     }
 
     var selectedTarget: ShareableCaptureTarget? {
@@ -224,7 +228,6 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     func load() async {
-        hasScreenRecordingPermission = permissionsService.hasScreenRecordingPermission()
         markerPreviewCacheService.pruneStaleFiles()
         recordingCoordinator.onStateChange?(.loadingTargets, "Loading capture targets…")
 
@@ -265,11 +268,9 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     func requestPermission() async {
-        _ = permissionsService.requestScreenRecordingPermission()
-        hasScreenRecordingPermission = permissionsService.hasScreenRecordingPermission()
-        statusMessage = hasScreenRecordingPermission
-            ? "Permission granted. Reload targets if needed."
-            : "Grant Screen Recording permission in System Settings, then relaunch the app if capture still fails."
+        let result = captureTargetManager.requestScreenRecordingPermission()
+        hasScreenRecordingPermission = result.hasScreenRecordingPermission
+        statusMessage = result.statusMessage
     }
 
     func startRecording() async {
@@ -331,11 +332,11 @@ final class CaptureSetupViewModel: ObservableObject {
             statusMessage = "Load a capture before exporting."
             return
         }
-        guard canExportRecording, exportTask == nil else {
+        guard canExportRecording, !exportManager.hasActiveExport else {
             NSLog("FlowTrack Capture ignored duplicate export request.")
             return
         }
-        guard let outputURL = chooseExportDestination(defaultName: summary.bundleName) else { return }
+        guard let outputURL = exportManager.chooseExportDestination(defaultName: summary.bundleName) else { return }
 
         cancelPendingMarkerPreviewRender()
         stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
@@ -347,58 +348,40 @@ final class CaptureSetupViewModel: ObservableObject {
         exportProgress = 0
         exportStatusMessage = "Preparing export…"
         exportedRecordingURL = nil
-        let exportOperationID = UUID()
-        activeExportOperationID = exportOperationID
-
-        exportTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                let result = try await exportRenderService.exportRecording(
-                    recordingURL: summary.recordingURL,
-                    summary: summary,
-                    outputURL: outputURL
-                ) { [weak self] phase, progress in
-                    guard let self else { return }
-                    guard self.activeExportOperationID == exportOperationID else { return }
-                    self.exportProgress = max(0, min(progress, 1))
-                    switch phase {
-                    case .preparing:
-                        self.exportState = .preparing
-                        self.exportStatusMessage = "Preparing export…"
-                    case .exporting:
-                        self.exportState = .exporting
-                        self.exportStatusMessage = "Exporting video…"
-                    case .finalizing:
-                        self.exportState = .finalizing
-                        self.exportStatusMessage = "Finalizing movie…"
-                    }
+        exportManager.exportRecording(
+            recordingURL: summary.recordingURL,
+            summary: summary,
+            outputURL: outputURL,
+            onPhaseUpdate: { [weak self] state, progress, statusMessage in
+                guard let self else { return }
+                self.exportProgress = progress
+                self.exportState = state
+                self.exportStatusMessage = statusMessage
+            },
+            onCompletion: { [weak self] outcome in
+                guard let self else { return }
+                switch outcome {
+                case .completed(let outputURL):
+                    self.exportedRecordingURL = outputURL
+                    self.exportProgress = 1
+                    self.exportState = .completed
+                    self.exportStatusMessage = "Export complete."
+                    NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                case .cancelled:
+                    self.exportState = .cancelled
+                    self.exportStatusMessage = "Export cancelled."
+                case .failed(let error):
+                    self.exportState = .failed(error.localizedDescription)
+                    self.exportStatusMessage = "Export failed."
                 }
-                guard activeExportOperationID == exportOperationID else { return }
-                exportedRecordingURL = result.outputURL
-                exportProgress = 1
-                exportState = .completed
-                exportStatusMessage = "Export complete."
-                NSWorkspace.shared.activateFileViewerSelecting([result.outputURL])
-            } catch is CancellationError {
-                guard activeExportOperationID == exportOperationID else { return }
-                exportState = .cancelled
-                exportStatusMessage = "Export cancelled."
-            } catch {
-                guard activeExportOperationID == exportOperationID else { return }
-                exportState = .failed(error.localizedDescription)
-                exportStatusMessage = "Export failed."
             }
-            if activeExportOperationID == exportOperationID {
-                exportTask = nil
-            }
-        }
+        )
     }
 
     func cancelExport() {
-        guard exportTask != nil || exportState.isInProgress else { return }
+        guard exportManager.hasActiveExport || exportState.isInProgress else { return }
         exportStatusMessage = "Cancelling export…"
-        exportTask?.cancel()
-        exportRenderService.cancelExport()
+        exportManager.cancelExport()
     }
 
     func dismissExportSheet() {
@@ -410,18 +393,21 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     private func refreshCaptureTargets(silent: Bool) async throws {
-        let targets = try await screenCaptureService.fetchTargets()
-        displays = targets.displays
-        windows = targets.windows
-
-        if let selectedTargetID, (displays + windows).contains(where: { $0.id == selectedTargetID }) == false {
-            self.selectedTargetID = nil
+        let refreshedSelectionID = selectedTargetID
+        let result = try await captureTargetManager.loadTargets(
+            selectedTargetID: refreshedSelectionID,
+            silent: silent
+        )
+        displays = result.displays
+        windows = result.windows
+        if refreshedSelectionID != nil,
+           result.selectedTargetID == nil,
+           selectedTargetID == refreshedSelectionID {
+            selectedTargetID = nil
         }
-
-        if !silent {
-            statusMessage = hasScreenRecordingPermission
-                ? "Choose one display or one window."
-                : "Screen Recording permission is required."
+        hasScreenRecordingPermission = result.hasScreenRecordingPermission
+        if let statusMessage = result.statusMessage {
+            self.statusMessage = statusMessage
         }
     }
 
@@ -454,8 +440,7 @@ final class CaptureSetupViewModel: ObservableObject {
             return
         }
         do {
-            let libraryRoot = try projectBundleService.libraryRootURL()
-            let bundleURL = libraryRoot.appendingPathComponent(item.bundleRelativePath, isDirectory: true)
+            let bundleURL = try libraryManager.bundleURL(for: item)
             openCapture(at: bundleURL)
         } catch {
             statusMessage = error.localizedDescription
@@ -464,8 +449,7 @@ final class CaptureSetupViewModel: ObservableObject {
 
     func revealLibraryCapture(_ item: CaptureLibraryItem) {
         do {
-            let libraryRoot = try projectBundleService.libraryRootURL()
-            let bundleURL = libraryRoot.appendingPathComponent(item.bundleRelativePath, isDirectory: true)
+            let bundleURL = try libraryManager.bundleURL(for: item)
             NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
         } catch {
             statusMessage = error.localizedDescription
@@ -1404,56 +1388,58 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     private func scheduleMetadataSave() {
-        guard recordingSummary != nil else { return }
-        metadataSaveTask?.cancel()
-        metadataSaveTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-            await self?.saveCurrentCaptureMetadata()
-        }
-    }
-
-    private func saveCurrentCaptureMetadata() async {
         guard let summary = recordingSummary else { return }
         let metadata = currentCaptureMetadata
+        let bundleURL = summary.bundleURL
+        captureMetadataManager.scheduleSave(
+            bundleURL: bundleURL,
+            metadata: metadata,
+            onSaved: { [weak self] updatedManifest in
+                await self?.applySavedCaptureMetadata(updatedManifest, bundleURL: bundleURL)
+            },
+            onError: { [weak self] error in
+                self?.statusMessage = "Could not save capture info: \(error.localizedDescription)"
+            }
+        )
+    }
+
+    private func applySavedCaptureMetadata(_ updatedManifest: ProjectManifest, bundleURL: URL) async {
+        guard let summary = recordingSummary, summary.bundleURL == bundleURL else { return }
+
+        let updatedSummary = RecordingInspectionSummary(
+            bundleURL: summary.bundleURL,
+            bundleName: summary.bundleName,
+            captureID: summary.captureID,
+            collectionName: updatedManifest.collectionName,
+            projectName: updatedManifest.projectName,
+            captureType: updatedManifest.captureType,
+            captureTitle: updatedManifest.captureTitle,
+            createdAt: updatedManifest.createdAt,
+            updatedAt: updatedManifest.updatedAt,
+            recordingURL: summary.recordingURL,
+            videoAspectRatio: summary.videoAspectRatio,
+            contentCoordinateSize: summary.contentCoordinateSize,
+            captureSourceKind: summary.captureSourceKind,
+            captureSourceTitle: summary.captureSourceTitle,
+            totalEventCount: summary.totalEventCount,
+            cursorMovedCount: summary.cursorMovedCount,
+            leftMouseDownCount: summary.leftMouseDownCount,
+            leftMouseUpCount: summary.leftMouseUpCount,
+            rightMouseDownCount: summary.rightMouseDownCount,
+            rightMouseUpCount: summary.rightMouseUpCount,
+            firstEventTimestamp: summary.firstEventTimestamp,
+            lastEventTimestamp: summary.lastEventTimestamp,
+            duration: summary.duration,
+            zoomMarkers: summary.zoomMarkers,
+            effectMarkers: summary.effectMarkers
+        )
+        recordingSummary = updatedSummary
+        captureTitle = updatedManifest.captureTitle
+        collectionName = updatedManifest.collectionName
+        projectName = updatedManifest.projectName
+        captureType = updatedManifest.captureType
 
         do {
-            let updatedManifest = try projectBundleService.updateCaptureMetadata(
-                in: summary.bundleURL,
-                captureMetadata: metadata
-            )
-            let updatedSummary = RecordingInspectionSummary(
-                bundleURL: summary.bundleURL,
-                bundleName: summary.bundleName,
-                captureID: summary.captureID,
-                collectionName: updatedManifest.collectionName,
-                projectName: updatedManifest.projectName,
-                captureType: updatedManifest.captureType,
-                captureTitle: updatedManifest.captureTitle,
-                createdAt: updatedManifest.createdAt,
-                updatedAt: updatedManifest.updatedAt,
-                recordingURL: summary.recordingURL,
-                videoAspectRatio: summary.videoAspectRatio,
-                contentCoordinateSize: summary.contentCoordinateSize,
-                captureSourceKind: summary.captureSourceKind,
-                captureSourceTitle: summary.captureSourceTitle,
-                totalEventCount: summary.totalEventCount,
-                cursorMovedCount: summary.cursorMovedCount,
-                leftMouseDownCount: summary.leftMouseDownCount,
-                leftMouseUpCount: summary.leftMouseUpCount,
-                rightMouseDownCount: summary.rightMouseDownCount,
-                rightMouseUpCount: summary.rightMouseUpCount,
-                firstEventTimestamp: summary.firstEventTimestamp,
-                lastEventTimestamp: summary.lastEventTimestamp,
-                duration: summary.duration,
-                zoomMarkers: summary.zoomMarkers,
-                effectMarkers: summary.effectMarkers
-            )
-            recordingSummary = updatedSummary
-            captureTitle = updatedManifest.captureTitle
-            collectionName = updatedManifest.collectionName
-            projectName = updatedManifest.projectName
-            captureType = updatedManifest.captureType
             try projectBundleService.registerCaptureInLibrary(updatedSummary)
             await refreshLibrary()
         } catch {
@@ -1479,7 +1465,7 @@ final class CaptureSetupViewModel: ObservableObject {
 
     func refreshLibrary() async {
         do {
-            let snapshot = try await projectBundleService.loadLibrarySnapshot()
+            let snapshot = try await libraryManager.loadLibrarySnapshot()
             libraryItems = snapshot.items
             libraryStatusMessage = snapshot.statusMessage
         } catch {
@@ -1585,12 +1571,8 @@ final class CaptureSetupViewModel: ObservableObject {
 
     private func releasePlaybackState() {
         cancelPendingMarkerPreviewRender()
-        metadataSaveTask?.cancel()
-        metadataSaveTask = nil
-        activeExportOperationID = UUID()
-        exportTask?.cancel()
-        exportTask = nil
-        exportRenderService.cancelExport()
+        captureMetadataManager.cancelPendingSave()
+        exportManager.reset()
         exportState = .idle
         exportProgress = 0
         exportStatusMessage = nil
@@ -1616,17 +1598,6 @@ final class CaptureSetupViewModel: ObservableObject {
         cleanupRenderedPreviewFile()
         projectBundleService.endPlaybackAccess(activePlaybackScopeURL)
         activePlaybackScopeURL = nil
-    }
-
-    private func chooseExportDestination(defaultName: String) -> URL? {
-        let panel = NSSavePanel()
-        panel.canCreateDirectories = true
-        panel.allowedContentTypes = [.movie]
-        panel.nameFieldStringValue = "\(defaultName) Export.mov"
-        panel.isExtensionHidden = false
-        panel.title = "Export Video"
-        panel.prompt = "Export"
-        return panel.runModal() == .OK ? panel.url : nil
     }
 
     private func seekPlayback(to seconds: Double) {

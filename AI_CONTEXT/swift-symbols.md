@@ -1,6 +1,6 @@
 # Swift Symbols
 
-Generated: 2026-05-06 07:09:57
+Generated: 2026-05-06 17:58:46
 
 ## Zoom and Track/CaptureInfoInspectorViews.swift
 
@@ -13,95 +13,108 @@ Generated: 2026-05-06 07:09:57
 - Line 234:    func autocompleteSuggestionPanel(
 - Line 271:    func captureTypeChips(selectedType: CaptureType) -> some View {
 
+## Zoom and Track/CaptureMetadataManager.swift
+
+- Line 16:    func scheduleSave(
+- Line 39:    func cancelPendingSave() {
+
 ## Zoom and Track/CaptureSetupViewModel.swift
 
 - Line 13:    enum PlaybackPresentationMode {
 - Line 20:    enum PlaybackTransitionPlateState {
 - Line 27:    enum ExportState: Equatable {
-- Line 226:    func load() async {
-- Line 249:    func activateCaptureTarget(_ target: ShareableCaptureTarget) {
-- Line 267:    func requestPermission() async {
-- Line 275:    func startRecording() async {
-- Line 304:    func stopRecording() async {
-- Line 313:    func revealInFinder() {
-- Line 318:    func chooseOutputFolder() {
-- Line 324:    func openRecording() {
-- Line 329:    func exportRecording() {
-- Line 397:    func cancelExport() {
-- Line 404:    func dismissExportSheet() {
-- Line 446:    func revealExportInFinder() {
-- Line 451:    func openLibraryCapture(_ item: CaptureLibraryItem) {
-- Line 465:    func revealLibraryCapture(_ item: CaptureLibraryItem) {
-- Line 475:    func startMarkerPreview(_ markerID: String) {
-- Line 579:    func togglePlayback() {
-- Line 606:    func seekPlaybackInteractively(to seconds: Double) {
-- Line 620:    func jumpPlaybackToStart() {
-- Line 634:    func cancelPlaybackPreview() {
-- Line 644:    func beginTimelineScrub() {
-- Line 660:    func updateTimelineScrub(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
-- Line 675:    func endTimelineScrub(at seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
-- Line 696:    func seekTimelineDirectly(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
-- Line 722:    func beginTimelineMarkerMove(_ markerID: String) {
-- Line 738:    func previewTimelineMarkerMove(_ markerID: String, to seconds: Double) {
-- Line 742:    func commitTimelineMarkerMove(_ markerID: String, to seconds: Double) {
-- Line 752:    func nudgeSelectedTimelineMarker(by delta: Double) {
-- Line 774:    func nudgeSelectedEffectTimelineMarker(by delta: Double) {
-- Line 810:    func setSelectedMarkerEnabled(_ enabled: Bool) {
-- Line 816:    func setMarkerEnabled(_ enabled: Bool, for markerID: String) {
-- Line 822:    func toggleMarkerEnabled(_ markerID: String) {
-- Line 828:    func setMarkerName(_ markerName: String?, for markerID: String) {
-- Line 835:    func setSelectedMarkerZoomScale(_ zoomScale: Double) {
-- Line 841:    func setSelectedMarkerLeadInTime(_ leadInTime: Double) {
-- Line 848:    func setSelectedMarkerZoomInDuration(_ zoomInDuration: Double) {
-- Line 855:    func setSelectedMarkerHoldDuration(_ holdDuration: Double) {
-- Line 862:    func setSelectedMarkerZoomOutDuration(_ zoomOutDuration: Double) {
-- Line 869:    func setSelectedMarkerEaseStyle(_ easeStyle: ZoomEaseStyle) {
-- Line 875:    func setSelectedMarkerZoomType(_ zoomType: ZoomType) {
-- Line 885:    func setSelectedMarkerBounceAmount(_ bounceAmount: Double) {
-- Line 891:    func setSelectedMarkerNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
-- Line 897:    func setSelectedMarkerNoZoomOverflowRegion(_ region: NoZoomOverflowRegion?) {
-- Line 903:    func clearSelectedMarkerNoZoomOverflowRegion() {
-- Line 907:    func setSelectedEffectFocusRegion(_ region: EffectFocusRegion?) {
-- Line 919:    func clearSelectedEffectFocusRegion() {
-- Line 923:    func selectEffectMarker(_ markerID: String, seekPlaybackHead: Bool = true) {
-- Line 937:    func previewEffectMarker(_ markerID: String) {
-- Line 959:    func startEffectMarkerPreview(_ markerID: String) {
-- Line 1063:    func setSelectedEffectMarkerEnabled(_ enabled: Bool) {
-- Line 1069:    func toggleEffectMarkerEnabled(_ markerID: String) {
-- Line 1075:    func setEffectMarkerName(_ markerName: String?, for markerID: String) {
-- Line 1082:    func setSelectedEffectStyle(_ style: EffectStyle) {
-- Line 1088:    func setSelectedEffectAmount(_ amount: Double) {
-- Line 1094:    func setSelectedEffectBlurAmount(_ amount: Double) {
-- Line 1104:    func setSelectedEffectDarkenAmount(_ amount: Double) {
-- Line 1114:    func setSelectedEffectTintAmount(_ amount: Double) {
-- Line 1124:    func setSelectedEffectFadeInDuration(_ duration: Double) {
-- Line 1130:    func setSelectedEffectFadeOutDuration(_ duration: Double) {
-- Line 1136:    func setSelectedEffectHoldDuration(_ duration: Double) {
-- Line 1142:    func setSelectedEffectCornerRadius(_ radius: Double) {
-- Line 1148:    func setSelectedEffectFeather(_ feather: Double) {
-- Line 1154:    func setSelectedEffectTintColor(_ tintColor: EffectTintColor) {
-- Line 1160:    func addEffectMarker(at timestamp: Double? = nil) {
-- Line 1195:    func deleteSelectedEffectMarker() {
-- Line 1203:    func reorderEffectMarkerList(to orderedMarkerIDs: [String]) {
-- Line 1223:    func setDefaultNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
-- Line 1228:    func setSelectedMarkerClickPulseEnabled(_ enabled: Bool) {
-- Line 1239:    func setSelectedMarkerClickPulsePreset(_ preset: ClickPulsePreset) {
-- Line 1246:    func setCurrentCaptureTitle(_ title: String) {
-- Line 1251:    func setCurrentCaptureCollectionName(_ collectionName: String) {
-- Line 1256:    func setCurrentCaptureProjectName(_ projectName: String) {
-- Line 1261:    func setCurrentCaptureType(_ captureType: CaptureType) {
-- Line 1266:    func deleteSelectedMarker() {
-- Line 1274:    func duplicateSelectedMarker() {
-- Line 1285:    func addClickFocusMarker(at sourcePoint: CGPoint, timestamp: Double? = nil) {
-- Line 1336:    func reorderMarkerList(to orderedMarkerIDs: [String]) {
-- Line 1355:    func moveSelectedMarker(to sourcePoint: CGPoint) {
-- Line 1480:    func refreshLibrary() async {
+- Line 230:    func load() async {
+- Line 252:    func activateCaptureTarget(_ target: ShareableCaptureTarget) {
+- Line 270:    func requestPermission() async {
+- Line 276:    func startRecording() async {
+- Line 305:    func stopRecording() async {
+- Line 314:    func revealInFinder() {
+- Line 319:    func chooseOutputFolder() {
+- Line 325:    func openRecording() {
+- Line 330:    func exportRecording() {
+- Line 381:    func cancelExport() {
+- Line 387:    func dismissExportSheet() {
+- Line 432:    func revealExportInFinder() {
+- Line 437:    func openLibraryCapture(_ item: CaptureLibraryItem) {
+- Line 450:    func revealLibraryCapture(_ item: CaptureLibraryItem) {
+- Line 459:    func startMarkerPreview(_ markerID: String) {
+- Line 563:    func togglePlayback() {
+- Line 590:    func seekPlaybackInteractively(to seconds: Double) {
+- Line 604:    func jumpPlaybackToStart() {
+- Line 618:    func cancelPlaybackPreview() {
+- Line 628:    func beginTimelineScrub() {
+- Line 644:    func updateTimelineScrub(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
+- Line 659:    func endTimelineScrub(at seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
+- Line 680:    func seekTimelineDirectly(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
+- Line 706:    func beginTimelineMarkerMove(_ markerID: String) {
+- Line 722:    func previewTimelineMarkerMove(_ markerID: String, to seconds: Double) {
+- Line 726:    func commitTimelineMarkerMove(_ markerID: String, to seconds: Double) {
+- Line 736:    func nudgeSelectedTimelineMarker(by delta: Double) {
+- Line 758:    func nudgeSelectedEffectTimelineMarker(by delta: Double) {
+- Line 794:    func setSelectedMarkerEnabled(_ enabled: Bool) {
+- Line 800:    func setMarkerEnabled(_ enabled: Bool, for markerID: String) {
+- Line 806:    func toggleMarkerEnabled(_ markerID: String) {
+- Line 812:    func setMarkerName(_ markerName: String?, for markerID: String) {
+- Line 819:    func setSelectedMarkerZoomScale(_ zoomScale: Double) {
+- Line 825:    func setSelectedMarkerLeadInTime(_ leadInTime: Double) {
+- Line 832:    func setSelectedMarkerZoomInDuration(_ zoomInDuration: Double) {
+- Line 839:    func setSelectedMarkerHoldDuration(_ holdDuration: Double) {
+- Line 846:    func setSelectedMarkerZoomOutDuration(_ zoomOutDuration: Double) {
+- Line 853:    func setSelectedMarkerEaseStyle(_ easeStyle: ZoomEaseStyle) {
+- Line 859:    func setSelectedMarkerZoomType(_ zoomType: ZoomType) {
+- Line 869:    func setSelectedMarkerBounceAmount(_ bounceAmount: Double) {
+- Line 875:    func setSelectedMarkerNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
+- Line 881:    func setSelectedMarkerNoZoomOverflowRegion(_ region: NoZoomOverflowRegion?) {
+- Line 887:    func clearSelectedMarkerNoZoomOverflowRegion() {
+- Line 891:    func setSelectedEffectFocusRegion(_ region: EffectFocusRegion?) {
+- Line 903:    func clearSelectedEffectFocusRegion() {
+- Line 907:    func selectEffectMarker(_ markerID: String, seekPlaybackHead: Bool = true) {
+- Line 921:    func previewEffectMarker(_ markerID: String) {
+- Line 943:    func startEffectMarkerPreview(_ markerID: String) {
+- Line 1047:    func setSelectedEffectMarkerEnabled(_ enabled: Bool) {
+- Line 1053:    func toggleEffectMarkerEnabled(_ markerID: String) {
+- Line 1059:    func setEffectMarkerName(_ markerName: String?, for markerID: String) {
+- Line 1066:    func setSelectedEffectStyle(_ style: EffectStyle) {
+- Line 1072:    func setSelectedEffectAmount(_ amount: Double) {
+- Line 1078:    func setSelectedEffectBlurAmount(_ amount: Double) {
+- Line 1088:    func setSelectedEffectDarkenAmount(_ amount: Double) {
+- Line 1098:    func setSelectedEffectTintAmount(_ amount: Double) {
+- Line 1108:    func setSelectedEffectFadeInDuration(_ duration: Double) {
+- Line 1114:    func setSelectedEffectFadeOutDuration(_ duration: Double) {
+- Line 1120:    func setSelectedEffectHoldDuration(_ duration: Double) {
+- Line 1126:    func setSelectedEffectCornerRadius(_ radius: Double) {
+- Line 1132:    func setSelectedEffectFeather(_ feather: Double) {
+- Line 1138:    func setSelectedEffectTintColor(_ tintColor: EffectTintColor) {
+- Line 1144:    func addEffectMarker(at timestamp: Double? = nil) {
+- Line 1179:    func deleteSelectedEffectMarker() {
+- Line 1187:    func reorderEffectMarkerList(to orderedMarkerIDs: [String]) {
+- Line 1207:    func setDefaultNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
+- Line 1212:    func setSelectedMarkerClickPulseEnabled(_ enabled: Bool) {
+- Line 1223:    func setSelectedMarkerClickPulsePreset(_ preset: ClickPulsePreset) {
+- Line 1230:    func setCurrentCaptureTitle(_ title: String) {
+- Line 1235:    func setCurrentCaptureCollectionName(_ collectionName: String) {
+- Line 1240:    func setCurrentCaptureProjectName(_ projectName: String) {
+- Line 1245:    func setCurrentCaptureType(_ captureType: CaptureType) {
+- Line 1250:    func deleteSelectedMarker() {
+- Line 1258:    func duplicateSelectedMarker() {
+- Line 1269:    func addClickFocusMarker(at sourcePoint: CGPoint, timestamp: Double? = nil) {
+- Line 1320:    func reorderMarkerList(to orderedMarkerIDs: [String]) {
+- Line 1339:    func moveSelectedMarker(to sourcePoint: CGPoint) {
+- Line 1466:    func refreshLibrary() async {
 
 ## Zoom and Track/CaptureSetupViews.swift
 
 - Line 3:extension ContentView {
 - Line 223:    func targetSection(title: String, targets: [ShareableCaptureTarget]) -> some View {
 - Line 241:    func targetRow(_ target: ShareableCaptureTarget) -> some View {
+
+## Zoom and Track/CaptureTargetManager.swift
+
+- Line 8:struct CaptureTargetRefreshResult {
+- Line 16:struct CapturePermissionResult {
+- Line 21:struct CaptureTargetManager {
+- Line 33:    func loadTargets(selectedTargetID: String?, silent: Bool) async throws -> CaptureTargetRefreshResult {
+- Line 53:    func requestScreenRecordingPermission() -> CapturePermissionResult {
 
 ## Zoom and Track/ContentView.swift
 
@@ -162,6 +175,14 @@ Generated: 2026-05-06 07:09:57
 - Line 510:        func refreshTableIfNeeded() {
 - Line 777:    func update(rootView: EffectListCellContent) {
 
+## Zoom and Track/ExportManager.swift
+
+- Line 7:    enum Outcome {
+- Line 21:    func chooseExportDestination(defaultName: String) -> URL? {
+- Line 32:    func exportRecording(
+- Line 77:    func cancelExport() {
+- Line 82:    func reset() {
+
 ## Zoom and Track/InputEventCaptureService.swift
 
 - Line 31:    func start() {
@@ -169,6 +190,12 @@ Generated: 2026-05-06 07:09:57
 - Line 75:    func stop() {
 - Line 89:    func finish() -> [RecordedEvent] {
 - Line 100:    func cancel() {
+
+## Zoom and Track/LibraryManager.swift
+
+- Line 3:struct LibraryManager {
+- Line 6:    func loadLibrarySnapshot() async throws -> CaptureLibrarySnapshot {
+- Line 10:    func bundleURL(for item: CaptureLibraryItem) throws -> URL {
 
 ## Zoom and Track/LibraryViews.swift
 
