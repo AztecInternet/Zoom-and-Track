@@ -1,6 +1,6 @@
 # Swift Symbols
 
-Generated: 2026-05-06 00:27:13
+Generated: 2026-05-06 07:09:57
 
 ## Zoom and Track/CaptureInfoInspectorViews.swift
 
@@ -106,6 +106,7 @@ Generated: 2026-05-06 00:27:13
 ## Zoom and Track/ContentView.swift
 
 - Line 12:struct ContentView: View {
+- Line 61:    struct OverlayMapping {
 - Line 70:    struct ZoomPreviewState {
 - Line 75:    struct EffectPreviewState {
 - Line 86:    enum EffectRegionHandle: Hashable {
@@ -115,53 +116,28 @@ Generated: 2026-05-06 00:27:13
 - Line 150:    enum CaptureInfoField: Hashable {
 - Line 156:    enum MotionTuning {
 - Line 164:    struct LibraryFilterOption: Identifiable {
-- Line 1119:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
-- Line 1701:    func infoRow(title: String, value: String) -> some View {
-- Line 1712:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
-- Line 1751:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
-- Line 1827:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
-- Line 1839:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
-- Line 1843:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
-- Line 1864:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
-- Line 1934:    func timecodeString(since start: Date, now: Date) -> String {
-- Line 1944:    func timecodeString(for seconds: Double) -> String {
-- Line 1958:    func makeNSView(context: Context) -> NSView {
-- Line 1966:    func updateNSView(_ nsView: NSView, context: Context) {
-- Line 1977:enum AppTab: String, CaseIterable, Identifiable {
-- Line 1999:struct MarkerListEntry: Identifiable {
-- Line 2008:struct MarkerListTableView: NSViewRepresentable {
-- Line 2020:    func makeCoordinator() -> Coordinator {
-- Line 2024:    func makeNSView(context: Context) -> NSScrollView {
-- Line 2061:    func updateNSView(_ nsView: NSScrollView, context: Context) {
-- Line 2082:        func handleTableViewAction(_ sender: Any?) {
-- Line 2092:        func numberOfRows(in tableView: NSTableView) -> Int {
-- Line 2096:        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-- Line 2100:        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-- Line 2126:        func tableViewSelectionDidChange(_ notification: Notification) {
-- Line 2139:        func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
-- Line 2148:        func tableView(
-- Line 2158:        func tableView(
-- Line 2179:        func syncSelection() {
-- Line 2196:        func refreshTableIfNeeded() {
-- Line 2423:    func update(rootView: MarkerListCellContent) {
-- Line 2441:    func validateDrop(info: DropInfo) -> Bool {
-- Line 2445:    func dropEntered(info: DropInfo) {
-- Line 2458:    func dropUpdated(info: DropInfo) -> DropProposal? {
-- Line 2465:    func performDrop(info: DropInfo) -> Bool {
-- Line 2488:    func dropExited(info: DropInfo) {
-- Line 2498:    func makeNSView(context: Context) -> AVPlayerView {
-- Line 2506:    func updateNSView(_ nsView: AVPlayerView, context: Context) {
-- Line 2515:struct PlaybackVideoLayerSurface: NSViewRepresentable {
-- Line 2518:    func makeNSView(context: Context) -> PlayerLayerHostView {
-- Line 2524:    func updateNSView(_ nsView: PlayerLayerHostView, context: Context) {
-- Line 2553:struct PrecisionTimeField: NSViewRepresentable {
-- Line 2560:    func makeCoordinator() -> Coordinator {
-- Line 2564:    func makeNSView(context: Context) -> NSTextField {
-- Line 2578:    func updateNSView(_ nsView: NSTextField, context: Context) {
-- Line 2611:        func controlTextDidBeginEditing(_ obj: Notification) {
-- Line 2619:        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-- Line 2635:        func controlTextDidEndEditing(_ obj: Notification) {
-- Line 2657:        func displayString(for value: Double) -> String {
+- Line 426:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
+- Line 542:    func mappedOverlayPoint(
+- Line 581:    func infoRow(title: String, value: String) -> some View {
+- Line 592:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
+- Line 631:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
+- Line 647:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
+- Line 654:    func clearTimelineHover() {
+- Line 663:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
+- Line 668:    func clearEffectTimelineHover() {
+- Line 673:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
+- Line 683:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
+- Line 692:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
+- Line 707:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
+- Line 719:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
+- Line 723:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
+- Line 744:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
+- Line 814:    func timecodeString(since start: Date, now: Date) -> String {
+- Line 824:    func timecodeString(for seconds: Double) -> String {
+- Line 838:    func makeNSView(context: Context) -> NSView {
+- Line 846:    func updateNSView(_ nsView: NSView, context: Context) {
+- Line 857:enum AppTab: String, CaseIterable, Identifiable {
+- Line 879:struct MarkerListEntry: Identifiable {
 
 ## Zoom and Track/EffectsEditorViews.swift
 
@@ -210,6 +186,29 @@ Generated: 2026-05-06 00:27:13
 - Line 462:    func toggleLibraryProjectFilter(_ projectName: String) {
 - Line 470:    func toggleLibraryTypeFilter(_ type: CaptureType) {
 - Line 474:    func clearLibraryFilters() {
+
+## Zoom and Track/MarkerListTableViews.swift
+
+- Line 5:struct MarkerListTableView: NSViewRepresentable {
+- Line 17:    func makeCoordinator() -> Coordinator {
+- Line 21:    func makeNSView(context: Context) -> NSScrollView {
+- Line 58:    func updateNSView(_ nsView: NSScrollView, context: Context) {
+- Line 79:        func handleTableViewAction(_ sender: Any?) {
+- Line 89:        func numberOfRows(in tableView: NSTableView) -> Int {
+- Line 93:        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+- Line 97:        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+- Line 123:        func tableViewSelectionDidChange(_ notification: Notification) {
+- Line 136:        func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
+- Line 145:        func tableView(
+- Line 155:        func tableView(
+- Line 176:        func syncSelection() {
+- Line 193:        func refreshTableIfNeeded() {
+- Line 420:    func update(rootView: MarkerListCellContent) {
+- Line 438:    func validateDrop(info: DropInfo) -> Bool {
+- Line 442:    func dropEntered(info: DropInfo) {
+- Line 455:    func dropUpdated(info: DropInfo) -> DropProposal? {
+- Line 462:    func performDrop(info: DropInfo) -> Bool {
+- Line 485:    func dropExited(info: DropInfo) {
 
 ## Zoom and Track/MarkerPreviewCacheService.swift
 
@@ -339,6 +338,13 @@ Generated: 2026-05-06 00:27:13
 - Line 657:    func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
 - Line 678:    func markerTypeSymbol(for zoomType: ZoomType) -> String {
 
+## Zoom and Track/ReviewPlaybackMainViews.swift
+
+- Line 4:extension ContentView {
+- Line 5:    func playbackVideoCard(
+- Line 628:    func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
+- Line 1014:    func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {
+
 ## Zoom and Track/ReviewPlaybackPreviewViews.swift
 
 - Line 5:extension ContentView {
@@ -374,6 +380,23 @@ Generated: 2026-05-06 00:27:13
 - Line 722:    func effectRegionPrecisionLoupe(
 - Line 780:    func transformedOverlayPoint(
 
+## Zoom and Track/ReviewSupportViews.swift
+
+- Line 5:struct PlaybackVideoSurface: NSViewRepresentable {
+- Line 8:    func makeNSView(context: Context) -> AVPlayerView {
+- Line 16:    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+- Line 25:struct PlaybackVideoLayerSurface: NSViewRepresentable {
+- Line 28:    func makeNSView(context: Context) -> PlayerLayerHostView {
+- Line 34:    func updateNSView(_ nsView: PlayerLayerHostView, context: Context) {
+- Line 64:struct PrecisionTimeField: NSViewRepresentable {
+- Line 71:    func makeCoordinator() -> Coordinator {
+- Line 75:    func makeNSView(context: Context) -> NSTextField {
+- Line 89:    func updateNSView(_ nsView: NSTextField, context: Context) {
+- Line 122:        func controlTextDidBeginEditing(_ obj: Notification) {
+- Line 130:        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+- Line 146:        func controlTextDidEndEditing(_ obj: Notification) {
+- Line 168:        func displayString(for value: Double) -> String {
+
 ## Zoom and Track/ReviewTimelineInteractionViews.swift
 
 - Line 3:extension ContentView {
@@ -401,6 +424,11 @@ Generated: 2026-05-06 00:27:13
 - Line 182:extension ScreenCaptureService: SCStreamOutput, SCStreamDelegate {
 - Line 183:    func stream(_ stream: SCStream, didStopWithError error: any Error) {
 - Line 187:    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
+
+## Zoom and Track/SettingsViews.swift
+
+- Line 3:extension ContentView {
+- Line 76:    func settingsCard(title: String, body: AnyView) -> some View {
 
 ## Zoom and Track/TimelineToolbarControls.swift
 
