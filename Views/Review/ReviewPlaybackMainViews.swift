@@ -797,6 +797,9 @@ extension ContentView {
                     onTimelineTap: { markerID in
                         isTimelineKeyboardFocused = true
                         suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
+                        if viewModel.isPlaybackActive {
+                            viewModel.togglePlayback()
+                        }
                         viewModel.startMarkerPreview(markerID)
                     },
                     onTimelineOptionDragChanged: { markerID, translationX in
@@ -924,9 +927,6 @@ extension ContentView {
         .focusEffectDisabled()
         .focused($isTimelineKeyboardFocused)
         .onKeyPress(.space) {
-            guard viewModel.canUsePlaybackTransport || viewModel.isRenderedPreviewActive || viewModel.playbackPresentationMode == .previewCompletedSlate else {
-                return .ignored
-            }
             viewModel.togglePlayback()
             return .handled
         }

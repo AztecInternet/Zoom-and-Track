@@ -115,6 +115,9 @@ final class CaptureSetupViewModel: ObservableObject {
         screenCaptureService: screenCaptureService
     )
     nonisolated(unsafe) private let captureMetadataManager: CaptureMetadataManager
+    private let playbackTransportManager = PlaybackTransportManager()
+    private let timelineScrubManager = TimelineScrubManager()
+    private let timelineMarkerMoveManager = TimelineMarkerMoveManager()
     private let inputEventCaptureService = InputEventCaptureService()
     private let markerPreviewRenderService = MarkerPreviewRenderService()
     private let markerPreviewCacheService = MarkerPreviewCacheService()
@@ -561,176 +564,242 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     func togglePlayback() {
-        guard canUsePlaybackTransport || isRenderedPreviewActive || playbackPresentationMode == .previewCompletedSlate else {
-            return
-        }
+        guard let plan = playbackTransportManager.togglePlan(
+            canUsePlaybackTransport: canUsePlaybackTransport,
+            isRenderedPreviewActive: isRenderedPreviewActive,
+            playbackPresentationMode: playbackPresentationMode,
+            isMainPlayerPlaying: mainPlayer?.timeControlStatus == .playing,
+            currentPlaybackTime: currentPlaybackTime
+        ) else { return }
         cancelPendingMarkerPreviewRender()
-        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+        if plan.shouldResetPreviewPresentation {
             playbackTransitionPlateState = .hidden
             playbackPresentationMode = .normal
         }
-        if isRenderedPreviewActive {
-            stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
-            mainPlayer?.play()
-            isPlaybackActive = true
-            cancelPreviewMode()
-            return
+        if plan.shouldStopPreviewPlayback {
+            stopPreviewPlayback(seekMainTo: plan.stopPreviewSeekTime, retainSlate: plan.retainSlate)
         }
-        cancelPreviewMode()
+        if plan.shouldCancelPreviewMode {
+            cancelPreviewMode()
+        }
         guard let player = mainPlayer else { return }
-        if player.timeControlStatus == .playing {
+        switch plan.playerCommand {
+        case .pause:
             player.pause()
             isPlaybackActive = false
-        } else {
+        case .play:
             player.play()
             isPlaybackActive = true
+        case .none:
+            break
         }
     }
 
     func seekPlaybackInteractively(to seconds: Double) {
-        guard canUsePlaybackTransport || isRenderedPreviewActive || playbackPresentationMode == .previewCompletedSlate else {
-            return
-        }
+        guard let plan = playbackTransportManager.interactiveSeekPlan(
+            canUsePlaybackTransport: canUsePlaybackTransport,
+            isRenderedPreviewActive: isRenderedPreviewActive,
+            playbackPresentationMode: playbackPresentationMode,
+            currentPlaybackTime: currentPlaybackTime,
+            targetTime: seconds
+        ) else { return }
         cancelPendingMarkerPreviewRender()
-        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+        if plan.shouldResetPreviewPresentation {
             playbackTransitionPlateState = .hidden
             playbackPresentationMode = .normal
         }
-        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
-        cancelPreviewMode()
-        seekPlayback(to: seconds)
+        if plan.shouldStopPreviewPlayback {
+            stopPreviewPlayback(seekMainTo: plan.stopPreviewSeekTime, retainSlate: plan.retainSlate)
+        }
+        if plan.shouldCancelPreviewMode {
+            cancelPreviewMode()
+        }
+        if let seekTime = plan.seekTime {
+            seekPlayback(to: seekTime)
+        }
     }
 
     func jumpPlaybackToStart() {
-        guard canUsePlaybackTransport || isRenderedPreviewActive || playbackPresentationMode == .previewCompletedSlate else {
-            return
-        }
+        guard let plan = playbackTransportManager.jumpToStartPlan(
+            canUsePlaybackTransport: canUsePlaybackTransport,
+            isRenderedPreviewActive: isRenderedPreviewActive,
+            playbackPresentationMode: playbackPresentationMode,
+            currentPlaybackTime: currentPlaybackTime
+        ) else { return }
         cancelPendingMarkerPreviewRender()
-        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+        if plan.shouldResetPreviewPresentation {
             playbackTransitionPlateState = .hidden
             playbackPresentationMode = .normal
         }
-        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
-        cancelPreviewMode()
-        seekPlayback(to: 0)
+        if plan.shouldStopPreviewPlayback {
+            stopPreviewPlayback(seekMainTo: plan.stopPreviewSeekTime, retainSlate: plan.retainSlate)
+        }
+        if plan.shouldCancelPreviewMode {
+            cancelPreviewMode()
+        }
+        if let seekTime = plan.seekTime {
+            seekPlayback(to: seekTime)
+        }
     }
 
     func cancelPlaybackPreview() {
+        let plan = playbackTransportManager.cancelPreviewPlan(
+            playbackPresentationMode: playbackPresentationMode,
+            currentPlaybackTime: currentPlaybackTime
+        )
         cancelPendingMarkerPreviewRender()
-        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+        if plan.shouldResetPreviewPresentation {
             playbackTransitionPlateState = .hidden
             playbackPresentationMode = .normal
         }
-        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
-        cancelPreviewMode()
+        if plan.shouldStopPreviewPlayback {
+            stopPreviewPlayback(seekMainTo: plan.stopPreviewSeekTime, retainSlate: plan.retainSlate)
+        }
+        if plan.shouldCancelPreviewMode {
+            cancelPreviewMode()
+        }
     }
 
     func beginTimelineScrub() {
-        guard canUsePlaybackTransport, let player = mainPlayer, !isTimelineScrubbing else { return }
+        guard let plan = timelineScrubManager.beginScrubPlan(
+            canUsePlaybackTransport: canUsePlaybackTransport,
+            hasMainPlayer: mainPlayer != nil,
+            isTimelineScrubbing: isTimelineScrubbing,
+            playbackPresentationMode: playbackPresentationMode,
+            currentPlaybackTime: currentPlaybackTime,
+            isMainPlayerPlaying: mainPlayer?.timeControlStatus == .playing
+        ) else { return }
         cancelPendingMarkerPreviewRender()
-        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+        if plan.shouldResetPreviewPresentation {
             playbackTransitionPlateState = .hidden
             playbackPresentationMode = .normal
         }
-        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
-        cancelPreviewMode()
-        wasPlayingBeforeTimelineScrub = player.timeControlStatus == .playing
-        player.pause()
-        isPlaybackActive = false
-        isTimelineScrubbing = true
-        manualSelectionSuppressionUntil = Date().addingTimeInterval(0.5)
+        if plan.shouldStopPreviewPlayback {
+            stopPreviewPlayback(seekMainTo: plan.stopPreviewSeekTime, retainSlate: plan.retainSlate)
+        }
+        if plan.shouldCancelPreviewMode {
+            cancelPreviewMode()
+        }
+        wasPlayingBeforeTimelineScrub = plan.wasPlayingBeforeTimelineScrub
+        if plan.shouldPause {
+            mainPlayer?.pause()
+        }
+        if plan.shouldSetPlaybackInactive {
+            isPlaybackActive = false
+        }
+        isTimelineScrubbing = plan.isTimelineScrubbing
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(plan.suppressionInterval)
     }
 
     func updateTimelineScrub(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
-        guard isTimelineScrubbing else { return }
-        if let snappedMarkerID {
-            selectedZoomMarkerID = snappedMarkerID
-        } else {
-            selectedZoomMarkerID = nil
-        }
-        if let snappedEffectMarkerID {
-            selectedEffectMarkerID = snappedEffectMarkerID
-        } else {
-            selectedEffectMarkerID = nil
-        }
-        seekPlayback(to: seconds)
+        guard let plan = timelineScrubManager.updateScrubPlan(
+            isTimelineScrubbing: isTimelineScrubbing,
+            targetTime: seconds,
+            snappedMarkerID: snappedMarkerID,
+            snappedEffectMarkerID: snappedEffectMarkerID
+        ) else { return }
+        selectedZoomMarkerID = plan.selectedZoomMarkerID
+        selectedEffectMarkerID = plan.selectedEffectMarkerID
+        seekPlayback(to: plan.targetTime)
     }
 
     func endTimelineScrub(at seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
-        guard isTimelineScrubbing else { return }
-        if let snappedMarkerID {
-            selectedZoomMarkerID = snappedMarkerID
-        } else {
-            selectedZoomMarkerID = nil
-        }
-        if let snappedEffectMarkerID {
-            selectedEffectMarkerID = snappedEffectMarkerID
-        } else {
-            selectedEffectMarkerID = nil
-        }
-        seekPlayback(to: seconds)
-        isTimelineScrubbing = false
-        manualSelectionSuppressionUntil = Date().addingTimeInterval(0.2)
-        if wasPlayingBeforeTimelineScrub {
+        guard let plan = timelineScrubManager.endScrubPlan(
+            isTimelineScrubbing: isTimelineScrubbing,
+            targetTime: seconds,
+            snappedMarkerID: snappedMarkerID,
+            snappedEffectMarkerID: snappedEffectMarkerID,
+            wasPlayingBeforeTimelineScrub: wasPlayingBeforeTimelineScrub
+        ) else { return }
+        selectedZoomMarkerID = plan.selectedZoomMarkerID
+        selectedEffectMarkerID = plan.selectedEffectMarkerID
+        seekPlayback(to: plan.targetTime)
+        isTimelineScrubbing = plan.isTimelineScrubbing
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(plan.suppressionInterval)
+        if plan.shouldResumePlayback {
             mainPlayer?.play()
             isPlaybackActive = true
         }
     }
 
     func seekTimelineDirectly(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
-        guard canUsePlaybackTransport || isRenderedPreviewActive || playbackPresentationMode == .previewCompletedSlate else {
-            return
-        }
+        guard let plan = timelineScrubManager.directSeekPlan(
+            canUsePlaybackTransport: canUsePlaybackTransport,
+            isRenderedPreviewActive: isRenderedPreviewActive,
+            playbackPresentationMode: playbackPresentationMode,
+            currentPlaybackTime: currentPlaybackTime,
+            targetTime: seconds,
+            snappedMarkerID: snappedMarkerID,
+            snappedEffectMarkerID: snappedEffectMarkerID
+        ) else { return }
         cancelPendingMarkerPreviewRender()
-        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+        if plan.shouldResetPreviewPresentation {
             playbackTransitionPlateState = .hidden
             playbackPresentationMode = .normal
         }
-        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
-        cancelPreviewMode()
-        if let snappedMarkerID {
-            selectedZoomMarkerID = snappedMarkerID
-            manualSelectionSuppressionUntil = Date().addingTimeInterval(0.35)
-        } else {
-            selectedZoomMarkerID = nil
+        if plan.shouldStopPreviewPlayback {
+            stopPreviewPlayback(seekMainTo: plan.stopPreviewSeekTime, retainSlate: plan.retainSlate)
         }
-        if let snappedEffectMarkerID {
-            selectedEffectMarkerID = snappedEffectMarkerID
-            manualSelectionSuppressionUntil = Date().addingTimeInterval(0.35)
-        } else {
-            selectedEffectMarkerID = nil
+        if plan.shouldCancelPreviewMode {
+            cancelPreviewMode()
         }
-        seekPlayback(to: seconds)
+        selectedZoomMarkerID = plan.selectedZoomMarkerID
+        selectedEffectMarkerID = plan.selectedEffectMarkerID
+        if let suppressionInterval = plan.suppressionInterval {
+            manualSelectionSuppressionUntil = Date().addingTimeInterval(suppressionInterval)
+        }
+        seekPlayback(to: plan.targetTime)
     }
 
     func beginTimelineMarkerMove(_ markerID: String) {
-        guard canEditClickFocusMarkers, let player = mainPlayer else { return }
+        guard let plan = timelineMarkerMoveManager.beginMovePlan(
+            canEditClickFocusMarkers: canEditClickFocusMarkers,
+            hasMainPlayer: mainPlayer != nil,
+            playbackPresentationMode: playbackPresentationMode,
+            currentPlaybackTime: currentPlaybackTime,
+            markerID: markerID,
+            isMainPlayerPlaying: mainPlayer?.timeControlStatus == .playing
+        ) else { return }
         cancelPendingMarkerPreviewRender()
-        if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
+        if plan.shouldResetPreviewPresentation {
             playbackTransitionPlateState = .hidden
             playbackPresentationMode = .normal
         }
-        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
-        cancelPreviewMode()
-        wasPlayingBeforeMarkerTimelineMove = player.timeControlStatus == .playing
-        player.pause()
-        isPlaybackActive = false
-        selectedZoomMarkerID = markerID
-        manualSelectionSuppressionUntil = Date().addingTimeInterval(0.5)
+        if plan.shouldStopPreviewPlayback {
+            stopPreviewPlayback(seekMainTo: plan.stopPreviewSeekTime, retainSlate: plan.retainSlate)
+        }
+        if plan.shouldCancelPreviewMode {
+            cancelPreviewMode()
+        }
+        wasPlayingBeforeMarkerTimelineMove = plan.wasPlayingBeforeMarkerTimelineMove
+        if plan.shouldPause {
+            mainPlayer?.pause()
+        }
+        if plan.shouldSetPlaybackInactive {
+            isPlaybackActive = false
+        }
+        selectedZoomMarkerID = plan.selectedZoomMarkerID
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(plan.suppressionInterval)
     }
 
     func previewTimelineMarkerMove(_ markerID: String, to seconds: Double) {
-        moveMarker(markerID, to: seconds, persist: false, seekPlaybackHead: false)
+        let plan = timelineMarkerMoveManager.previewMovePlan(markerID: markerID, targetTime: seconds)
+        moveMarker(plan.markerID, to: plan.targetTime, persist: plan.shouldPersist, seekPlaybackHead: plan.shouldSeekPlaybackHead)
     }
 
     func commitTimelineMarkerMove(_ markerID: String, to seconds: Double) {
-        moveMarker(markerID, to: seconds, persist: true, seekPlaybackHead: true)
-        manualSelectionSuppressionUntil = Date().addingTimeInterval(0.2)
-        if wasPlayingBeforeMarkerTimelineMove {
+        let plan = timelineMarkerMoveManager.commitMovePlan(
+            markerID: markerID,
+            targetTime: seconds,
+            wasPlayingBeforeMarkerTimelineMove: wasPlayingBeforeMarkerTimelineMove
+        )
+        moveMarker(plan.markerID, to: plan.targetTime, persist: plan.shouldPersist, seekPlaybackHead: plan.shouldSeekPlaybackHead)
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(plan.suppressionInterval)
+        if plan.shouldResumePlayback {
             mainPlayer?.play()
             isPlaybackActive = true
         }
-        wasPlayingBeforeMarkerTimelineMove = false
+        wasPlayingBeforeMarkerTimelineMove = plan.nextWasPlayingBeforeMarkerTimelineMove
     }
 
     func nudgeSelectedTimelineMarker(by delta: Double) {
