@@ -1142,19 +1142,41 @@ final class CaptureSetupViewModel: ObservableObject {
 
     func setSelectedEffectFadeInDuration(_ duration: Double) {
         updateSelectedEffectMarker { marker in
-            marker.fadeInDuration = min(max(duration, 0.05), 3.0)
+            marker.startTime = marker.holdStartTime - min(max(duration, 0), 3.0)
         }
     }
 
     func setSelectedEffectFadeOutDuration(_ duration: Double) {
         updateSelectedEffectMarker { marker in
-            marker.fadeOutDuration = min(max(duration, 0.05), 3.0)
+            marker.endTime = marker.holdEndTime + min(max(duration, 0), 3.0)
+        }
+    }
+
+    func setSelectedEffectHoldStartTime(_ time: Double) {
+        let maxDuration = recordingSummary?.duration
+        updateSelectedEffectMarker { marker in
+            let existingFadeInDuration = marker.fadeInDuration
+            let maxHoldStart = min(marker.holdEndTime, maxDuration ?? marker.holdEndTime)
+            let clampedHoldStart = min(max(time, existingFadeInDuration), maxHoldStart)
+            marker.holdStartTime = clampedHoldStart
+            marker.startTime = clampedHoldStart - existingFadeInDuration
+        }
+    }
+
+    func setSelectedEffectHoldEndTime(_ time: Double) {
+        let maxDuration = max(recordingSummary?.duration ?? 0, 0)
+        updateSelectedEffectMarker { marker in
+            let existingFadeOutDuration = marker.fadeOutDuration
+            let maxHoldEnd = max(marker.holdStartTime, maxDuration - existingFadeOutDuration)
+            let clampedHoldEnd = min(max(time, marker.holdStartTime), maxHoldEnd)
+            marker.holdEndTime = clampedHoldEnd
+            marker.endTime = clampedHoldEnd + existingFadeOutDuration
         }
     }
 
     func setSelectedEffectHoldDuration(_ duration: Double) {
         updateSelectedEffectMarker { marker in
-            marker.endTime = max(marker.sourceEventTimestamp + min(max(duration, 0.05), 10.0), marker.startTime + 0.05)
+            marker.holdEndTime = marker.holdStartTime + min(max(duration, 0.05), 10.0)
         }
     }
 
@@ -1186,14 +1208,14 @@ final class CaptureSetupViewModel: ObservableObject {
         let maxDuration = max(summary.duration ?? (eventTimestamp + 1.0), eventTimestamp)
 
         var effectMarkers = summary.effectMarkers
-        let marker = EffectPlanItem(
+        var marker = EffectPlanItem(
             id: nextEffectMarkerID(from: effectMarkers),
             markerName: nil,
             sourceEventTimestamp: eventTimestamp,
             startTime: max(0, eventTimestamp - 0.35),
+            holdStartTime: max(0, eventTimestamp - 0.35) + 0.18,
+            holdEndTime: min(eventTimestamp + 1.0, maxDuration) - 0.24,
             endTime: min(eventTimestamp + 1.0, maxDuration),
-            fadeInDuration: 0.18,
-            fadeOutDuration: 0.24,
             enabled: true,
             displayOrder: nextEffectDisplayOrder(from: effectMarkers),
             style: .blurDarken,
@@ -1206,6 +1228,7 @@ final class CaptureSetupViewModel: ObservableObject {
             tintColor: .defaultTint,
             focusRegion: nil
         )
+        syncEffectTiming(&marker, maxDuration: summary.duration)
         effectMarkers.append(marker)
         selectedEffectMarkerID = marker.id
         saveEffectMarkers(effectMarkers, basedOn: summary)
@@ -1668,6 +1691,7 @@ final class CaptureSetupViewModel: ObservableObject {
 
         var effectMarkers = summary.effectMarkers
         mutate(&effectMarkers[index])
+        syncEffectTiming(&effectMarkers[index], maxDuration: summary.duration)
         saveEffectMarkers(effectMarkers, basedOn: summary)
     }
 
@@ -1690,6 +1714,7 @@ final class CaptureSetupViewModel: ObservableObject {
 
         var effectMarkers = summary.effectMarkers
         mutate(&effectMarkers[index])
+        syncEffectTiming(&effectMarkers[index], maxDuration: summary.duration)
         saveEffectMarkers(effectMarkers, basedOn: summary)
     }
 
@@ -1830,6 +1855,16 @@ final class CaptureSetupViewModel: ObservableObject {
             Int(marker.id.replacingOccurrences(of: "effect-", with: ""))
         }.max() ?? 0
         return String(format: "effect-%04d", maxIndex + 1)
+    }
+
+    private func syncEffectTiming(_ marker: inout EffectPlanItem, maxDuration: Double?) {
+        let clampedDuration = max(maxDuration ?? marker.endTime, 0)
+        marker.startTime = min(max(marker.startTime, 0), clampedDuration)
+        marker.endTime = min(max(marker.endTime, 0), clampedDuration)
+        marker.holdStartTime = min(max(marker.holdStartTime, marker.startTime), marker.endTime)
+        marker.holdEndTime = min(max(marker.holdEndTime, marker.holdStartTime), marker.endTime)
+        marker.startTime = min(marker.startTime, marker.holdStartTime)
+        marker.normalizeTiming()
     }
 
     private func syncMarkerTiming(_ marker: inout ZoomPlanItem) {

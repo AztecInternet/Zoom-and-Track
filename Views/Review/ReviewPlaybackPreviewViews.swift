@@ -65,8 +65,8 @@ extension ContentView {
             return nil
         }
 
-        let fadeInDuration = max(marker.fadeInDuration, 0)
-        let fadeOutDuration = max(marker.fadeOutDuration, 0)
+        let fadeInDuration = max(marker.holdStartTime - marker.startTime, 0)
+        let fadeOutDuration = max(marker.endTime - marker.holdEndTime, 0)
         let fadeInProgress: Double
         if fadeInDuration <= 0.0001 {
             fadeInProgress = 1

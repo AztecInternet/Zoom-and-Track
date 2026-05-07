@@ -493,24 +493,34 @@ extension ContentView {
 
                 VStack(alignment: .leading, spacing: 6) {
                     InspectorSectionHeaderView(title: "Timing")
-                    timingSliderRow(
-                        title: "Hold",
-                        value: max(marker.endTime - marker.sourceEventTimestamp, 0.05),
-                        range: 0.05...10,
+                    let maxTimelineTime = max(viewModel.recordingSummary?.duration ?? marker.endTime, marker.holdEndTime)
+                    let maxFadeInDuration = max(min(3.0, marker.holdStartTime), 0)
+                    let maxFadeOutDuration = max(min(3.0, maxTimelineTime - marker.holdEndTime), 0)
+                    pointTimingRow(
+                        title: "Hold Start Point",
+                        value: marker.holdStartTime,
+                        range: 0...maxTimelineTime,
+                        phase: .leadIn,
+                        action: setSelectedEffectHoldStartTimeAndFollowPlayback
+                    )
+                    pointTimingRow(
+                        title: "Hold End Point",
+                        value: marker.holdEndTime,
+                        range: 0...maxTimelineTime,
                         phase: .hold,
-                        action: viewModel.setSelectedEffectHoldDuration
+                        action: setSelectedEffectHoldEndTimeAndFollowPlayback
                     )
                     timingSliderRow(
-                        title: "Fade In",
+                        title: "Fade In Duration",
                         value: marker.fadeInDuration,
-                        range: 0.05...3,
+                        range: 0...maxFadeInDuration,
                         phase: .leadIn,
                         action: viewModel.setSelectedEffectFadeInDuration
                     )
                     timingSliderRow(
-                        title: "Fade Out",
+                        title: "Fade Out Duration",
                         value: marker.fadeOutDuration,
-                        range: 0.05...3,
+                        range: 0...maxFadeOutDuration,
                         phase: .zoomOut,
                         action: viewModel.setSelectedEffectFadeOutDuration
                     )
@@ -627,6 +637,89 @@ extension ContentView {
                 }
             )
         }
+    }
+
+    func pointTimingRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                PrecisionTimeField(
+                    value: value,
+                    range: range,
+                    action: action,
+                    onBeginEditing: {
+                        inspectorFocusedTimingPhase = phase
+                    },
+                    onEndEditing: {
+                        if inspectorFocusedTimingPhase == phase {
+                            inspectorFocusedTimingPhase = nil
+                        }
+                    }
+                )
+                .frame(width: 72, height: 22)
+            }
+
+            GeometryReader { geometry in
+                let lowerBound = range.lowerBound
+                let upperBound = range.upperBound
+                let span = max(upperBound - lowerBound, 0.0001)
+                let clampedValue = min(max(value, lowerBound), upperBound)
+                let fraction = min(max((clampedValue - lowerBound) / span, 0), 1)
+                let handleInset: CGFloat = 3
+                let usableWidth = max(geometry.size.width - (handleInset * 2), 1)
+                let handleX = handleInset + (usableWidth * fraction)
+
+                ZStack(alignment: .leading) {
+                    Capsule(style: .continuous)
+                        .fill(Color.secondary.opacity(0.18))
+                        .frame(height: 4)
+                        .frame(maxHeight: .infinity, alignment: .center)
+
+                    Capsule(style: .continuous)
+                        .fill(Color.accentColor)
+                        .frame(width: 4, height: 18)
+                        .position(x: handleX, y: geometry.size.height / 2)
+                }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            inspectorFocusedTimingPhase = phase
+                            let localX = min(max(value.location.x - handleInset, 0), usableWidth)
+                            let newFraction = usableWidth <= 0 ? 0 : localX / usableWidth
+                            let newValue = lowerBound + (span * newFraction)
+                            action(newValue)
+                        }
+                        .onEnded { _ in
+                            if inspectorFocusedTimingPhase == phase {
+                                inspectorFocusedTimingPhase = nil
+                            }
+                        }
+                )
+            }
+            .frame(height: 18)
+        }
+    }
+
+    func setSelectedEffectHoldStartTimeAndFollowPlayback(_ time: Double) {
+        if viewModel.isPlaybackActive {
+            viewModel.togglePlayback()
+        }
+        viewModel.setSelectedEffectHoldStartTime(time)
+        let resolvedTime = viewModel.selectedEffectMarker?.holdStartTime ?? time
+        viewModel.seekPlaybackInteractively(to: resolvedTime)
+    }
+
+    func setSelectedEffectHoldEndTimeAndFollowPlayback(_ time: Double) {
+        if viewModel.isPlaybackActive {
+            viewModel.togglePlayback()
+        }
+        viewModel.setSelectedEffectHoldEndTime(time)
+        let resolvedTime = viewModel.selectedEffectMarker?.holdEndTime ?? time
+        viewModel.seekPlaybackInteractively(to: resolvedTime)
     }
 
     @ViewBuilder

@@ -19,6 +19,8 @@ func effectTimelineSegmentLayouts(for markers: [EffectPlanItem], duration: Doubl
         .map { marker in
             let eventRatio = min(max(marker.snapTime / safeDuration, 0), 1)
             let startRatio = min(max(marker.startTime / safeDuration, 0), eventRatio)
+            let holdStartRatio = min(max(marker.holdStartTime / safeDuration, startRatio), 1)
+            let holdEndRatio = min(max(marker.holdEndTime / safeDuration, holdStartRatio), 1)
             let endRatio = min(max(marker.endTime / safeDuration, eventRatio), 1)
             let lane = effectTimelineLane(
                 for: startRatio,
@@ -31,6 +33,8 @@ func effectTimelineSegmentLayouts(for markers: [EffectPlanItem], duration: Doubl
                 marker: marker,
                 lane: lane,
                 startRatio: startRatio,
+                holdStartRatio: holdStartRatio,
+                holdEndRatio: holdEndRatio,
                 eventRatio: eventRatio,
                 endRatio: endRatio
             )
@@ -79,6 +83,8 @@ struct EffectTimelineSegmentLayout: Identifiable {
     let marker: EffectPlanItem
     let lane: Int
     let startRatio: Double
+    let holdStartRatio: Double
+    let holdEndRatio: Double
     let eventRatio: Double
     let endRatio: Double
 
@@ -101,8 +107,9 @@ struct EffectTimelineSegmentView: View {
         let laneSpacing: CGFloat = 4
         let laneY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
         let startX = CGFloat(layout.startRatio) * width
+        let holdStartX = CGFloat(layout.holdStartRatio) * width
+        let holdEndX = CGFloat(layout.holdEndRatio) * width
         let endX = CGFloat(layout.endRatio) * width
-        let eventX = CGFloat(layout.eventRatio) * width
         let barWidth = max(endX - startX, 12)
         let baseColor: Color = isSelected
             ? .accentColor
@@ -117,26 +124,43 @@ struct EffectTimelineSegmentView: View {
         let localCenterX = localMinX + (localWidth / 2)
         let localCenterY = hoverTargetHeight / 2
         let localStartX = startX - localMinX
-        let localEventX = eventX - localMinX
+        let localHoldStartX = holdStartX - localMinX
+        let localHoldEndX = holdEndX - localMinX
+        let fadeInWidth = max(localHoldStartX - localStartX, 0)
+        let holdWidth = max(localHoldEndX - localHoldStartX, 0)
+        let fadeOutWidth = max(barWidth - (fadeInWidth + holdWidth), 0)
         let localBarCenterX = localStartX + (barWidth / 2)
 
         ZStack(alignment: .leading) {
             Capsule(style: .continuous)
-                .fill(barColor.opacity(isSelected ? 0.88 : 0.62))
+                .fill(barColor.opacity(isSelected ? 0.26 : 0.18))
                 .frame(width: barWidth, height: laneHeight)
                 .position(x: localBarCenterX, y: localCenterY)
 
-            Capsule(style: .continuous)
-                .fill(barColor.opacity(isSelected ? 1 : 0.82))
-                .frame(width: isSelected ? 8 : 6, height: isSelected ? 18 : 14)
-                .position(x: localEventX, y: localCenterY)
-
-            if isSelected {
-                Capsule(style: .continuous)
-                    .stroke(Color.accentColor.opacity(0.35), lineWidth: 4)
-                    .frame(width: 12, height: 22)
-                    .position(x: localEventX, y: localCenterY)
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(barColor.opacity(isSelected ? 0.58 : 0.42))
+                    .frame(width: fadeInWidth)
+                Rectangle()
+                    .fill(barColor.opacity(isSelected ? 0.92 : 0.74))
+                    .frame(width: holdWidth)
+                Rectangle()
+                    .fill(barColor.opacity(isSelected ? 0.58 : 0.42))
+                    .frame(width: fadeOutWidth)
             }
+            .frame(width: barWidth, height: laneHeight)
+            .clipShape(Capsule(style: .continuous))
+            .position(x: localBarCenterX, y: localCenterY)
+
+            Capsule(style: .continuous)
+                .fill(Color.white.opacity(isSelected ? 0.92 : 0.72))
+                .frame(width: 3, height: isSelected ? 20 : 16)
+                .position(x: localHoldStartX, y: localCenterY)
+
+            Capsule(style: .continuous)
+                .fill(Color.white.opacity(isSelected ? 0.92 : 0.72))
+                .frame(width: 3, height: isSelected ? 20 : 16)
+                .position(x: localHoldEndX, y: localCenterY)
 
             if isHovered {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -251,7 +275,7 @@ private func effectTimelineTooltipOverlay(
             .font(.system(size: 11))
         Text("Fade Out \(String(format: "%.2fs", marker.fadeOutDuration))")
             .font(.system(size: 11))
-        Text("Hold \(String(format: "%.2fs", max(marker.endTime - marker.sourceEventTimestamp, 0.05)))")
+        Text("Hold \(String(format: "%.2fs", max(marker.holdDuration, 0.05)))")
             .font(.system(size: 11))
         Text(marker.enabled ? "Enabled" : "Disabled")
             .font(.system(size: 11))
@@ -653,7 +677,7 @@ private struct EffectListCellContent: View {
                     }
 
                     Label {
-                        Text(String(format: "%.2fs", max(marker.endTime - marker.sourceEventTimestamp, 0.05)))
+                        Text(String(format: "%.2fs", max(marker.holdDuration, 0.05)))
                             .font(.system(size: 11, weight: .regular, design: .monospaced))
                     } icon: {
                         Image(systemName: "pause.rectangle")

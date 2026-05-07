@@ -493,9 +493,9 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
     var markerName: String?
     var sourceEventTimestamp: Double
     var startTime: Double
+    var holdStartTime: Double
+    var holdEndTime: Double
     var endTime: Double
-    var fadeInDuration: Double
-    var fadeOutDuration: Double
     var enabled: Bool
     var displayOrder: Int?
     var style: EffectStyle
@@ -513,6 +513,8 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         case markerName
         case sourceEventTimestamp
         case startTime
+        case holdStartTime
+        case holdEndTime
         case endTime
         case fadeInDuration
         case fadeOutDuration
@@ -534,9 +536,9 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         markerName: String?,
         sourceEventTimestamp: Double,
         startTime: Double,
+        holdStartTime: Double,
+        holdEndTime: Double,
         endTime: Double,
-        fadeInDuration: Double,
-        fadeOutDuration: Double,
         enabled: Bool,
         displayOrder: Int?,
         style: EffectStyle,
@@ -553,9 +555,9 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         self.markerName = markerName
         self.sourceEventTimestamp = sourceEventTimestamp
         self.startTime = startTime
+        self.holdStartTime = holdStartTime
+        self.holdEndTime = holdEndTime
         self.endTime = endTime
-        self.fadeInDuration = fadeInDuration
-        self.fadeOutDuration = fadeOutDuration
         self.enabled = enabled
         self.displayOrder = displayOrder
         self.style = style
@@ -576,8 +578,12 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         sourceEventTimestamp = try container.decode(Double.self, forKey: .sourceEventTimestamp)
         startTime = try container.decode(Double.self, forKey: .startTime)
         endTime = try container.decode(Double.self, forKey: .endTime)
-        fadeInDuration = try container.decode(Double.self, forKey: .fadeInDuration)
-        fadeOutDuration = try container.decode(Double.self, forKey: .fadeOutDuration)
+        let legacyFadeInDuration = try container.decodeIfPresent(Double.self, forKey: .fadeInDuration) ?? 0
+        let legacyFadeOutDuration = try container.decodeIfPresent(Double.self, forKey: .fadeOutDuration) ?? 0
+        let decodedHoldStartTime = try container.decodeIfPresent(Double.self, forKey: .holdStartTime)
+        let decodedHoldEndTime = try container.decodeIfPresent(Double.self, forKey: .holdEndTime)
+        holdStartTime = decodedHoldStartTime ?? (startTime + legacyFadeInDuration)
+        holdEndTime = decodedHoldEndTime ?? (endTime - legacyFadeOutDuration)
         enabled = try container.decode(Bool.self, forKey: .enabled)
         displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
         style = try container.decode(EffectStyle.self, forKey: .style)
@@ -589,15 +595,58 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         feather = try container.decodeIfPresent(Double.self, forKey: .feather) ?? 0
         tintColor = try container.decodeIfPresent(EffectTintColor.self, forKey: .tintColor) ?? .defaultTint
         focusRegion = try container.decodeIfPresent(EffectFocusRegion.self, forKey: .focusRegion)
+        normalizeTiming()
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(markerName, forKey: .markerName)
+        try container.encode(sourceEventTimestamp, forKey: .sourceEventTimestamp)
+        try container.encode(startTime, forKey: .startTime)
+        try container.encode(holdStartTime, forKey: .holdStartTime)
+        try container.encode(holdEndTime, forKey: .holdEndTime)
+        try container.encode(endTime, forKey: .endTime)
+        try container.encode(enabled, forKey: .enabled)
+        try container.encodeIfPresent(displayOrder, forKey: .displayOrder)
+        try container.encode(style, forKey: .style)
+        try container.encode(amount, forKey: .amount)
+        try container.encode(blurAmount, forKey: .blurAmount)
+        try container.encode(darkenAmount, forKey: .darkenAmount)
+        try container.encode(tintAmount, forKey: .tintAmount)
+        try container.encode(cornerRadius, forKey: .cornerRadius)
+        try container.encode(feather, forKey: .feather)
+        try container.encode(tintColor, forKey: .tintColor)
+        try container.encodeIfPresent(focusRegion, forKey: .focusRegion)
+    }
+
+    var fadeInDuration: Double {
+        max(holdStartTime - startTime, 0)
+    }
+
+    var holdDuration: Double {
+        max(holdEndTime - holdStartTime, 0)
+    }
+
+    var fadeOutDuration: Double {
+        max(endTime - holdEndTime, 0)
     }
 
     var snapTime: Double {
-        let fullyOnStart = min(max(startTime + max(fadeInDuration, 0), startTime), endTime)
-        let fullyOnEnd = max(min(endTime - max(fadeOutDuration, 0), endTime), startTime)
+        let fullyOnStart = min(max(holdStartTime, startTime), endTime)
+        let fullyOnEnd = max(min(holdEndTime, endTime), fullyOnStart)
         if fullyOnEnd > fullyOnStart {
             return (fullyOnStart + fullyOnEnd) / 2
         }
         return (startTime + endTime) / 2
+    }
+
+    mutating func normalizeTiming() {
+        startTime = max(startTime, 0)
+        endTime = max(endTime, 0)
+        holdStartTime = min(max(holdStartTime, startTime), endTime)
+        holdEndTime = min(max(holdEndTime, holdStartTime), endTime)
+        startTime = min(startTime, holdStartTime)
     }
 }
 
