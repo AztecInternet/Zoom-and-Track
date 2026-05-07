@@ -73,12 +73,8 @@ func timelineSegment(
     isHovered: Bool,
     hoveredTimelineMarkerID: String?,
     hoveredTimelinePhase: MarkerTimingPhase?,
-    isMarkerDragActive: Bool,
-    isOptionModifierActive: Bool,
     onHoverChanged: @escaping (Bool, MarkerTimingPhase?, CGPoint) -> Void,
-    onTap: @escaping () -> Void,
-    onOptionDragChanged: @escaping (CGFloat) -> Void,
-    onOptionDragEnded: @escaping (CGFloat) -> Void
+    onTap: @escaping () -> Void
 ) -> some View {
     let marker = layout.marker
     let baseColor: Color = isSelected ? .accentColor : (isEnabled ? Color.primary.opacity(0.72) : Color.secondary.opacity(0.35))
@@ -113,21 +109,6 @@ func timelineSegment(
         max(localBarCenterX, highlightedBarWidth / 2),
         max(localWidth - (highlightedBarWidth / 2), highlightedBarWidth / 2)
     )
-    let optionDragGesture = DragGesture(minimumDistance: 0)
-        .onChanged { value in
-            guard isMarkerDragActive || isOptionModifierActive else {
-                return
-            }
-            onHoverChanged(false, nil, hoverAnchor)
-            onOptionDragChanged(value.translation.width)
-        }
-        .onEnded { value in
-            guard isMarkerDragActive || isOptionModifierActive else {
-                return
-            }
-            onOptionDragEnded(value.translation.width)
-        }
-
     ZStack {
         timelineSegmentBar(
             marker: marker,
@@ -224,7 +205,6 @@ func timelineSegment(
     .frame(width: localWidth, height: localHeight)
     .position(x: localCenterX, y: laneY + (localHeight / 2))
     .brightness(isHovered ? 0.06 : 0)
-    .simultaneousGesture(optionDragGesture)
 }
 
 func timelineMarkerTooltipOverlay(
@@ -240,10 +220,16 @@ func timelineMarkerTooltipOverlay(
     let tooltipHalfWidth = tooltipWidth / 2
     let tooltipX = min(max(anchor.x, tooltipHalfWidth), max(width - tooltipHalfWidth, tooltipHalfWidth))
     let tooltipY: CGFloat = -120
+    let trimmedMarkerName = marker.markerName?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let displayName = trimmedMarkerName?.isEmpty == false ? trimmedMarkerName! : "Unnamed Marker"
+    let clickPulseStatus = marker.clickPulse.map { "Click Pulse: \($0.preset.displayName)" } ?? "Click Pulse: Off"
 
     return VStack(alignment: .leading, spacing: 4) {
-        Text("Marker #\(markerNumber)")
+        Text(displayName)
             .font(.system(size: 11, weight: .semibold))
+        Text("Marker #\(markerNumber)")
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
         Text(timecodeString(for: marker.sourceEventTimestamp))
             .font(.system(size: 11, design: .monospaced))
             .foregroundStyle(.secondary)
@@ -258,6 +244,8 @@ func timelineMarkerTooltipOverlay(
             Text("Zoom \(String(format: "%.1fx", marker.zoomScale))")
                 .font(.system(size: 11))
         }
+        Text(clickPulseStatus)
+            .font(.system(size: 11))
         Text("Motion to Click Offset \(String(format: "%.2fs", marker.leadInTime))")
             .font(.system(size: 11))
         if marker.zoomType != .outOnly {

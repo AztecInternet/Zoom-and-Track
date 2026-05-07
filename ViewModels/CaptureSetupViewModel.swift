@@ -102,7 +102,6 @@ final class CaptureSetupViewModel: ObservableObject {
     private var renderingPreviewMarkerID: String?
     private var renderingPreviewEffectMarkerID: String?
     private var targetRefreshTask: Task<Void, Never>?
-    private var wasPlayingBeforeMarkerTimelineMove = false
     private let timelineMarkerNudgeInterval = 0.1
 
     private let permissionsService = PermissionsService()
@@ -117,7 +116,6 @@ final class CaptureSetupViewModel: ObservableObject {
     nonisolated(unsafe) private let captureMetadataManager: CaptureMetadataManager
     private let playbackTransportManager = PlaybackTransportManager()
     private let timelineScrubManager = TimelineScrubManager()
-    private let timelineMarkerMoveManager = TimelineMarkerMoveManager()
     private let inputEventCaptureService = InputEventCaptureService()
     private let markerPreviewRenderService = MarkerPreviewRenderService()
     private let markerPreviewCacheService = MarkerPreviewCacheService()
@@ -751,57 +749,6 @@ final class CaptureSetupViewModel: ObservableObject {
         seekPlayback(to: plan.targetTime)
     }
 
-    func beginTimelineMarkerMove(_ markerID: String) {
-        guard let plan = timelineMarkerMoveManager.beginMovePlan(
-            canEditClickFocusMarkers: canEditClickFocusMarkers,
-            hasMainPlayer: mainPlayer != nil,
-            playbackPresentationMode: playbackPresentationMode,
-            currentPlaybackTime: currentPlaybackTime,
-            markerID: markerID,
-            isMainPlayerPlaying: mainPlayer?.timeControlStatus == .playing
-        ) else { return }
-        cancelPendingMarkerPreviewRender()
-        if plan.shouldResetPreviewPresentation {
-            playbackTransitionPlateState = .hidden
-            playbackPresentationMode = .normal
-        }
-        if plan.shouldStopPreviewPlayback {
-            stopPreviewPlayback(seekMainTo: plan.stopPreviewSeekTime, retainSlate: plan.retainSlate)
-        }
-        if plan.shouldCancelPreviewMode {
-            cancelPreviewMode()
-        }
-        wasPlayingBeforeMarkerTimelineMove = plan.wasPlayingBeforeMarkerTimelineMove
-        if plan.shouldPause {
-            mainPlayer?.pause()
-        }
-        if plan.shouldSetPlaybackInactive {
-            isPlaybackActive = false
-        }
-        selectedZoomMarkerID = plan.selectedZoomMarkerID
-        manualSelectionSuppressionUntil = Date().addingTimeInterval(plan.suppressionInterval)
-    }
-
-    func previewTimelineMarkerMove(_ markerID: String, to seconds: Double) {
-        let plan = timelineMarkerMoveManager.previewMovePlan(markerID: markerID, targetTime: seconds)
-        moveMarker(plan.markerID, to: plan.targetTime, persist: plan.shouldPersist, seekPlaybackHead: plan.shouldSeekPlaybackHead)
-    }
-
-    func commitTimelineMarkerMove(_ markerID: String, to seconds: Double) {
-        let plan = timelineMarkerMoveManager.commitMovePlan(
-            markerID: markerID,
-            targetTime: seconds,
-            wasPlayingBeforeMarkerTimelineMove: wasPlayingBeforeMarkerTimelineMove
-        )
-        moveMarker(plan.markerID, to: plan.targetTime, persist: plan.shouldPersist, seekPlaybackHead: plan.shouldSeekPlaybackHead)
-        manualSelectionSuppressionUntil = Date().addingTimeInterval(plan.suppressionInterval)
-        if plan.shouldResumePlayback {
-            mainPlayer?.play()
-            isPlaybackActive = true
-        }
-        wasPlayingBeforeMarkerTimelineMove = plan.nextWasPlayingBeforeMarkerTimelineMove
-    }
-
     func nudgeSelectedTimelineMarker(by delta: Double) {
         guard canEditClickFocusMarkers, let markerID = selectedZoomMarkerID else { return }
         cancelPendingMarkerPreviewRender()
@@ -984,6 +931,25 @@ final class CaptureSetupViewModel: ObservableObject {
             seekPlayback(to: marker.snapTime)
         } else {
             currentPlaybackTime = marker.snapTime
+        }
+    }
+
+    func selectZoomMarker(_ markerID: String, seekPlaybackHead: Bool = true) {
+        guard let summary = recordingSummary,
+              let marker = summary.zoomMarkers.first(where: { $0.id == markerID }) else {
+            return
+        }
+
+        if isPlaybackActive {
+            mainPlayer?.pause()
+            isPlaybackActive = false
+        }
+
+        if seekPlaybackHead {
+            seekTimelineDirectly(to: marker.sourceEventTimestamp, snappedMarkerID: markerID, snappedEffectMarkerID: nil)
+        } else {
+            selectedZoomMarkerID = markerID
+            currentPlaybackTime = marker.sourceEventTimestamp
         }
     }
 
@@ -1290,9 +1256,13 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     func setSelectedMarkerClickPulsePreset(_ preset: ClickPulsePreset) {
+        let markerID = selectedZoomMarkerID
         updateSelectedMarker { marker in
             guard marker.isClickFocus else { return }
             marker.clickPulse = ClickPulseConfiguration(preset: preset)
+        }
+        if let markerID {
+            startMarkerPreview(markerID)
         }
     }
 
@@ -1733,9 +1703,7 @@ final class CaptureSetupViewModel: ObservableObject {
             )
             try projectBundleService.saveZoomPlan(envelope, in: summary.bundleURL)
             let updatedSummary = summaryWithMarkers(markers, basedOn: summary)
-            publishOnNextRunLoop { [weak self] in
-                self?.recordingSummary = updatedSummary
-            }
+            recordingSummary = updatedSummary
         } catch {
             statusMessage = "Could not save zoomPlan.json: \(error.localizedDescription)"
         }

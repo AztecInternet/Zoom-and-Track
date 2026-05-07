@@ -396,6 +396,18 @@ extension ContentView {
                     }
                 }
 
+                if marker.isClickFocus {
+                    ClickPulseSelectorControl(
+                        selectedPreset: marker.clickPulse?.preset,
+                        onSelectOff: {
+                            viewModel.setSelectedMarkerClickPulseEnabled(false)
+                        },
+                        onSelectPreset: { preset in
+                            viewModel.setSelectedMarkerClickPulsePreset(preset)
+                        }
+                    )
+                }
+
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 6) {
@@ -686,5 +698,90 @@ extension ContentView {
         case .noZoom:
             return "smallcircle.filled.circle"
         }
+    }
+}
+
+private struct ClickPulseSelectorControl: View {
+    let selectedPreset: ClickPulsePreset?
+    let onSelectOff: () -> Void
+    let onSelectPreset: (ClickPulsePreset) -> Void
+
+    @State private var isPopoverPresented = false
+
+    private var currentSelectionLabel: String {
+        if let selectedPreset {
+            return selectedPreset.displayName
+        }
+        return "Off"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            InspectorSectionHeaderView(title: "Click Pulse")
+
+            Button {
+                isPopoverPresented.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Text(currentSelectionLabel)
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.secondary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    clickPulseRow(title: "Off", isSelected: selectedPreset == nil) {
+                        onSelectOff()
+                        isPopoverPresented = false
+                    }
+
+                    ForEach(ClickPulsePreset.allCases) { preset in
+                        clickPulseRow(title: preset.displayName, isSelected: selectedPreset == preset) {
+                            onSelectPreset(preset)
+                            isPopoverPresented = false
+                        }
+                    }
+                }
+                .padding(8)
+                .frame(width: 220)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func clickPulseRow(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                Text(title)
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 0)
+            }
+            .font(.system(size: 13))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+        )
     }
 }

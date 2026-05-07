@@ -5,13 +5,10 @@ struct TimelineToolbarView: View {
     let canEditClickFocusMarkers: Bool
     let isPlacingClickFocus: Bool
     let selectedMarker: ZoomPlanItem?
-    let showsPulseControls: Bool
     let showsNoZoomFallbackControls: Bool
     let isDrawingNoZoomOverflowRegion: Bool
     let onToggleAddClickFocus: () -> Void
     let onDeleteSelectedMarker: () -> Void
-    let onToggleClickPulse: () -> Void
-    let onSelectClickPulsePreset: (ClickPulsePreset) -> Void
     let onSelectNoZoomFallbackMode: (NoZoomFallbackMode) -> Void
     let onToggleOverflowRegion: () -> Void
 
@@ -37,40 +34,6 @@ struct TimelineToolbarView: View {
                     help: "Delete Selected Marker",
                     action: onDeleteSelectedMarker
                 )
-            }
-
-            if showsPulseControls, let selectedMarker {
-                Divider()
-                    .frame(height: 14)
-
-                Text("click pulse")
-                    .font(.system(size: 10, weight: .light))
-                    .foregroundStyle(Color.accentColor)
-
-                TimelineGadgetButton(
-                    systemName: "pointer.arrow.click.2",
-                    isActive: selectedMarker.isClickPulseEnabled,
-                    isEnabled: true,
-                    help: selectedMarker.isClickPulseEnabled ? "Disable Click Pulse" : "Enable Click Pulse",
-                    action: onToggleClickPulse
-                )
-
-                if selectedMarker.isClickPulseEnabled, let clickPulse = selectedMarker.clickPulse {
-                    Menu {
-                        ForEach(ClickPulsePreset.allCases) { preset in
-                            Button(preset.displayName) {
-                                onSelectClickPulsePreset(preset)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 18, height: 18)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .help("Click Pulse Style: \(clickPulse.preset.displayName)")
-                }
             }
 
             if showsNoZoomFallbackControls, let selectedMarker {

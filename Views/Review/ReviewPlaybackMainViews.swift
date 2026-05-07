@@ -111,7 +111,7 @@ extension ContentView {
                 .position(x: fittedRect.midX, y: fittedRect.midY)
                 .coordinateSpace(name: "videoOverlay")
 
-                if !isRenderedPreviewActive,
+                if playbackPresentationMode != .playingRenderedPreview,
                    !isOverflowRegionDrawActive,
                    let mapping = mappedOverlayPoint(
                     for: selectedMarker,
@@ -633,9 +633,8 @@ extension ContentView {
         let segmentOriginY: CGFloat = 16
         let hoveredTooltipEntry = hoveredTimelineTooltipEntry(in: summary)
         let hoveredEffectTooltipEntry = hoveredEffectTimelineTooltipEntry(in: summary)
-        let timelineInteractionSuppressed = activeTimelineMarkerDragID != nil || NSEvent.modifierFlags.contains(.option)
+        let timelineInteractionSuppressed = false
         let selectedMarker = editorMode == .zoomAndClicks ? viewModel.selectedZoomMarker : nil
-        let showsPulseControls = selectedMarker?.isClickFocus == true
         let showsNoZoomFallbackControls = selectedMarker?.zoomType == .noZoom
 
         return VStack(alignment: .leading, spacing: 8) {
@@ -648,7 +647,6 @@ extension ContentView {
                     timelineToolbar(
                         summary: summary,
                         selectedMarker: selectedMarker,
-                        showsPulseControls: showsPulseControls,
                         showsNoZoomFallbackControls: showsNoZoomFallbackControls,
                         hasSelectedMarker: viewModel.selectedZoomMarkerID != nil,
                         canEditClickFocusMarkers: viewModel.canEditClickFocusMarkers,
@@ -667,13 +665,6 @@ extension ContentView {
                         },
                         onDeleteSelectedMarker: {
                             viewModel.deleteSelectedMarker()
-                        },
-                        onToggleClickPulse: {
-                            guard let selectedMarker else { return }
-                            viewModel.setSelectedMarkerClickPulseEnabled(!selectedMarker.isClickPulseEnabled)
-                        },
-                        onSelectClickPulsePreset: { preset in
-                            viewModel.setSelectedMarkerClickPulsePreset(preset)
                         },
                         onSelectNoZoomFallbackMode: { mode in
                             if mode != .scale {
@@ -766,8 +757,6 @@ extension ContentView {
                     selectedZoomMarkerID: viewModel.selectedZoomMarkerID,
                     hoveredTimelineMarkerID: hoveredTimelineMarkerID,
                     hoveredTimelinePhase: hoveredTimelinePhase,
-                    activeTimelineMarkerDragID: activeTimelineMarkerDragID,
-                    isOptionModifierActive: NSEvent.modifierFlags.contains(.option),
                     hoveredTooltipMarker: hoveredTooltipEntry?.marker,
                     hoveredTooltipMarkerNumber: hoveredTooltipEntry?.markerNumber,
                     hoveredTooltipAnchor: hoveredTimelineTooltipAnchor,
@@ -797,33 +786,7 @@ extension ContentView {
                     onTimelineTap: { markerID in
                         isTimelineKeyboardFocused = true
                         suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
-                        if viewModel.isPlaybackActive {
-                            viewModel.togglePlayback()
-                        }
-                        viewModel.startMarkerPreview(markerID)
-                    },
-                    onTimelineOptionDragChanged: { markerID, translationX in
-                        isTimelineKeyboardFocused = true
-                        guard let layout = segmentLayouts.first(where: { $0.marker.id == markerID }) else { return }
-                        if activeTimelineMarkerDragID == nil {
-                            activeTimelineMarkerDragID = markerID
-                            activeTimelineMarkerDragStartTime = layout.marker.sourceEventTimestamp
-                            viewModel.beginTimelineMarkerMove(markerID)
-                        }
-                        guard activeTimelineMarkerDragID == markerID else { return }
-                        let startTime = activeTimelineMarkerDragStartTime ?? layout.marker.sourceEventTimestamp
-                        let targetTime = startTime + (Double(translationX / width) * duration)
-                        viewModel.previewTimelineMarkerMove(markerID, to: targetTime)
-                    },
-                    onTimelineOptionDragEnded: { markerID, translationX in
-                        isTimelineKeyboardFocused = true
-                        guard let layout = segmentLayouts.first(where: { $0.marker.id == markerID }) else { return }
-                        guard activeTimelineMarkerDragID == markerID else { return }
-                        let startTime = activeTimelineMarkerDragStartTime ?? layout.marker.sourceEventTimestamp
-                        let targetTime = startTime + (Double(translationX / width) * duration)
-                        viewModel.commitTimelineMarkerMove(markerID, to: targetTime)
-                        activeTimelineMarkerDragID = nil
-                        activeTimelineMarkerDragStartTime = nil
+                        viewModel.selectZoomMarker(markerID, seekPlaybackHead: true)
                     },
                     onEffectHoverChanged: { markerID, isHovering, anchor in
                         guard editorMode == .effects else { return }
@@ -845,7 +808,6 @@ extension ContentView {
                 .highPriorityGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
-                            guard activeTimelineMarkerDragID == nil else { return }
                             let currentX = min(max(value.location.x, 0), width)
                             let hasMovedEnough = abs(value.translation.width) > 3
 
@@ -869,7 +831,6 @@ extension ContentView {
                             }
                         }
                         .onEnded { value in
-                            guard activeTimelineMarkerDragID == nil else { return }
                             let endX = min(max(value.location.x, 0), width)
                             let zoomSnap = editorMode == .zoomAndClicks
                                 ? timelineSnapTarget(at: endX, width: width, duration: duration, markers: summary.zoomMarkers)
@@ -889,7 +850,7 @@ extension ContentView {
                             } else if let zoomSnap {
                                 isTimelineKeyboardFocused = true
                                 suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
-                                viewModel.startMarkerPreview(zoomSnap.marker.id)
+                                viewModel.selectZoomMarker(zoomSnap.marker.id, seekPlaybackHead: true)
                             } else if let effectSnap {
                                 isTimelineKeyboardFocused = true
                                 viewModel.seekTimelineDirectly(

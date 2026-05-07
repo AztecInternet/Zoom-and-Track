@@ -5,7 +5,6 @@ extension ContentView {
     func timelineToolbar(
         summary: RecordingInspectionSummary,
         selectedMarker: ZoomPlanItem?,
-        showsPulseControls: Bool,
         showsNoZoomFallbackControls: Bool,
         hasSelectedMarker: Bool,
         canEditClickFocusMarkers: Bool,
@@ -13,8 +12,6 @@ extension ContentView {
         isDrawingNoZoomOverflowRegion: Bool,
         onToggleAddClickFocus: @escaping () -> Void,
         onDeleteSelectedMarker: @escaping () -> Void,
-        onToggleClickPulse: @escaping () -> Void,
-        onSelectClickPulsePreset: @escaping (ClickPulsePreset) -> Void,
         onSelectNoZoomFallbackMode: @escaping (NoZoomFallbackMode) -> Void,
         onToggleOverflowRegion: @escaping () -> Void
     ) -> some View {
@@ -23,13 +20,10 @@ extension ContentView {
             canEditClickFocusMarkers: canEditClickFocusMarkers,
             isPlacingClickFocus: isPlacingClickFocus,
             selectedMarker: selectedMarker,
-            showsPulseControls: showsPulseControls,
             showsNoZoomFallbackControls: showsNoZoomFallbackControls,
             isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion,
             onToggleAddClickFocus: onToggleAddClickFocus,
             onDeleteSelectedMarker: onDeleteSelectedMarker,
-            onToggleClickPulse: onToggleClickPulse,
-            onSelectClickPulsePreset: onSelectClickPulsePreset,
             onSelectNoZoomFallbackMode: onSelectNoZoomFallbackMode,
             onToggleOverflowRegion: onToggleOverflowRegion
         )
@@ -47,8 +41,6 @@ extension ContentView {
         selectedZoomMarkerID: String?,
         hoveredTimelineMarkerID: String?,
         hoveredTimelinePhase: MarkerTimingPhase?,
-        activeTimelineMarkerDragID: String?,
-        isOptionModifierActive: Bool,
         hoveredTooltipMarker: ZoomPlanItem?,
         hoveredTooltipMarkerNumber: Int?,
         hoveredTooltipAnchor: CGPoint?,
@@ -64,8 +56,6 @@ extension ContentView {
         effectPlaybackHighlightProvider: @escaping (EffectPlanItem) -> Bool,
         onTimelineHoverChanged: @escaping (String, Bool, MarkerTimingPhase?, CGPoint) -> Void,
         onTimelineTap: @escaping (String) -> Void,
-        onTimelineOptionDragChanged: @escaping (String, CGFloat) -> Void,
-        onTimelineOptionDragEnded: @escaping (String, CGFloat) -> Void,
         onEffectHoverChanged: @escaping (String, Bool, CGPoint?) -> Void,
         onEffectSelect: @escaping (String) -> Void
     ) -> some View {
@@ -110,19 +100,11 @@ extension ContentView {
                         isHovered: !timelineInteractionSuppressed && hoveredTimelineMarkerID == layout.marker.id,
                         hoveredTimelineMarkerID: hoveredTimelineMarkerID,
                         hoveredTimelinePhase: hoveredTimelinePhase,
-                        isMarkerDragActive: activeTimelineMarkerDragID == layout.marker.id,
-                        isOptionModifierActive: isOptionModifierActive,
                         onHoverChanged: { isHovering, phase, anchor in
                             onTimelineHoverChanged(layout.marker.id, isHovering, phase, anchor)
                         },
                         onTap: {
                             onTimelineTap(layout.marker.id)
-                        },
-                        onOptionDragChanged: { translationX in
-                            onTimelineOptionDragChanged(layout.marker.id, translationX)
-                        },
-                        onOptionDragEnded: { translationX in
-                            onTimelineOptionDragEnded(layout.marker.id, translationX)
                         }
                     )
                 }
@@ -237,7 +219,7 @@ extension ContentView {
                 ? "Zoom & Click bars are shown as grey reference guides while editing effects."
                 : isDrawingNoZoomOverflowRegion
                 ? "←/→/↑/↓ to nudge the overflow region, ⌥ + Arrow for 10x speed"
-                : "⌥ Click to select a Marker, ⌥ Click + Drag to reposition, ←/→ to nudge 0.1s"
+                : "Click a Marker to preview it, ←/→ to nudge 0.1s"
             )
                 .font(.system(size: 10, weight: .light))
                 .foregroundStyle(.secondary)
