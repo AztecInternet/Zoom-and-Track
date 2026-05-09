@@ -81,6 +81,10 @@ extension ContentView {
             fadeOutProgress = min(max((marker.endTime - currentTime) / fadeOutDuration, 0), 1)
         }
 
+        if marker.style == .heatHazeEdge || marker.style == .distortion {
+            return nil
+        }
+
         let timingIntensity = min(fadeInProgress, fadeOutProgress)
         let blurIntensity = timingIntensity * min(max(marker.blurAmount, 0), 1)
         let darkenIntensity = timingIntensity * min(max(marker.darkenAmount, 0), 1)
@@ -206,6 +210,10 @@ extension ContentView {
             return Color.black.opacity(effectState.darkenIntensity)
         case .blurDarken:
             return Color.black.opacity(effectState.darkenIntensity)
+        case .distortion:
+            return .clear
+        case .heatHazeEdge:
+            return .clear
         case .tint:
             return effectState.tintColor.opacity(0.42 * effectState.tintIntensity)
         case .blur:
@@ -776,6 +784,7 @@ extension ContentView {
                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
         )
     }
+
 
     func transformedOverlayPoint(
         _ point: CGPoint,

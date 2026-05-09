@@ -44,6 +44,7 @@
 		DD88BC932FABD3E600BFFBBF /* ExportProgressSheetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD88BC922FABD3E600BFFBBF /* ExportProgressSheetViews.swift */; };
 		DD88BC952FABD8A800BFFBBF /* PlaybackTransportManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD88BC942FABD8A800BFFBBF /* PlaybackTransportManager.swift */; };
 		DD88BC972FABDFD800BFFBBF /* TimelineScrubManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD88BC962FABDFD800BFFBBF /* TimelineScrubManager.swift */; };
+		DD88BC9B2FAEF0BC00BFFBBF /* RealtimeEffectPreviewSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD88BC9A2FAEF0BC00BFFBBF /* RealtimeEffectPreviewSurface.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -84,6 +85,7 @@
 		DD88BC922FABD3E600BFFBBF /* ExportProgressSheetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportProgressSheetViews.swift; sourceTree = "<group>"; };
 		DD88BC942FABD8A800BFFBBF /* PlaybackTransportManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTransportManager.swift; sourceTree = "<group>"; };
 		DD88BC962FABDFD800BFFBBF /* TimelineScrubManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineScrubManager.swift; sourceTree = "<group>"; };
+		DD88BC9A2FAEF0BC00BFFBBF /* RealtimeEffectPreviewSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeEffectPreviewSurface.swift; sourceTree = "<group>"; };
 		DD9203042F9D6A80003C3C1A /* FlowTrack Capture.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "FlowTrack Capture.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -219,6 +221,7 @@
 				DD88BC682FAA9C8600BFFBBF /* ReviewTimelineViews.swift */,
 				DD88BC512FA8562800BFFBBF /* TimelineToolbarControls.swift */,
 				DD88BC642FAA78E400BFFBBF /* ZoomAndClicksEditorViews.swift */,
+				DD88BC9A2FAEF0BC00BFFBBF /* RealtimeEffectPreviewSurface.swift */,
 			);
 			path = Review;
 			sourceTree = "<group>";
@@ -347,6 +350,7 @@
 				DD88BC6F2FAAA92500BFFBBF /* ReviewTimelineInteractionViews.swift in Sources */,
 				DD88BC592FA8562800BFFBBF /* MarkerPreviewRenderService.swift in Sources */,
 				DD88BC782FAB026400BFFBBF /* MarkerListTableViews.swift in Sources */,
+				DD88BC9B2FAEF0BC00BFFBBF /* RealtimeEffectPreviewSurface.swift in Sources */,
 				DD88BC792FAB026400BFFBBF /* ReviewSupportViews.swift in Sources */,
 				DD88BC5A2FA8562800BFFBBF /* MediaWriterService.swift in Sources */,
 				DD88BC5B2FA8562800BFFBBF /* Models.swift in Sources */,

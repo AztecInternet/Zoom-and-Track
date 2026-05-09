@@ -110,17 +110,19 @@ struct EffectTimelineSegmentView: View {
         let holdStartX = CGFloat(layout.holdStartRatio) * width
         let holdEndX = CGFloat(layout.holdEndRatio) * width
         let endX = CGFloat(layout.endRatio) * width
-        let barWidth = max(endX - startX, 12)
+        let actualBarWidth = max(endX - startX, 1)
+        let hitTargetWidth = max(actualBarWidth, 18)
         let baseColor: Color = isSelected
             ? .accentColor
             : (isEnabled ? Color.orange.opacity(0.82) : Color.secondary.opacity(0.35))
         let barColor = isPlaybackHighlighted ? Color.accentColor : baseColor
         let hoverHighlightColor = (isSelected ? Color.accentColor : baseColor).opacity(isHovered ? (isEnabled ? 0.22 : 0.12) : 0)
         let hoverTargetHeight: CGFloat = laneHeight
-        let hoverAnchor = CGPoint(x: startX + (barWidth / 2), y: max(laneY - 20, 10))
-        let highlightedBarWidth = barWidth + 10
-        let localMinX = startX
-        let localWidth = max(barWidth, 18)
+        let hoverAnchor = CGPoint(x: startX + (actualBarWidth / 2), y: max(laneY - 20, 10))
+        let highlightedBarWidth = actualBarWidth + 10
+        let hitPadding = max((hitTargetWidth - actualBarWidth) / 2, 0)
+        let localMinX = startX - hitPadding
+        let localWidth = hitTargetWidth
         let localCenterX = localMinX + (localWidth / 2)
         let localCenterY = hoverTargetHeight / 2
         let localStartX = startX - localMinX
@@ -128,13 +130,13 @@ struct EffectTimelineSegmentView: View {
         let localHoldEndX = holdEndX - localMinX
         let fadeInWidth = max(localHoldStartX - localStartX, 0)
         let holdWidth = max(localHoldEndX - localHoldStartX, 0)
-        let fadeOutWidth = max(barWidth - (fadeInWidth + holdWidth), 0)
-        let localBarCenterX = localStartX + (barWidth / 2)
+        let fadeOutWidth = max(actualBarWidth - (fadeInWidth + holdWidth), 0)
+        let localBarCenterX = localStartX + (actualBarWidth / 2)
 
         ZStack(alignment: .leading) {
             Capsule(style: .continuous)
                 .fill(barColor.opacity(isSelected ? 0.26 : 0.18))
-                .frame(width: barWidth, height: laneHeight)
+                .frame(width: actualBarWidth, height: laneHeight)
                 .position(x: localBarCenterX, y: localCenterY)
 
             HStack(spacing: 0) {
@@ -148,7 +150,7 @@ struct EffectTimelineSegmentView: View {
                     .fill(barColor.opacity(isSelected ? 0.58 : 0.42))
                     .frame(width: fadeOutWidth)
             }
-            .frame(width: barWidth, height: laneHeight)
+            .frame(width: actualBarWidth, height: laneHeight)
             .clipShape(Capsule(style: .continuous))
             .position(x: localBarCenterX, y: localCenterY)
 
@@ -176,9 +178,9 @@ struct EffectTimelineSegmentView: View {
 
             Capsule(style: .continuous)
                 .fill(Color.clear)
-                .frame(width: barWidth, height: hoverTargetHeight)
-                .position(x: localBarCenterX, y: localCenterY)
-                .contentShape(Capsule(style: .continuous))
+                .frame(width: hitTargetWidth, height: hoverTargetHeight)
+                .position(x: localCenterX, y: localCenterY)
+                .contentShape(Rectangle())
                 .onHover { isHovering in
                     onHoverChanged(isHovering, isHovering ? hoverAnchor : nil)
                 }
@@ -317,6 +319,9 @@ private func effectTooltipAmountSummary(for marker: EffectPlanItem) -> String {
         return String(format: "Blur %.0f%%", marker.blurAmount * 100)
     case .darken:
         return String(format: "Darken %.0f%%", marker.darkenAmount * 100)
+    case .distortion, .heatHazeEdge:
+        let preset = (marker.distortion ?? .defaultConfiguration).preset.displayName
+        return String(format: "%@ %.0f%%", preset, marker.amount * 100)
     case .tint:
         return String(format: "Tint %.0f%%", marker.tintAmount * 100)
     case .blurDarken:
@@ -767,6 +772,10 @@ private struct EffectListCellContent: View {
             return String(format: "B %.0f%%", marker.blurAmount * 100)
         case .darken:
             return String(format: "D %.0f%%", marker.darkenAmount * 100)
+        case .distortion, .heatHazeEdge:
+            let preset = (marker.distortion ?? .defaultConfiguration).preset
+            let label = preset == .atmospheric ? "A" : "H"
+            return String(format: "%@ %.0f%%", label, marker.amount * 100)
         case .tint:
             return String(format: "T %.0f%%", marker.tintAmount * 100)
         case .blurDarken:

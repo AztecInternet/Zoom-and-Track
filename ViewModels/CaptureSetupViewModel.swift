@@ -81,6 +81,9 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published private(set) var exportStatusMessage: String?
     @Published private(set) var exportedRecordingURL: URL?
     @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
+    @Published var distortionLoupeNormalizedPoint: CGPoint?
+    @Published var distortionLoupeImage: NSImage?
+    @Published var isRenderingDistortionLoupe = false
     
     private var hasRestoredLastRecording = false
     private var activePlaybackScopeURL: URL?
@@ -102,6 +105,8 @@ final class CaptureSetupViewModel: ObservableObject {
     private var renderingPreviewMarkerID: String?
     private var renderingPreviewEffectMarkerID: String?
     private var targetRefreshTask: Task<Void, Never>?
+    private var distortionLoupeRenderTask: Task<Void, Never>?
+    private var distortionLoupeRevision = 0
     private let timelineMarkerNudgeInterval = 0.1
 
     private let permissionsService = PermissionsService()
@@ -226,6 +231,11 @@ final class CaptureSetupViewModel: ObservableObject {
         sessionState != .preparing &&
         sessionState != .recording &&
         sessionState != .stopping
+    }
+
+    var isSelectedEffectDistortion: Bool {
+        guard let selectedEffectMarker else { return false }
+        return selectedEffectMarker.style == .distortion || selectedEffectMarker.style == .heatHazeEdge
     }
 
     func load() async {
@@ -927,11 +937,13 @@ final class CaptureSetupViewModel: ObservableObject {
         }
 
         selectedEffectMarkerID = markerID
+        distortionLoupeNormalizedPoint = nil
         if seekPlaybackHead {
             seekPlayback(to: marker.snapTime)
         } else {
             currentPlaybackTime = marker.snapTime
         }
+        scheduleDistortionLoupeRefresh()
     }
 
     func selectZoomMarker(_ markerID: String, seekPlaybackHead: Bool = true) {
@@ -1101,12 +1113,71 @@ final class CaptureSetupViewModel: ObservableObject {
     func setSelectedEffectStyle(_ style: EffectStyle) {
         updateSelectedEffectMarker { marker in
             marker.style = style
+            if style == .distortion {
+                marker.distortion = marker.distortion ?? .defaultConfiguration
+            }
+        }
+        if style == .distortion {
+            distortionLoupeNormalizedPoint = nil
+            scheduleDistortionLoupeRefresh()
+        } else {
+            clearDistortionLoupe()
         }
     }
 
     func setSelectedEffectAmount(_ amount: Double) {
         updateSelectedEffectMarker { marker in
             marker.amount = min(max(amount, 0), 1)
+        }
+    }
+
+    func setDistortionLoupePoint(_ point: CGPoint) {
+        distortionLoupeNormalizedPoint = CGPoint(
+            x: min(max(point.x, 0), 1),
+            y: min(max(point.y, 0), 1)
+        )
+        scheduleDistortionLoupeRefresh()
+    }
+
+    func resetDistortionLoupePointToDefault() {
+        distortionLoupeNormalizedPoint = nil
+        scheduleDistortionLoupeRefresh()
+    }
+
+    func setSelectedEffectDistortionPreset(_ preset: DistortionPreset) {
+        updateSelectedEffectMarker { marker in
+            if marker.distortion == nil {
+                marker.distortion = .defaultConfiguration
+            }
+            marker.distortion?.preset = preset
+            marker.distortion?.mapSource = .preset(preset)
+        }
+    }
+
+    func setSelectedEffectDistortionScale(_ scale: Double) {
+        updateSelectedEffectMarker { marker in
+            if marker.distortion == nil {
+                marker.distortion = .defaultConfiguration
+            }
+            marker.distortion?.scale = min(max(scale, 0), 1)
+        }
+    }
+
+    func setSelectedEffectDistortionBackgroundBlend(_ blend: Double) {
+        updateSelectedEffectMarker { marker in
+            if marker.distortion == nil {
+                marker.distortion = .defaultConfiguration
+            }
+            marker.distortion?.backgroundBlend = min(max(blend, 0), 1)
+        }
+    }
+
+    func setSelectedEffectDistortionBackgroundBlur(_ blur: Double) {
+        updateSelectedEffectMarker { marker in
+            if marker.distortion == nil {
+                marker.distortion = .defaultConfiguration
+            }
+            marker.distortion?.backgroundBlur = min(max(blur, 0), 1)
         }
     }
 
@@ -1669,6 +1740,7 @@ final class CaptureSetupViewModel: ObservableObject {
         let clampedSeconds = max(seconds, 0)
         publishOnNextRunLoop { [weak self] in
             self?.currentPlaybackTime = clampedSeconds
+            self?.scheduleDistortionLoupeRefreshIfNeeded()
         }
     }
 
@@ -1844,6 +1916,7 @@ final class CaptureSetupViewModel: ObservableObject {
             )
             publishOnNextRunLoop { [weak self] in
                 self?.recordingSummary = updatedSummary
+                self?.scheduleDistortionLoupeRefreshIfNeeded()
             }
         } catch {
             statusMessage = "Could not save zoomPlan.json: \(error.localizedDescription)"
@@ -1855,6 +1928,49 @@ final class CaptureSetupViewModel: ObservableObject {
             Int(marker.id.replacingOccurrences(of: "effect-", with: ""))
         }.max() ?? 0
         return String(format: "effect-%04d", maxIndex + 1)
+    }
+
+    func scheduleDistortionLoupeRefresh() {
+        clearDistortionLoupe()
+    }
+
+    private func scheduleDistortionLoupeRefreshIfNeeded() {
+        clearDistortionLoupe()
+    }
+
+    func defaultDistortionLoupeNormalizedPoint(for marker: EffectPlanItem) -> CGPoint {
+        guard let region = marker.focusRegion else {
+            return CGPoint(x: 0.5, y: 0.5)
+        }
+
+        let offset = max(region.width * 0.12, 0.04)
+        let rightCandidate = region.centerX + (region.width / 2) + offset
+        if rightCandidate < 0.96 {
+            return CGPoint(
+                x: min(max(rightCandidate, 0), 1),
+                y: min(max(region.centerY, 0), 1)
+            )
+        }
+
+        let leftCandidate = region.centerX - (region.width / 2) - offset
+        if leftCandidate > 0.04 {
+            return CGPoint(
+                x: min(max(leftCandidate, 0), 1),
+                y: min(max(region.centerY, 0), 1)
+            )
+        }
+
+        return CGPoint(
+            x: min(max(region.centerX, 0), 1),
+            y: min(max(region.centerY, 0), 1)
+        )
+    }
+
+    private func clearDistortionLoupe() {
+        distortionLoupeRenderTask?.cancel()
+        distortionLoupeRenderTask = nil
+        distortionLoupeImage = nil
+        isRenderingDistortionLoupe = false
     }
 
     private func syncEffectTiming(_ marker: inout EffectPlanItem, maxDuration: Double?) {

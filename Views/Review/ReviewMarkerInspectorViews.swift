@@ -737,6 +737,8 @@ extension ContentView {
                 value: marker.darkenAmount,
                 action: viewModel.setSelectedEffectDarkenAmount
             )
+        case .distortion, .heatHazeEdge:
+            distortionEditorSection(for: marker)
         case .tint:
             effectAmountSliderRow(
                 title: "Tint Amount",
@@ -756,6 +758,48 @@ extension ContentView {
                     action: viewModel.setSelectedEffectDarkenAmount
                 )
             }
+        }
+    }
+
+    func distortionEditorSection(for marker: EffectPlanItem) -> some View {
+        let distortion = marker.distortion ?? .defaultConfiguration
+        return VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Preset")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Picker("Distortion Preset", selection: Binding(
+                    get: { distortion.preset },
+                    set: { viewModel.setSelectedEffectDistortionPreset($0) }
+                )) {
+                    ForEach(DistortionPreset.allCases) { preset in
+                        Text(preset.displayName).tag(preset)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
+
+            effectAmountSliderRow(
+                title: "Amount",
+                value: marker.amount,
+                action: viewModel.setSelectedEffectAmount
+            )
+            effectAmountSliderRow(
+                title: "Turbulence Size",
+                value: distortion.scale,
+                action: viewModel.setSelectedEffectDistortionScale
+            )
+            effectAmountSliderRow(
+                title: "Distortion Blend",
+                value: distortion.backgroundBlend,
+                action: viewModel.setSelectedEffectDistortionBackgroundBlend
+            )
+            effectAmountSliderRow(
+                title: "Background Blur",
+                value: distortion.backgroundBlur,
+                action: viewModel.setSelectedEffectDistortionBackgroundBlur
+            )
         }
     }
 

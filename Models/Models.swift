@@ -453,8 +453,14 @@ struct NoZoomOverflowRegion: Codable, Equatable {
 enum EffectStyle: String, Codable, CaseIterable, Identifiable {
     case blur
     case darken
+    case distortion
+    case heatHazeEdge
     case tint
     case blurDarken
+
+    static var allCases: [EffectStyle] {
+        [.blur, .darken, .distortion, .tint, .blurDarken]
+    }
 
     var id: String { rawValue }
 
@@ -464,12 +470,95 @@ enum EffectStyle: String, Codable, CaseIterable, Identifiable {
             return "Blur"
         case .darken:
             return "Darken"
+        case .distortion:
+            return "Distortion"
+        case .heatHazeEdge:
+            return "Distortion"
         case .tint:
             return "Tint"
         case .blurDarken:
             return "Blur + Darken"
         }
     }
+}
+
+enum DistortionPreset: String, Codable, CaseIterable, Identifiable {
+    case atmospheric
+    case heatHaze
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .atmospheric:
+            return "Atmospheric"
+        case .heatHaze:
+            return "Heat Haze"
+        }
+    }
+}
+
+enum DistortionMapSource: Codable, Equatable {
+    case preset(DistortionPreset)
+    case importedMap(id: String)
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case preset
+        case id
+    }
+
+    private enum Kind: String, Codable {
+        case preset
+        case importedMap
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(Kind.self, forKey: .kind)
+        switch kind {
+        case .preset:
+            self = .preset(try container.decode(DistortionPreset.self, forKey: .preset))
+        case .importedMap:
+            self = .importedMap(id: try container.decode(String.self, forKey: .id))
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .preset(let preset):
+            try container.encode(Kind.preset, forKey: .kind)
+            try container.encode(preset, forKey: .preset)
+        case .importedMap(let id):
+            try container.encode(Kind.importedMap, forKey: .kind)
+            try container.encode(id, forKey: .id)
+        }
+    }
+}
+
+struct DistortionConfiguration: Codable, Equatable {
+    var preset: DistortionPreset
+    var mapSource: DistortionMapSource
+    var scale: Double
+    var backgroundBlend: Double
+    var backgroundBlur: Double
+
+    static let defaultConfiguration = DistortionConfiguration(
+        preset: .atmospheric,
+        mapSource: .preset(.atmospheric),
+        scale: 0.55,
+        backgroundBlend: 0.72,
+        backgroundBlur: 0.18
+    )
+
+    static let legacyHeatHazeConfiguration = DistortionConfiguration(
+        preset: .heatHaze,
+        mapSource: .preset(.heatHaze),
+        scale: 0.7,
+        backgroundBlend: 1.0,
+        backgroundBlur: 0.28
+    )
 }
 
 struct EffectFocusRegion: Codable, Equatable {
@@ -507,6 +596,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
     var feather: Double
     var tintColor: EffectTintColor
     var focusRegion: EffectFocusRegion?
+    var distortion: DistortionConfiguration?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -529,6 +619,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         case feather
         case tintColor
         case focusRegion
+        case distortion
     }
 
     init(
@@ -549,7 +640,8 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         cornerRadius: Double,
         feather: Double,
         tintColor: EffectTintColor,
-        focusRegion: EffectFocusRegion?
+        focusRegion: EffectFocusRegion?,
+        distortion: DistortionConfiguration? = nil
     ) {
         self.id = id
         self.markerName = markerName
@@ -569,6 +661,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         self.feather = feather
         self.tintColor = tintColor
         self.focusRegion = focusRegion
+        self.distortion = style == .distortion ? (distortion ?? .defaultConfiguration) : distortion
     }
 
     init(from decoder: Decoder) throws {
@@ -586,7 +679,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         holdEndTime = decodedHoldEndTime ?? (endTime - legacyFadeOutDuration)
         enabled = try container.decode(Bool.self, forKey: .enabled)
         displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
-        style = try container.decode(EffectStyle.self, forKey: .style)
+        let decodedStyle = try container.decode(EffectStyle.self, forKey: .style)
         amount = try container.decode(Double.self, forKey: .amount)
         blurAmount = try container.decodeIfPresent(Double.self, forKey: .blurAmount) ?? amount
         darkenAmount = try container.decodeIfPresent(Double.self, forKey: .darkenAmount) ?? amount
@@ -595,6 +688,17 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         feather = try container.decodeIfPresent(Double.self, forKey: .feather) ?? 0
         tintColor = try container.decodeIfPresent(EffectTintColor.self, forKey: .tintColor) ?? .defaultTint
         focusRegion = try container.decodeIfPresent(EffectFocusRegion.self, forKey: .focusRegion)
+        let decodedDistortion = try container.decodeIfPresent(DistortionConfiguration.self, forKey: .distortion)
+        if decodedStyle == .heatHazeEdge {
+            style = .distortion
+            distortion = decodedDistortion ?? .legacyHeatHazeConfiguration
+        } else if decodedStyle == .distortion {
+            style = .distortion
+            distortion = decodedDistortion ?? .defaultConfiguration
+        } else {
+            style = decodedStyle
+            distortion = decodedDistortion
+        }
         normalizeTiming()
     }
 
@@ -618,6 +722,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         try container.encode(feather, forKey: .feather)
         try container.encode(tintColor, forKey: .tintColor)
         try container.encodeIfPresent(focusRegion, forKey: .focusRegion)
+        try container.encodeIfPresent(distortion, forKey: .distortion)
     }
 
     var fadeInDuration: Double {

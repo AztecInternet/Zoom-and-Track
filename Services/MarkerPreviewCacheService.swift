@@ -5,7 +5,7 @@ import Foundation
 final class MarkerPreviewCacheService {
     private let fileManager = FileManager.default
     private let cacheLifetime: TimeInterval = 7 * 24 * 60 * 60
-    private let previewRenderVersion = 6
+    private let previewRenderVersion = 14
 
     func cachedPreview(
         for recordingURL: URL,
@@ -237,6 +237,7 @@ final class MarkerPreviewCacheService {
             "feather=\(marker.feather)",
             "tintColor=\(marker.tintColor.red),\(marker.tintColor.green),\(marker.tintColor.blue),\(marker.tintColor.alpha)",
             "focusRegion=\(marker.focusRegion.map { "\($0.centerX),\($0.centerY),\($0.width),\($0.height)" } ?? "none")",
+            "distortion=\(distortionSignature(for: marker.distortion))",
             "renderWidth=\(renderSize.width)",
             "renderHeight=\(renderSize.height)",
             "previewRenderVersion=\(previewRenderVersion)",
@@ -281,10 +282,29 @@ final class MarkerPreviewCacheService {
                     "\(marker.tintColor.red),\(marker.tintColor.green),\(marker.tintColor.blue),\(marker.tintColor.alpha)",
                     marker.focusRegion.map { region in
                         "\(region.centerX),\(region.centerY),\(region.width),\(region.height)"
-                    } ?? "none"
+                    } ?? "none",
+                    distortionSignature(for: marker.distortion)
                 ].joined(separator: ",")
             }
             .joined(separator: ";")
+    }
+
+    private func distortionSignature(for distortion: DistortionConfiguration?) -> String {
+        guard let distortion else { return "none" }
+        let mapSource: String
+        switch distortion.mapSource {
+        case .preset(let preset):
+            mapSource = "preset:\(preset.rawValue)"
+        case .importedMap(let id):
+            mapSource = "imported:\(id)"
+        }
+        return [
+            distortion.preset.rawValue,
+            mapSource,
+            String(distortion.scale),
+            String(distortion.backgroundBlend),
+            String(distortion.backgroundBlur)
+        ].joined(separator: "|")
     }
 
     private func zoomCacheSignature(for zoomMarkers: [ZoomPlanItem]) -> String {

@@ -343,6 +343,191 @@ final class MarkerPreviewRenderService {
         )
     }
 
+    func renderDistortionLoupeFrame(
+        recordingURL: URL,
+        summary: RecordingInspectionSummary,
+        selectedMarker: EffectPlanItem,
+        time: Double,
+        normalizedPoint: CGPoint,
+        loupeSize: CGSize = CGSize(width: 280, height: 180)
+    ) async throws -> NSImage? {
+        guard let focusRegion = selectedMarker.focusRegion else {
+            return nil
+        }
+
+        let asset = AVURLAsset(url: recordingURL)
+        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+        guard let sourceVideoTrack = videoTracks.first else {
+            return nil
+        }
+
+        let naturalSize = try await sourceVideoTrack.load(.naturalSize)
+        let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+        let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+        let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+        guard orientedSize.width > 0, orientedSize.height > 0 else {
+            return nil
+        }
+
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = false
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let cgImage = try generator.copyCGImage(
+            at: CMTime(seconds: max(time, 0), preferredTimescale: 600),
+            actualTime: nil
+        )
+
+        let baseOrientationTransform = preferredTransform.concatenating(
+            CGAffineTransform(translationX: -orientedRect.origin.x, y: -orientedRect.origin.y)
+        )
+        let outputSize = cappedRenderSize(for: orientedSize, maxWidth: 960)
+        let outputRect = CGRect(origin: .zero, size: outputSize)
+        let baseScale = outputSize.width / orientedSize.width
+        let contentCoordinateSize = summary.contentCoordinateSize
+        let previewState = SharedMotionEngine.activeZoomState(
+            at: time,
+            zoomMarkers: summary.zoomMarkers,
+            contentCoordinateSize: contentCoordinateSize,
+            coordinateSpace: .bottomLeft
+        )
+
+        var image = CIImage(cgImage: cgImage).transformed(by: baseOrientationTransform)
+        image = image.transformed(by: CGAffineTransform(scaleX: baseScale, y: baseScale))
+
+        if let previewState {
+            let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
+            image = image.transformed(by: CGAffineTransform(scaleX: previewState.scale, y: previewState.scale))
+            image = image.transformed(by: CGAffineTransform(translationX: offset.width, y: offset.height))
+        }
+
+        let effectImage = makeEffectOverlay(
+            at: time,
+            effectMarkers: summary.effectMarkers,
+            contentCoordinateSize: contentCoordinateSize,
+            orientedVideoSize: orientedSize,
+            outputSize: outputSize,
+            previewState: previewState,
+            sourceImage: image.cropped(to: outputRect)
+        )?.cropped(to: outputRect) ?? image.cropped(to: outputRect)
+
+        let contentPoint = CGPoint(
+            x: min(max(normalizedPoint.x, 0), 1) * contentCoordinateSize.width,
+            y: min(max(normalizedPoint.y, 0), 1) * contentCoordinateSize.height
+        )
+        let resolvedPoint = SharedMotionEngine.resolveOverlayPoint(
+            contentPoint: contentPoint,
+            contentCoordinateSize: contentCoordinateSize,
+            orientedVideoSize: orientedSize,
+            outputSize: outputSize,
+            previewState: previewState
+        ).point
+
+        let focusSourceRect = CGRect(
+            x: (focusRegion.centerX - (focusRegion.width / 2)) * contentCoordinateSize.width,
+            y: (focusRegion.centerY - (focusRegion.height / 2)) * contentCoordinateSize.height,
+            width: focusRegion.width * contentCoordinateSize.width,
+            height: focusRegion.height * contentCoordinateSize.height
+        )
+        let focusTopLeft = SharedMotionEngine.resolveOverlayPoint(
+            contentPoint: CGPoint(x: focusSourceRect.minX, y: focusSourceRect.minY),
+            contentCoordinateSize: contentCoordinateSize,
+            orientedVideoSize: orientedSize,
+            outputSize: outputSize,
+            previewState: previewState
+        ).point
+        let focusBottomRight = SharedMotionEngine.resolveOverlayPoint(
+            contentPoint: CGPoint(x: focusSourceRect.maxX, y: focusSourceRect.maxY),
+            contentCoordinateSize: contentCoordinateSize,
+            orientedVideoSize: orientedSize,
+            outputSize: outputSize,
+            previewState: previewState
+        ).point
+        let transformedFocusRect = CGRect(
+            x: focusTopLeft.x,
+            y: focusTopLeft.y,
+            width: focusBottomRight.x - focusTopLeft.x,
+            height: focusBottomRight.y - focusTopLeft.y
+        ).standardized
+
+        let desiredCropSize = CGSize(
+            width: max(loupeSize.width * 2.2, transformedFocusRect.width * 1.2),
+            height: max(loupeSize.height * 2.2, transformedFocusRect.height * 1.2)
+        )
+        let cropRect = CGRect(
+            x: resolvedPoint.x - (desiredCropSize.width / 2),
+            y: resolvedPoint.y - (desiredCropSize.height / 2),
+            width: desiredCropSize.width,
+            height: desiredCropSize.height
+        ).intersection(outputRect)
+        guard cropRect.width > 1, cropRect.height > 1 else {
+            return nil
+        }
+
+        let loupeImage = effectImage.cropped(to: cropRect)
+        guard let rendered = ciContext.createCGImage(loupeImage, from: cropRect) else {
+            return nil
+        }
+        return NSImage(cgImage: rendered, size: cropRect.size)
+    }
+
+    func makeRealtimeEffectPreviewImage(
+        pixelBuffer: CVPixelBuffer,
+        at currentTime: Double,
+        summary: RecordingInspectionSummary,
+        effectMarkers: [EffectPlanItem],
+        outputSize: CGSize,
+        preferredTransform: CGAffineTransform,
+        orientedVideoSize: CGSize
+    ) -> CIImage? {
+        guard outputSize.width > 0,
+              outputSize.height > 0,
+              orientedVideoSize.width > 0,
+              orientedVideoSize.height > 0 else {
+            return nil
+        }
+
+        let outputRect = CGRect(origin: .zero, size: outputSize)
+        let baseOrientationTransform = preferredTransform.concatenating(
+            CGAffineTransform(
+                translationX: -CGRect(origin: .zero, size: CGSize(
+                    width: CVPixelBufferGetWidth(pixelBuffer),
+                    height: CVPixelBufferGetHeight(pixelBuffer)
+                )).applying(preferredTransform).origin.x,
+                y: -CGRect(origin: .zero, size: CGSize(
+                    width: CVPixelBufferGetWidth(pixelBuffer),
+                    height: CVPixelBufferGetHeight(pixelBuffer)
+                )).applying(preferredTransform).origin.y
+            )
+        )
+        let baseScale = outputSize.width / orientedVideoSize.width
+        let previewState = SharedMotionEngine.activeZoomState(
+            at: currentTime,
+            zoomMarkers: summary.zoomMarkers,
+            contentCoordinateSize: summary.contentCoordinateSize,
+            coordinateSpace: .bottomLeft
+        )
+
+        var image = CIImage(cvPixelBuffer: pixelBuffer).transformed(by: baseOrientationTransform)
+        image = image.transformed(by: CGAffineTransform(scaleX: baseScale, y: baseScale))
+
+        if let previewState {
+            let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
+            image = image.transformed(by: CGAffineTransform(scaleX: previewState.scale, y: previewState.scale))
+            image = image.transformed(by: CGAffineTransform(translationX: offset.width, y: offset.height))
+        }
+
+        return makeEffectOverlay(
+            at: currentTime,
+            effectMarkers: effectMarkers,
+            contentCoordinateSize: summary.contentCoordinateSize,
+            orientedVideoSize: orientedVideoSize,
+            outputSize: outputSize,
+            previewState: previewState,
+            sourceImage: image.cropped(to: outputRect)
+        )?.cropped(to: outputRect)
+    }
+
     private func export(
         _ session: AVAssetExportSession,
         to outputURL: URL,
@@ -627,6 +812,8 @@ private struct EffectRenderState {
     let region: EffectFocusRegion
     let blurIntensity: Double
     let darkenIntensity: Double
+    let distortionIntensity: Double
+    let distortion: DistortionConfiguration?
     let tintIntensity: Double
     let cornerRadius: CGFloat
     let feather: CGFloat
@@ -748,6 +935,63 @@ private func makeEffectOverlay(
 
     var outputImage = sourceImage?.cropped(to: outputRect)
 
+    if effectState.style == .distortion || effectState.style == .heatHazeEdge,
+       let sourceImage {
+        let outsideMaskImage = maskImage
+            .applyingFilter("CIColorInvert")
+            .cropped(to: outputRect)
+        let distortion = effectState.distortion ?? .defaultConfiguration
+        let blendAmount = min(max(distortion.backgroundBlend, 0), 1)
+        let blendMaskImage = outsideMaskImage.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputRVector": CIVector(x: blendAmount, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: blendAmount, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: blendAmount, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: blendAmount)
+            ]
+        )
+        let displacementMap = makeDistortionBackgroundDisplacementMap(
+            outputSize: outputSize,
+            outsideMaskImage: outsideMaskImage,
+            distortion: distortion,
+            intensity: effectState.distortionIntensity
+        )
+        let displacedImage = sourceImage
+            .clampedToExtent()
+            .applyingFilter(
+                "CIDisplacementDistortion",
+                parameters: [
+                    "inputDisplacementImage": displacementMap,
+                    kCIInputScaleKey: distortionDisplacementScale(
+                        preset: distortion.preset,
+                        intensity: effectState.distortionIntensity
+                    )
+                ]
+            )
+            .cropped(to: outputRect)
+        let softenedDisplacedImage = displacedImage
+            .clampedToExtent()
+            .applyingFilter(
+                "CIGaussianBlur",
+                parameters: [kCIInputRadiusKey: distortionBackgroundBlurRadius(
+                    blur: distortion.backgroundBlur,
+                    intensity: effectState.distortionIntensity
+                )]
+            )
+            .cropped(to: outputRect)
+
+        outputImage = softenedDisplacedImage
+            .applyingFilter(
+                "CIBlendWithMask",
+                parameters: [
+                    kCIInputBackgroundImageKey: sourceImage.cropped(to: outputRect),
+                    kCIInputMaskImageKey: blendMaskImage
+                ]
+            )
+            .cropped(to: outputRect)
+    }
+
     if effectState.style == .blur || effectState.style == .blurDarken,
        let sourceImage {
         let blurRadius = 28 * effectState.blurIntensity
@@ -812,15 +1056,18 @@ private func activeEffectRenderState(
     let timingIntensity = min(fadeInProgress, fadeOutProgress)
     let blurIntensity = timingIntensity * min(max(marker.blurAmount, 0), 1)
     let darkenIntensity = timingIntensity * min(max(marker.darkenAmount, 0), 1)
+    let distortionIntensity = timingIntensity * min(max(marker.amount, 0), 1)
     let tintIntensity = timingIntensity * min(max(marker.tintAmount, 0), 1)
 
-    guard max(blurIntensity, darkenIntensity, tintIntensity) > 0 else { return nil }
+    guard max(blurIntensity, darkenIntensity, distortionIntensity, tintIntensity) > 0 else { return nil }
 
     return EffectRenderState(
         style: marker.style,
         region: region,
         blurIntensity: blurIntensity,
         darkenIntensity: darkenIntensity,
+        distortionIntensity: distortionIntensity,
+        distortion: marker.distortion,
         tintIntensity: tintIntensity,
         cornerRadius: CGFloat(max(marker.cornerRadius, 0)),
         feather: CGFloat(max(marker.feather, 0)),
@@ -839,11 +1086,120 @@ private func effectOverlayColor(for state: EffectRenderState) -> NSColor {
         return NSColor.black.withAlphaComponent(state.darkenIntensity)
     case .blurDarken:
         return NSColor.black.withAlphaComponent(state.darkenIntensity)
+    case .distortion:
+        return .clear
+    case .heatHazeEdge:
+        return .clear
     case .tint:
         return state.tintColor.withAlphaComponent(0.42 * state.tintIntensity)
     case .blur:
         return .clear
     }
+}
+
+private func makeDistortionBackgroundDisplacementMap(
+    outputSize: CGSize,
+    outsideMaskImage: CIImage,
+    distortion: DistortionConfiguration,
+    intensity: Double
+) -> CIImage {
+    let outputRect = CGRect(origin: .zero, size: outputSize)
+    let neutralMap = CIImage(color: CIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1))
+        .cropped(to: outputRect)
+    let coarseWidthMultiplier: Double
+    let fineWidthMultiplier: Double
+    let coarseBlur: Double
+    let fineBlur: Double
+    let color0: CIColor
+    let color1: CIColor
+
+    switch distortion.preset {
+    case .atmospheric:
+        coarseWidthMultiplier = 0.14
+        fineWidthMultiplier = 0.075
+        coarseBlur = 34
+        fineBlur = 16
+        color0 = CIColor(red: 0.8, green: 0.8, blue: 0.8, alpha: 1)
+        color1 = CIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1)
+    case .heatHaze:
+        coarseWidthMultiplier = 0.11
+        fineWidthMultiplier = 0.06
+        coarseBlur = 24
+        fineBlur = 12
+        color0 = CIColor(red: 0.9, green: 0.9, blue: 0.9, alpha: 1)
+        color1 = CIColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1)
+    }
+
+    let coarsePattern = CIFilter(
+        name: "CICheckerboardGenerator",
+        parameters: [
+            "inputCenter": CIVector(x: outputSize.width * 0.5, y: outputSize.height * 0.5),
+            "inputColor0": color0,
+            "inputColor1": color1,
+            "inputWidth": max(min(outputSize.width, outputSize.height) * (coarseWidthMultiplier * max(distortion.scale, 0.2)), 20),
+            "inputSharpness": 0
+        ]
+    )!.outputImage!
+        .transformed(by: CGAffineTransform(rotationAngle: 0.31))
+        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: coarseBlur * max(distortion.scale, 0.2)])
+        .cropped(to: outputRect)
+
+    let finePattern = CIFilter(
+        name: "CICheckerboardGenerator",
+        parameters: [
+            "inputCenter": CIVector(x: outputSize.width * 0.5, y: outputSize.height * 0.5),
+            "inputColor0": color0,
+            "inputColor1": color1,
+            "inputWidth": max(min(outputSize.width, outputSize.height) * (fineWidthMultiplier * max(distortion.scale, 0.2)), 10),
+            "inputSharpness": 0
+        ]
+    )!.outputImage!
+        .transformed(by: CGAffineTransform(rotationAngle: -0.47))
+        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: fineBlur * max(distortion.scale, 0.2)])
+        .cropped(to: outputRect)
+
+    let blendedPattern = coarsePattern
+        .applyingFilter("CIOverlayBlendMode", parameters: [kCIInputBackgroundImageKey: finePattern])
+        .cropped(to: outputRect)
+
+    let maskedPattern = blendedPattern
+        .applyingFilter(
+            "CIBlendWithMask",
+            parameters: [
+                kCIInputBackgroundImageKey: neutralMap,
+                kCIInputMaskImageKey: outsideMaskImage
+            ]
+        )
+        .cropped(to: outputRect)
+
+    return maskedPattern
+        .applyingFilter(
+            "CIColorControls",
+            parameters: [
+                kCIInputSaturationKey: 0,
+                kCIInputContrastKey: 1 + (2.4 * intensity)
+            ]
+        )
+        .cropped(to: outputRect)
+}
+
+private func distortionDisplacementScale(
+    preset: DistortionPreset,
+    intensity: Double
+) -> Double {
+    switch preset {
+    case .atmospheric:
+        return 220 * intensity
+    case .heatHaze:
+        return 425 * intensity
+    }
+}
+
+private func distortionBackgroundBlurRadius(
+    blur: Double,
+    intensity: Double
+) -> Double {
+    18 * min(max(blur, 0), 1) * intensity
 }
 
 private func makeRoundedRectMaskImage(

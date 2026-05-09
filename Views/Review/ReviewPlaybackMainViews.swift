@@ -67,6 +67,22 @@ extension ContentView {
                         .offset(zoomPreviewOffset(for: previewState, in: fittedRect))
                         .blur(radius: playbackVideoHeightDragOrigin == nil ? 0 : 4)
 
+                    if let summary = viewModel.recordingSummary,
+                       let selectedEffectMarker,
+                       selectedEffectMarker.style == .distortion,
+                       !isEffectRegionDrawActive,
+                       !isRenderedPreviewActive {
+                        RealtimeEffectPreviewSurface(
+                            player: mainPlayer,
+                            summary: summary,
+                            selectedEffectMarker: selectedEffectMarker,
+                            currentPlaybackTime: currentTime,
+                            logicalVideoSize: fittedRect.size,
+                            isVisible: true
+                        )
+                        .frame(width: fittedRect.width, height: fittedRect.height)
+                    }
+
                     if let activeEffectState,
                        activeEffectState.style == .blur || activeEffectState.style == .blurDarken,
                        let overlayRect = overlayRect(
