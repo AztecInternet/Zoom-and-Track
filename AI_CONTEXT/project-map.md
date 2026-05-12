@@ -1,6 +1,6 @@
 # Project Map
 
-Generated: 2026-05-12 22:25:40
+Generated: 2026-05-12 22:39:50
 
 ## Swift Files
 
@@ -1162,7 +1162,7 @@ Generated: 2026-05-12 22:25:40
 - Line 887:    @State private var isPopoverPresented = false
 
 ### Views/Review/ReviewPlaybackMainViews.swift
-- Lines: 1077
+- Lines: 1152
 - Imports:
 - import AVFoundation
 - import SwiftUI
@@ -1170,9 +1170,11 @@ Generated: 2026-05-12 22:25:40
 - Line 4:extension ContentView {
 - Functions / Vars:
 - Line 5:    func playbackVideoCard(
-- Line 673:    func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
-- Line 1035:    func finishEffectFocusRegionDrawing(with region: EffectFocusRegion? = nil) {
-- Line 1048:    func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {
+- Line 654:    func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
+- Line 1016:    func finishEffectFocusRegionDrawing(with region: EffectFocusRegion? = nil) {
+- Line 1029:    func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {
+- Line 1071:    var body: some View {
+- Line 1111:    var body: some View {
 
 ### Views/Review/ReviewPlaybackPreviewViews.swift
 - Lines: 803

@@ -1,6 +1,6 @@
 # Swift Symbols
 
-Generated: 2026-05-12 22:25:40
+Generated: 2026-05-12 22:39:50
 
 ## App/ContentView.swift
 
@@ -487,9 +487,9 @@ Generated: 2026-05-12 22:25:40
 
 - Line 4:extension ContentView {
 - Line 5:    func playbackVideoCard(
-- Line 673:    func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
-- Line 1035:    func finishEffectFocusRegionDrawing(with region: EffectFocusRegion? = nil) {
-- Line 1048:    func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {
+- Line 654:    func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
+- Line 1016:    func finishEffectFocusRegionDrawing(with region: EffectFocusRegion? = nil) {
+- Line 1029:    func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {
 
 ## Views/Review/ReviewPlaybackPreviewViews.swift
 

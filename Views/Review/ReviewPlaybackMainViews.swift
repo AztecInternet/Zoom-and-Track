@@ -598,33 +598,6 @@ extension ContentView {
                 }
             }
 
-            if let renderingStatusMessage {
-                VStack {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(renderingStatusMessage)
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(Color.black.opacity(0.62))
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                    )
-                    .foregroundStyle(.white)
-                    .padding(.top, 18)
-
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .allowsHitTesting(false)
-            }
-
             if playbackTransitionPlateState != .hidden {
                 ZStack {
                     Rectangle()
@@ -641,11 +614,19 @@ extension ContentView {
                     )
                     .blendMode(.plusLighter)
 
-                    Image("Logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 330)
-                        .opacity(0.96)
+                    VStack(spacing: 18) {
+                        Image("Logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 330)
+                            .opacity(0.96)
+
+                        if let renderingStatusMessage {
+                            RenderPreviewActivityView(statusMessage: renderingStatusMessage)
+                                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.18), value: renderingStatusMessage != nil)
 
                     if playbackPresentationMode == .previewCompletedSlate {
                         VStack {
@@ -1074,4 +1055,98 @@ extension ContentView {
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
+}
+
+private struct RenderPreviewActivityView: View {
+    let statusMessage: String
+
+    private let messages: [RenderPreviewMessage] = [
+        RenderPreviewMessage(symbolName: "sparkles", text: "Polishing the preview"),
+        RenderPreviewMessage(symbolName: "rectangle.dashed", text: "Protecting the important bits"),
+        RenderPreviewMessage(symbolName: "wand.and.stars", text: "Applying the effect pass"),
+        RenderPreviewMessage(symbolName: "slider.horizontal.3", text: "Tuning the visual treatment"),
+        RenderPreviewMessage(symbolName: "hourglass", text: "Compositing the frame")
+    ]
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let elapsed = timeline.date.timeIntervalSinceReferenceDate
+            let message = messages[Int(elapsed / 2.4) % messages.count]
+            let phase = elapsed.truncatingRemainder(dividingBy: 1.6) / 1.6
+
+            VStack(spacing: 10) {
+                RenderPreviewActivityDots(phase: phase)
+                    .frame(width: 184, height: 14)
+
+                HStack(spacing: 7) {
+                    Image(systemName: message.symbolName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+
+                    Text(message.text.isEmpty ? statusMessage : message.text)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(.white.opacity(0.88))
+                .id(message.text)
+                .transition(.opacity)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.black.opacity(0.28))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.11), lineWidth: 1)
+            )
+        }
+    }
+}
+
+private struct RenderPreviewActivityDots: View {
+    let phase: TimeInterval
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = max(geometry.size.width, 1)
+            let height = geometry.size.height
+            let dotCount = 9
+            let dotSize: CGFloat = 6
+            let spacing = width / CGFloat(max(dotCount - 1, 1))
+            let cyclePosition = phase * Double(dotCount + 4)
+
+            ZStack {
+                Capsule(style: .continuous)
+                    .fill(Color.accentColor.opacity(0.10))
+
+                ForEach(0..<dotCount, id: \.self) { index in
+                    let reveal = min(max(cyclePosition - Double(index), 0), 1)
+                    let retreat = min(max(cyclePosition - Double(index + 4), 0), 1)
+                    let brightness = max(0, reveal - retreat)
+                    let pop = sin(brightness * .pi)
+                    let dotX = CGFloat(index) * spacing
+
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.18 + 0.76 * brightness))
+                        .frame(
+                            width: dotSize + CGFloat(pop) * 2,
+                            height: dotSize + CGFloat(pop) * 2
+                        )
+                        .position(x: dotX, y: height / 2)
+                }
+            }
+            .clipShape(Capsule(style: .continuous))
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(Color.accentColor.opacity(0.18), lineWidth: 1)
+            )
+        }
+    }
+}
+
+private struct RenderPreviewMessage {
+    let symbolName: String
+    let text: String
 }
