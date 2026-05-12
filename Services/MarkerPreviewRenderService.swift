@@ -4,6 +4,32 @@ import CoreGraphics
 import CoreImage
 import Foundation
 
+private struct DistortionImportedColorMaskSet {
+    let red: CIImage?
+    let blue: CIImage?
+    let cyan: CIImage?
+}
+
+private let distortionColorMaskContext = CIContext()
+private let distortionColorMaskCache = DistortionColorMaskCache()
+
+private final class DistortionColorMaskCache {
+    private let lock = NSLock()
+    private var storage: [String: DistortionImportedColorMaskSet] = [:]
+
+    func value(for key: String) -> DistortionImportedColorMaskSet? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage[key]
+    }
+
+    func store(_ value: DistortionImportedColorMaskSet, for key: String) {
+        lock.lock()
+        storage[key] = value
+        lock.unlock()
+    }
+}
+
 struct RenderedMarkerPreview {
     let outputURL: URL
     let sourceStartTime: Double
@@ -15,6 +41,22 @@ final class MarkerPreviewRenderService {
     private let ciContext = CIContext()
     private let previewPaddingBefore: Double = 0.10
     private let previewPaddingAfter: Double = 0.10
+    private let projectBundleService = ProjectBundleService()
+    private var importedDistortionMapCache: [String: CIImage] = [:]
+
+    private func importedDistortionMapImage(for mapID: String) -> CIImage? {
+        if let cached = importedDistortionMapCache[mapID] {
+            return cached
+        }
+
+        guard let mapURL = try? projectBundleService.distortionImportedMapURL(for: mapID),
+              let image = CIImage(contentsOf: mapURL) else {
+            return nil
+        }
+
+        importedDistortionMapCache[mapID] = image
+        return image
+    }
 
     func renderPreview(
         recordingURL: URL,
@@ -134,7 +176,8 @@ final class MarkerPreviewRenderService {
                 orientedVideoSize: orientedSize,
                 outputSize: outputSize,
                 previewState: previewState,
-                sourceImage: image.cropped(to: outputRect)
+                sourceImage: image.cropped(to: outputRect),
+                importedDistortionMapProvider: { [weak self] in self?.importedDistortionMapImage(for: $0) }
             )
 
             var outputImage = image.cropped(to: outputRect)
@@ -295,7 +338,8 @@ final class MarkerPreviewRenderService {
                 orientedVideoSize: orientedSize,
                 outputSize: outputSize,
                 previewState: previewState,
-                sourceImage: image.cropped(to: outputRect)
+                sourceImage: image.cropped(to: outputRect),
+                importedDistortionMapProvider: { [weak self] in self?.importedDistortionMapImage(for: $0) }
             )
 
             var outputImage = image.cropped(to: outputRect)
@@ -373,10 +417,9 @@ final class MarkerPreviewRenderService {
         generator.appliesPreferredTrackTransform = false
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
-        let cgImage = try generator.copyCGImage(
-            at: CMTime(seconds: max(time, 0), preferredTimescale: 600),
-            actualTime: nil
-        )
+        let cgImage = try await generator.image(
+            at: CMTime(seconds: max(time, 0), preferredTimescale: 600)
+        ).image
 
         let baseOrientationTransform = preferredTransform.concatenating(
             CGAffineTransform(translationX: -orientedRect.origin.x, y: -orientedRect.origin.y)
@@ -408,7 +451,8 @@ final class MarkerPreviewRenderService {
             orientedVideoSize: orientedSize,
             outputSize: outputSize,
             previewState: previewState,
-            sourceImage: image.cropped(to: outputRect)
+            sourceImage: image.cropped(to: outputRect),
+            importedDistortionMapProvider: { [weak self] in self?.importedDistortionMapImage(for: $0) }
         )?.cropped(to: outputRect) ?? image.cropped(to: outputRect)
 
         let contentPoint = CGPoint(
@@ -524,7 +568,8 @@ final class MarkerPreviewRenderService {
             orientedVideoSize: orientedVideoSize,
             outputSize: outputSize,
             previewState: previewState,
-            sourceImage: image.cropped(to: outputRect)
+            sourceImage: image.cropped(to: outputRect),
+            importedDistortionMapProvider: { [weak self] in self?.importedDistortionMapImage(for: $0) }
         )?.cropped(to: outputRect)
     }
 
@@ -602,7 +647,23 @@ struct ExportRenderResult {
 final class ExportRenderService {
     private let ciContext = CIContext()
     private let maxFallbackWidth: CGFloat = 3840
+    private let projectBundleService = ProjectBundleService()
+    private var importedDistortionMapCache: [String: CIImage] = [:]
     private var activeExportSession: AVAssetExportSession?
+
+    private func importedDistortionMapImage(for mapID: String) -> CIImage? {
+        if let cached = importedDistortionMapCache[mapID] {
+            return cached
+        }
+
+        guard let mapURL = try? projectBundleService.distortionImportedMapURL(for: mapID),
+              let image = CIImage(contentsOf: mapURL) else {
+            return nil
+        }
+
+        importedDistortionMapCache[mapID] = image
+        return image
+    }
 
     func cancelExport() {
         activeExportSession?.cancelExport()
@@ -721,7 +782,8 @@ final class ExportRenderService {
                 orientedVideoSize: orientedSize,
                 outputSize: outputSize,
                 previewState: previewState,
-                sourceImage: image.cropped(to: outputRect)
+                sourceImage: image.cropped(to: outputRect),
+                importedDistortionMapProvider: { [weak self] in self?.importedDistortionMapImage(for: $0) }
             )
 
             var outputImage = image.cropped(to: outputRect)
@@ -884,7 +946,8 @@ private func makeEffectOverlay(
     orientedVideoSize: CGSize,
     outputSize: CGSize,
     previewState: SharedMotionEngine.PreviewState?,
-    sourceImage: CIImage? = nil
+    sourceImage: CIImage? = nil,
+    importedDistortionMapProvider: ((String) -> CIImage?)? = nil
 ) -> CIImage? {
     guard let effectState = activeEffectRenderState(at: currentTime, effectMarkers: effectMarkers),
           contentCoordinateSize.width > 0,
@@ -955,7 +1018,8 @@ private func makeEffectOverlay(
             outputSize: outputSize,
             outsideMaskImage: outsideMaskImage,
             distortion: distortion,
-            intensity: effectState.distortionIntensity
+            intensity: effectState.distortionIntensity,
+            importedDistortionMapProvider: importedDistortionMapProvider
         )
         let displacedImage = sourceImage
             .clampedToExtent()
@@ -990,6 +1054,22 @@ private func makeEffectOverlay(
                 ]
             )
             .cropped(to: outputRect)
+
+        if let colorEffectOverlay = makeDistortionImportedColorEffectOverlay(
+            outputRect: outputRect,
+            outsideMaskImage: outsideMaskImage,
+            distortion: distortion,
+            intensity: effectState.distortionIntensity,
+            currentTime: currentTime,
+            importedDistortionMapProvider: importedDistortionMapProvider
+        ), let baseImage = outputImage {
+            outputImage = colorEffectOverlay
+                .applyingFilter(
+                    "CIScreenBlendMode",
+                    parameters: [kCIInputBackgroundImageKey: baseImage]
+                )
+                .cropped(to: outputRect)
+        }
     }
 
     if effectState.style == .blur || effectState.style == .blurDarken,
@@ -1101,11 +1181,60 @@ private func makeDistortionBackgroundDisplacementMap(
     outputSize: CGSize,
     outsideMaskImage: CIImage,
     distortion: DistortionConfiguration,
-    intensity: Double
+    intensity: Double,
+    importedDistortionMapProvider: ((String) -> CIImage?)?
 ) -> CIImage {
     let outputRect = CGRect(origin: .zero, size: outputSize)
     let neutralMap = CIImage(color: CIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1))
         .cropped(to: outputRect)
+
+    let basePattern: CIImage
+    switch distortion.mapSource {
+    case .preset:
+        basePattern = makeBuiltInDistortionBackgroundDisplacementMap(
+            outputSize: outputSize,
+            distortion: distortion
+        )
+    case .importedMap(let id):
+        if let importedImage = importedDistortionMapProvider?(id) {
+            basePattern = fittedDistortionImportedMap(
+                importedImage,
+                outputRect: outputRect
+            )
+        } else {
+            basePattern = makeBuiltInDistortionBackgroundDisplacementMap(
+                outputSize: outputSize,
+                distortion: distortion
+            )
+        }
+    }
+
+    let maskedPattern = basePattern
+        .applyingFilter(
+            "CIBlendWithMask",
+            parameters: [
+                kCIInputBackgroundImageKey: neutralMap,
+                kCIInputMaskImageKey: outsideMaskImage
+            ]
+        )
+        .cropped(to: outputRect)
+
+    return maskedPattern
+        .applyingFilter(
+            "CIColorControls",
+            parameters: [
+                kCIInputSaturationKey: 0,
+                kCIInputContrastKey: 1 + (2.4 * intensity)
+            ]
+        )
+        .cropped(to: outputRect)
+}
+
+private func makeBuiltInDistortionBackgroundDisplacementMap(
+    outputSize: CGSize,
+    distortion: DistortionConfiguration
+) -> CIImage {
+    let outputRect = CGRect(origin: .zero, size: outputSize)
     let coarseWidthMultiplier: Double
     let fineWidthMultiplier: Double
     let coarseBlur: Double
@@ -1162,25 +1291,875 @@ private func makeDistortionBackgroundDisplacementMap(
         .applyingFilter("CIOverlayBlendMode", parameters: [kCIInputBackgroundImageKey: finePattern])
         .cropped(to: outputRect)
 
-    let maskedPattern = blendedPattern
+    return blendedPattern.cropped(to: outputRect)
+}
+
+private func makeDistortionImportedColorEffectOverlay(
+    outputRect: CGRect,
+    outsideMaskImage: CIImage,
+    distortion: DistortionConfiguration,
+    intensity: Double,
+    currentTime: Double,
+    importedDistortionMapProvider: ((String) -> CIImage?)?
+) -> CIImage? {
+    guard case .importedMap(let mapID) = distortion.mapSource,
+          let importedImage = importedDistortionMapProvider?(mapID),
+          let masks = importedDistortionColorMasks(
+            for: importedImage,
+            mapID: mapID,
+            importedMapHash: distortion.importedMapHash,
+            outputRect: outputRect
+          ) else {
+        return nil
+    }
+
+    let glowStrength = max(distortion.colorEffectGlowStrength, 0)
+    let glowRadiusMultiplier = 0.55 + (max(distortion.colorEffectGlowRadius, 0) * 1.35)
+    let animationIntensity = max(distortion.colorEffectAnimationIntensity, 0)
+    let palette = colorEffectPaletteDefinition(for: distortion.colorEffectPalette)
+    let motionProfile = colorEffectMotionProfile(for: distortion.colorEffectPalette)
+    let baseSeed = normalizedMotionSeed(for: "\(mapID)|\(distortion.colorEffectPalette.rawValue)")
+    let glitchState = organicColorGlitchState(
+        outputRect: outputRect,
+        currentTime: currentTime,
+        seedKey: "\(mapID)|\(distortion.importedMapHash ?? "none")|\(distortion.colorEffectPalette.rawValue)",
+        animationIntensity: animationIntensity
+    )
+    let blueAnimation = animatedColorEffectState(
+        currentTime: currentTime,
+        seed: baseSeed + 0.11,
+        profile: motionProfile,
+        channelBias: 0.96,
+        animationIntensity: animationIntensity
+    )
+    let redAnimation = animatedColorEffectState(
+        currentTime: currentTime,
+        seed: baseSeed + 0.47,
+        profile: motionProfile,
+        channelBias: 1.02,
+        animationIntensity: animationIntensity
+    )
+    let cyanAnimation = animatedColorEffectState(
+        currentTime: currentTime,
+        seed: baseSeed + 0.79,
+        profile: motionProfile,
+        channelBias: 1.08,
+        animationIntensity: animationIntensity
+    )
+
+    let overlays = [
+        makeMaskedGlowOverlay(
+            maskImage: masks.blue,
+            outsideMaskImage: outsideMaskImage,
+            outputRect: outputRect,
+            innerGlowColor: palette.blueInner,
+            outerGlowColor: palette.blueOuter,
+            glowOpacity: palette.blueOpacity * (0.7 + (glowStrength * 1.1)) * intensity * blueAnimation.opacityMultiplier,
+            innerBlurRadius: 18 * glowRadiusMultiplier * blueAnimation.innerRadiusMultiplier,
+            outerBlurRadius: 34 * glowRadiusMultiplier * blueAnimation.outerRadiusMultiplier
+        ),
+        makeMaskedGlowOverlay(
+            maskImage: masks.red,
+            outsideMaskImage: outsideMaskImage,
+            outputRect: outputRect,
+            innerGlowColor: palette.redInner,
+            outerGlowColor: palette.redOuter,
+            glowOpacity: palette.redOpacity * (0.62 + (glowStrength * 0.95)) * intensity * redAnimation.opacityMultiplier,
+            innerBlurRadius: 16 * glowRadiusMultiplier * redAnimation.innerRadiusMultiplier,
+            outerBlurRadius: 30 * glowRadiusMultiplier * redAnimation.outerRadiusMultiplier
+        ),
+        makeMaskedGlowOverlay(
+            maskImage: masks.cyan,
+            outsideMaskImage: outsideMaskImage,
+            outputRect: outputRect,
+            innerGlowColor: palette.cyanInner,
+            outerGlowColor: palette.cyanOuter,
+            glowOpacity: palette.cyanOpacity * (0.84 + (glowStrength * 1.2)) * intensity * cyanAnimation.opacityMultiplier,
+            innerBlurRadius: 14 * glowRadiusMultiplier * cyanAnimation.innerRadiusMultiplier,
+            outerBlurRadius: 28 * glowRadiusMultiplier * cyanAnimation.outerRadiusMultiplier
+        )
+    ].compactMap { $0 }
+
+    let glitchOverlays = [
+        makeOrganicGlitchGlowOverlay(
+            maskImage: masks.blue,
+            outsideMaskImage: outsideMaskImage,
+            outputRect: outputRect,
+            channel: .blue,
+            glitchState: glitchState,
+            innerGlowColor: palette.blueInner,
+            outerGlowColor: palette.blueOuter,
+            glowOpacity: palette.blueOpacity * (0.7 + (glowStrength * 1.1)) * intensity * blueAnimation.opacityMultiplier,
+            innerBlurRadius: 18 * glowRadiusMultiplier * blueAnimation.innerRadiusMultiplier,
+            outerBlurRadius: 34 * glowRadiusMultiplier * blueAnimation.outerRadiusMultiplier
+        ),
+        makeOrganicGlitchGlowOverlay(
+            maskImage: masks.red,
+            outsideMaskImage: outsideMaskImage,
+            outputRect: outputRect,
+            channel: .red,
+            glitchState: glitchState,
+            innerGlowColor: palette.redInner,
+            outerGlowColor: palette.redOuter,
+            glowOpacity: palette.redOpacity * (0.62 + (glowStrength * 0.95)) * intensity * redAnimation.opacityMultiplier,
+            innerBlurRadius: 16 * glowRadiusMultiplier * redAnimation.innerRadiusMultiplier,
+            outerBlurRadius: 30 * glowRadiusMultiplier * redAnimation.outerRadiusMultiplier
+        ),
+        makeOrganicGlitchGlowOverlay(
+            maskImage: masks.cyan,
+            outsideMaskImage: outsideMaskImage,
+            outputRect: outputRect,
+            channel: .cyan,
+            glitchState: glitchState,
+            innerGlowColor: palette.cyanInner,
+            outerGlowColor: palette.cyanOuter,
+            glowOpacity: palette.cyanOpacity * (0.84 + (glowStrength * 1.2)) * intensity * cyanAnimation.opacityMultiplier,
+            innerBlurRadius: 14 * glowRadiusMultiplier * cyanAnimation.innerRadiusMultiplier,
+            outerBlurRadius: 28 * glowRadiusMultiplier * cyanAnimation.outerRadiusMultiplier
+        )
+    ].compactMap { $0 }
+
+    let allOverlays = overlays + glitchOverlays
+
+    guard let firstOverlay = allOverlays.first else {
+        return nil
+    }
+
+    return allOverlays.dropFirst().reduce(firstOverlay) { partial, overlay in
+        overlay
+            .applyingFilter(
+                "CISourceOverCompositing",
+                parameters: [kCIInputBackgroundImageKey: partial]
+            )
+            .cropped(to: outputRect)
+    }
+}
+
+private func makeMaskedGlowOverlay(
+    maskImage: CIImage?,
+    outsideMaskImage: CIImage,
+    outputRect: CGRect,
+    innerGlowColor: CIColor,
+    outerGlowColor: CIColor,
+    glowOpacity: Double,
+    innerBlurRadius: Double,
+    outerBlurRadius: Double
+) -> CIImage? {
+    guard let maskImage, glowOpacity > 0.001 else {
+        return nil
+    }
+
+    let effectiveMask = maskImage
         .applyingFilter(
-            "CIBlendWithMask",
+            "CIMultiplyCompositing",
+            parameters: [kCIInputBackgroundImageKey: outsideMaskImage]
+        )
+        .applyingFilter(
+            "CIColorMatrix",
             parameters: [
-                kCIInputBackgroundImageKey: neutralMap,
-                kCIInputMaskImageKey: outsideMaskImage
+                "inputRVector": CIVector(x: 1.15, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.15, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: 1.15, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1.4)
             ]
+        )
+        .cropped(to: outputRect)
+    let transparentImage = CIImage(color: .clear).cropped(to: outputRect)
+    let clampedGlowOpacity = min(max(glowOpacity, 0), 2.4)
+    let centerCutoutMask = effectiveMask
+        .cropped(to: outputRect)
+    let innerHaloMask = haloMask(
+        from: effectiveMask,
+        centerCutoutMask: centerCutoutMask,
+        expansionRadius: max(innerBlurRadius * 0.18, 2.5),
+        blurRadius: max(innerBlurRadius, 8),
+        alphaScale: min(1.0 + (clampedGlowOpacity * 0.2), 1.45),
+        outputRect: outputRect
+    )
+    .applyingFilter(
+        "CIMultiplyCompositing",
+        parameters: [kCIInputBackgroundImageKey: outsideMaskImage]
+    )
+    .cropped(to: outputRect)
+    let outerHaloMask = haloMask(
+        from: effectiveMask,
+        centerCutoutMask: centerCutoutMask,
+        expansionRadius: max(outerBlurRadius * 0.22, 5.0),
+        blurRadius: max(outerBlurRadius, 16),
+        alphaScale: min(0.95 + (clampedGlowOpacity * 0.16), 1.3),
+        outputRect: outputRect
+    )
+    .applyingFilter(
+        "CIMultiplyCompositing",
+        parameters: [kCIInputBackgroundImageKey: outsideMaskImage]
+    )
+    .cropped(to: outputRect)
+
+    let innerGlow = maskedColorPlate(
+        color: innerGlowColor,
+        opacity: clampedGlowOpacity,
+        mask: innerHaloMask,
+        outputRect: outputRect,
+        transparentImage: transparentImage
+    )
+    let outerGlow = maskedColorPlate(
+        color: outerGlowColor,
+        opacity: min(clampedGlowOpacity * 0.92, 2.2),
+        mask: outerHaloMask,
+        outputRect: outputRect,
+        transparentImage: transparentImage
+    )
+    let stackedGlow = outerGlow
+        .applyingFilter(
+            "CISourceOverCompositing",
+            parameters: [kCIInputBackgroundImageKey: innerGlow]
+        )
+        .applyingFilter(
+            "CIMultiplyCompositing",
+            parameters: [kCIInputBackgroundImageKey: outsideMaskImage]
         )
         .cropped(to: outputRect)
 
-    return maskedPattern
+    return stackedGlow
+}
+
+private func haloMask(
+    from baseMask: CIImage,
+    centerCutoutMask: CIImage,
+    expansionRadius: Double,
+    blurRadius: Double,
+    alphaScale: Double,
+    outputRect: CGRect
+) -> CIImage {
+    baseMask
+        .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: expansionRadius])
+        .cropped(to: outputRect)
+        .clampedToExtent()
         .applyingFilter(
-            "CIColorControls",
+            "CISubtractBlendMode",
+            parameters: [kCIInputBackgroundImageKey: centerCutoutMask]
+        )
+        .cropped(to: outputRect)
+        .clampedToExtent()
+        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: blurRadius])
+        .cropped(to: outputRect)
+        .applyingFilter(
+            "CISubtractBlendMode",
+            parameters: [kCIInputBackgroundImageKey: centerCutoutMask]
+        )
+        .cropped(to: outputRect)
+        .applyingFilter(
+            "CIColorMatrix",
             parameters: [
-                kCIInputSaturationKey: 0,
-                kCIInputContrastKey: 1 + (2.4 * intensity)
+                "inputRVector": CIVector(x: 1, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: 1, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: alphaScale)
             ]
         )
         .cropped(to: outputRect)
+}
+
+private struct DistortionColorPaletteDefinition {
+    let redInner: CIColor
+    let redOuter: CIColor
+    let redOpacity: Double
+    let blueInner: CIColor
+    let blueOuter: CIColor
+    let blueOpacity: Double
+    let cyanInner: CIColor
+    let cyanOuter: CIColor
+    let cyanOpacity: Double
+}
+
+private struct DistortionColorMotionProfile {
+    let primaryFrequency: Double
+    let secondaryFrequency: Double
+    let flareFrequency: Double
+    let pulseAmplitude: Double
+    let driftAmplitude: Double
+    let radiusAmplitude: Double
+    let flareAmplitude: Double
+    let flareSharpness: Double
+}
+
+private struct DistortionColorAnimationState {
+    let opacityMultiplier: Double
+    let innerRadiusMultiplier: Double
+    let outerRadiusMultiplier: Double
+}
+
+private enum DistortionColorGlitchChannel {
+    case red
+    case blue
+    case cyan
+}
+
+private struct DistortionColorGlitchState {
+    let channel: DistortionColorGlitchChannel
+    let region: CGRect
+    let offsets: [CGSize]
+    let opacityMultiplier: Double
+    let radiusMultiplier: Double
+}
+
+private func colorEffectPaletteDefinition(for palette: DistortionColorEffectPalette) -> DistortionColorPaletteDefinition {
+    switch palette {
+    case .ember:
+        return DistortionColorPaletteDefinition(
+            redInner: CIColor(red: 1.0, green: 0.56, blue: 0.18, alpha: 1),
+            redOuter: CIColor(red: 1.0, green: 0.14, blue: 0.08, alpha: 1),
+            redOpacity: 1.05,
+            blueInner: CIColor(red: 1.0, green: 0.74, blue: 0.22, alpha: 1),
+            blueOuter: CIColor(red: 1.0, green: 0.34, blue: 0.08, alpha: 1),
+            blueOpacity: 0.94,
+            cyanInner: CIColor(red: 1.0, green: 0.9, blue: 0.56, alpha: 1),
+            cyanOuter: CIColor(red: 1.0, green: 0.46, blue: 0.14, alpha: 1),
+            cyanOpacity: 1.12
+        )
+    case .electric:
+        return DistortionColorPaletteDefinition(
+            redInner: CIColor(red: 1.0, green: 0.24, blue: 0.7, alpha: 1),
+            redOuter: CIColor(red: 0.54, green: 0.0, blue: 1.0, alpha: 1),
+            redOpacity: 1.0,
+            blueInner: CIColor(red: 0.4, green: 0.82, blue: 1.0, alpha: 1),
+            blueOuter: CIColor(red: 0.18, green: 0.28, blue: 1.0, alpha: 1),
+            blueOpacity: 1.08,
+            cyanInner: CIColor(red: 0.74, green: 1.0, blue: 1.0, alpha: 1),
+            cyanOuter: CIColor(red: 0.18, green: 0.56, blue: 1.0, alpha: 1),
+            cyanOpacity: 1.18
+        )
+    case .plasma:
+        return DistortionColorPaletteDefinition(
+            redInner: CIColor(red: 1.0, green: 0.46, blue: 0.18, alpha: 1),
+            redOuter: CIColor(red: 1.0, green: 0.06, blue: 0.36, alpha: 1),
+            redOpacity: 1.0,
+            blueInner: CIColor(red: 0.28, green: 0.82, blue: 1.0, alpha: 1),
+            blueOuter: CIColor(red: 0.44, green: 0.24, blue: 1.0, alpha: 1),
+            blueOpacity: 1.04,
+            cyanInner: CIColor(red: 0.7, green: 1.0, blue: 0.98, alpha: 1),
+            cyanOuter: CIColor(red: 0.48, green: 0.86, blue: 1.0, alpha: 1),
+            cyanOpacity: 1.14
+        )
+    case .frost:
+        return DistortionColorPaletteDefinition(
+            redInner: CIColor(red: 0.9, green: 0.96, blue: 1.0, alpha: 1),
+            redOuter: CIColor(red: 0.52, green: 0.76, blue: 1.0, alpha: 1),
+            redOpacity: 0.92,
+            blueInner: CIColor(red: 0.78, green: 0.94, blue: 1.0, alpha: 1),
+            blueOuter: CIColor(red: 0.34, green: 0.58, blue: 1.0, alpha: 1),
+            blueOpacity: 1.0,
+            cyanInner: CIColor(red: 0.96, green: 1.0, blue: 1.0, alpha: 1),
+            cyanOuter: CIColor(red: 0.6, green: 0.88, blue: 1.0, alpha: 1),
+            cyanOpacity: 1.08
+        )
+    case .ghost:
+        return DistortionColorPaletteDefinition(
+            redInner: CIColor(red: 0.96, green: 0.96, blue: 1.0, alpha: 1),
+            redOuter: CIColor(red: 0.76, green: 0.8, blue: 1.0, alpha: 1),
+            redOpacity: 0.78,
+            blueInner: CIColor(red: 0.92, green: 0.96, blue: 1.0, alpha: 1),
+            blueOuter: CIColor(red: 0.6, green: 0.72, blue: 1.0, alpha: 1),
+            blueOpacity: 0.84,
+            cyanInner: CIColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1),
+            cyanOuter: CIColor(red: 0.82, green: 0.9, blue: 1.0, alpha: 1),
+            cyanOpacity: 0.94
+        )
+    }
+}
+
+private func colorEffectMotionProfile(for palette: DistortionColorEffectPalette) -> DistortionColorMotionProfile {
+    switch palette {
+    case .ember:
+        return DistortionColorMotionProfile(
+            primaryFrequency: 0.62,
+            secondaryFrequency: 1.14,
+            flareFrequency: 1.9,
+            pulseAmplitude: 0.14,
+            driftAmplitude: 0.08,
+            radiusAmplitude: 0.1,
+            flareAmplitude: 0.22,
+            flareSharpness: 6.5
+        )
+    case .electric:
+        return DistortionColorMotionProfile(
+            primaryFrequency: 1.35,
+            secondaryFrequency: 2.6,
+            flareFrequency: 4.8,
+            pulseAmplitude: 0.12,
+            driftAmplitude: 0.1,
+            radiusAmplitude: 0.08,
+            flareAmplitude: 0.18,
+            flareSharpness: 10.0
+        )
+    case .plasma:
+        return DistortionColorMotionProfile(
+            primaryFrequency: 0.88,
+            secondaryFrequency: 1.72,
+            flareFrequency: 3.1,
+            pulseAmplitude: 0.15,
+            driftAmplitude: 0.09,
+            radiusAmplitude: 0.11,
+            flareAmplitude: 0.16,
+            flareSharpness: 7.5
+        )
+    case .frost:
+        return DistortionColorMotionProfile(
+            primaryFrequency: 0.54,
+            secondaryFrequency: 0.92,
+            flareFrequency: 1.4,
+            pulseAmplitude: 0.08,
+            driftAmplitude: 0.06,
+            radiusAmplitude: 0.07,
+            flareAmplitude: 0.08,
+            flareSharpness: 5.0
+        )
+    case .ghost:
+        return DistortionColorMotionProfile(
+            primaryFrequency: 0.42,
+            secondaryFrequency: 0.74,
+            flareFrequency: 1.08,
+            pulseAmplitude: 0.06,
+            driftAmplitude: 0.05,
+            radiusAmplitude: 0.05,
+            flareAmplitude: 0.06,
+            flareSharpness: 4.2
+        )
+    }
+}
+
+private func normalizedMotionSeed(for string: String) -> Double {
+    var accumulator: UInt64 = 1469598103934665603
+    for byte in string.utf8 {
+        accumulator ^= UInt64(byte)
+        accumulator &*= 1099511628211
+    }
+    let normalized = Double(accumulator % 10_000) / 10_000
+    return normalized
+}
+
+private func animatedColorEffectState(
+    currentTime: Double,
+    seed: Double,
+    profile: DistortionColorMotionProfile,
+    channelBias: Double,
+    animationIntensity: Double
+) -> DistortionColorAnimationState {
+    let phase = seed * .pi * 2
+    let slowPulse = 0.5 + (0.5 * sin((currentTime * profile.primaryFrequency) + phase))
+    let driftPulse = 0.5 + (0.5 * sin((currentTime * profile.secondaryFrequency) + (phase * 1.7)))
+    let flareWave = max(0, sin((currentTime * profile.flareFrequency) + (phase * 2.3)))
+    let flare = pow(flareWave, profile.flareSharpness)
+    let intensityMix = 0.25 + (animationIntensity * 1.35)
+
+    let opacityMultiplier = channelBias * (
+        0.84
+        + (slowPulse * profile.pulseAmplitude * intensityMix)
+        + (driftPulse * profile.driftAmplitude * intensityMix)
+        + (flare * profile.flareAmplitude * intensityMix)
+    )
+    let innerRadiusMultiplier = 0.92 + (slowPulse * profile.radiusAmplitude * 0.55 * intensityMix) + (flare * 0.05 * intensityMix)
+    let outerRadiusMultiplier = 0.96 + (driftPulse * profile.radiusAmplitude * intensityMix) + (flare * 0.08 * intensityMix)
+
+    return DistortionColorAnimationState(
+        opacityMultiplier: opacityMultiplier,
+        innerRadiusMultiplier: innerRadiusMultiplier,
+        outerRadiusMultiplier: outerRadiusMultiplier
+    )
+}
+
+private func organicColorGlitchState(
+    outputRect: CGRect,
+    currentTime: Double,
+    seedKey: String,
+    animationIntensity: Double
+) -> DistortionColorGlitchState? {
+    guard animationIntensity > 0.02, outputRect.width > 1, outputRect.height > 1 else {
+        return nil
+    }
+
+    let slotDuration = 0.46
+    let slotIndex = Int(floor(max(currentTime, 0) / slotDuration))
+    let slotTime = currentTime - (Double(slotIndex) * slotDuration)
+    let eventSeedKey = "\(seedKey)|organic-glitch|\(slotIndex)"
+    let eventChance = normalizedMotionSeed(for: "\(eventSeedKey)|chance")
+    let chanceThreshold = min(0.42 + (animationIntensity * 0.42), 0.78)
+    guard eventChance <= chanceThreshold else {
+        return nil
+    }
+
+    let activeDuration = 0.14 + (normalizedMotionSeed(for: "\(eventSeedKey)|duration") * 0.16)
+    guard slotTime >= 0, slotTime <= activeDuration else {
+        return nil
+    }
+
+    let frameIndex = Int(floor(slotTime * 42))
+    let channelRoll = normalizedMotionSeed(for: "\(eventSeedKey)|channel")
+    let channel: DistortionColorGlitchChannel
+    if channelRoll < 0.333 {
+        channel = .blue
+    } else if channelRoll < 0.666 {
+        channel = .red
+    } else {
+        channel = .cyan
+    }
+
+    let regionWidth = outputRect.width * (0.10 + (normalizedMotionSeed(for: "\(eventSeedKey)|width") * 0.22))
+    let regionHeight = outputRect.height * (0.12 + (normalizedMotionSeed(for: "\(eventSeedKey)|height") * 0.26))
+    let maxX = max(outputRect.width - regionWidth, 0)
+    let maxY = max(outputRect.height - regionHeight, 0)
+    let region = CGRect(
+        x: outputRect.minX + (maxX * normalizedMotionSeed(for: "\(eventSeedKey)|x")),
+        y: outputRect.minY + (maxY * normalizedMotionSeed(for: "\(eventSeedKey)|y")),
+        width: regionWidth,
+        height: regionHeight
+    )
+
+    let progress = slotTime / max(activeDuration, 0.001)
+    let twitchEnvelope = pow(max(sin(progress * .pi), 0), 0.28)
+    let movementScale = max(min(outputRect.width, outputRect.height) * 0.042, 5) * (0.48 + (animationIntensity * 1.55))
+    let offsets = (0..<3).map { echoIndex in
+        let echoSeed = "\(eventSeedKey)|\(frameIndex)|\(echoIndex)"
+        let dxRoll = normalizedMotionSeed(for: "\(echoSeed)|dx")
+        let dyRoll = normalizedMotionSeed(for: "\(echoSeed)|dy")
+        let dxSign = normalizedMotionSeed(for: "\(echoSeed)|dx-sign") < 0.5 ? -1.0 : 1.0
+        let dySign = normalizedMotionSeed(for: "\(echoSeed)|dy-sign") < 0.5 ? -1.0 : 1.0
+        let echoScale = 1.0 - (Double(echoIndex) * 0.24)
+
+        return CGSize(
+            width: dxSign * movementScale * (0.45 + dxRoll) * twitchEnvelope * echoScale,
+            height: dySign * movementScale * 0.58 * (0.28 + dyRoll) * twitchEnvelope * echoScale
+        )
+    }
+
+    return DistortionColorGlitchState(
+        channel: channel,
+        region: region,
+        offsets: offsets,
+        opacityMultiplier: (0.58 + (animationIntensity * 1.2)) * twitchEnvelope,
+        radiusMultiplier: 0.72 + (normalizedMotionSeed(for: "\(eventSeedKey)|radius") * 0.46)
+    )
+}
+
+private func makeOrganicGlitchGlowOverlay(
+    maskImage: CIImage?,
+    outsideMaskImage: CIImage,
+    outputRect: CGRect,
+    channel: DistortionColorGlitchChannel,
+    glitchState: DistortionColorGlitchState?,
+    innerGlowColor: CIColor,
+    outerGlowColor: CIColor,
+    glowOpacity: Double,
+    innerBlurRadius: Double,
+    outerBlurRadius: Double
+) -> CIImage? {
+    guard let maskImage,
+          let glitchState,
+          glitchState.channel == channel,
+          glitchState.opacityMultiplier > 0.001 else {
+        return nil
+    }
+
+    let regionMask = makeRoundedRectMaskImage(
+        outputSize: outputRect.size,
+        rect: glitchState.region,
+        cornerRadius: min(glitchState.region.width, glitchState.region.height) * 0.36,
+        feather: max(min(glitchState.region.width, glitchState.region.height) * 0.14, 6)
+    )
+    .cropped(to: outputRect)
+    let localMask = maskImage
+        .applyingFilter(
+            "CIMultiplyCompositing",
+            parameters: [kCIInputBackgroundImageKey: regionMask]
+        )
+        .cropped(to: outputRect)
+
+    guard let baseGlitch = makeMaskedGlowOverlay(
+        maskImage: localMask,
+        outsideMaskImage: outsideMaskImage,
+        outputRect: outputRect,
+        innerGlowColor: innerGlowColor,
+        outerGlowColor: outerGlowColor,
+        glowOpacity: glowOpacity * glitchState.opacityMultiplier,
+        innerBlurRadius: innerBlurRadius * glitchState.radiusMultiplier,
+        outerBlurRadius: outerBlurRadius * glitchState.radiusMultiplier
+    ) else {
+        return nil
+    }
+
+    let shiftedGlows = glitchState.offsets.enumerated().map { index, offset in
+        baseGlitch
+            .applyingFilter(
+                "CIColorMatrix",
+                parameters: [
+                    "inputRVector": CIVector(x: 1, y: 0, z: 0, w: 0),
+                    "inputGVector": CIVector(x: 0, y: 1, z: 0, w: 0),
+                    "inputBVector": CIVector(x: 0, y: 0, z: 1, w: 0),
+                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.84 - (CGFloat(index) * 0.18))
+                ]
+            )
+            .transformed(by: CGAffineTransform(
+                translationX: offset.width,
+                y: offset.height
+            ))
+            .cropped(to: outputRect)
+    }
+
+    guard let firstGlow = shiftedGlows.first else {
+        return nil
+    }
+
+    return shiftedGlows.dropFirst().reduce(firstGlow) { partial, shiftedGlow in
+        shiftedGlow
+            .applyingFilter(
+                "CISourceOverCompositing",
+                parameters: [kCIInputBackgroundImageKey: partial]
+            )
+            .cropped(to: outputRect)
+    }
+}
+
+private func maskedColorPlate(
+    color: CIColor,
+    opacity: Double,
+    mask: CIImage,
+    outputRect: CGRect,
+    transparentImage: CIImage
+) -> CIImage {
+    CIImage(
+        color: CIColor(
+            red: color.red,
+            green: color.green,
+            blue: color.blue,
+            alpha: CGFloat(opacity)
+        )
+    )
+    .cropped(to: outputRect)
+    .applyingFilter(
+        "CIBlendWithMask",
+        parameters: [
+            kCIInputBackgroundImageKey: transparentImage,
+            kCIInputMaskImageKey: mask
+        ]
+    )
+    .cropped(to: outputRect)
+}
+
+private func fittedDistortionImportedMap(
+    _ image: CIImage,
+    outputRect: CGRect
+) -> CIImage {
+    let sourceRect = image.extent
+    guard sourceRect.width > 0, sourceRect.height > 0 else {
+        return image.cropped(to: outputRect)
+    }
+
+    let scale = max(outputRect.width / sourceRect.width, outputRect.height / sourceRect.height)
+    let scaledWidth = sourceRect.width * scale
+    let scaledHeight = sourceRect.height * scale
+    let translatedImage = image
+        .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        .transformed(by: CGAffineTransform(
+            translationX: outputRect.midX - (scaledWidth / 2),
+            y: outputRect.midY - (scaledHeight / 2)
+        ))
+
+    return translatedImage
+        .cropped(to: outputRect)
+}
+
+private func importedDistortionColorMasks(
+    for image: CIImage,
+    mapID: String,
+    importedMapHash: String?,
+    outputRect: CGRect
+) -> DistortionImportedColorMaskSet? {
+    let cacheKey = [
+        mapID,
+        importedMapHash ?? "none",
+        String(Int(outputRect.width.rounded(.toNearestOrAwayFromZero))),
+        String(Int(outputRect.height.rounded(.toNearestOrAwayFromZero)))
+    ].joined(separator: "|")
+    if let cached = distortionColorMaskCache.value(for: cacheKey) {
+        return cached
+    }
+
+    let fittedImage = fittedDistortionImportedMap(image, outputRect: outputRect)
+    guard let cgImage = distortionColorMaskContext.createCGImage(fittedImage, from: outputRect),
+          let rgbaData = normalizedRGBAData(from: cgImage) else {
+        return nil
+    }
+
+    let width = cgImage.width
+    let height = cgImage.height
+    var redMask = [UInt8](repeating: 0, count: width * height)
+    var blueMask = [UInt8](repeating: 0, count: width * height)
+    var cyanMask = [UInt8](repeating: 0, count: width * height)
+    var redCount = 0
+    var blueCount = 0
+    var cyanCount = 0
+    var maxRedMaskValue: UInt8 = 0
+    var maxBlueMaskValue: UInt8 = 0
+    var maxCyanMaskValue: UInt8 = 0
+
+    for pixelIndex in 0..<(width * height) {
+        let componentIndex = pixelIndex * 4
+        let red = Double(rgbaData[componentIndex])
+        let green = Double(rgbaData[componentIndex + 1])
+        let blue = Double(rgbaData[componentIndex + 2])
+        let alpha = Double(rgbaData[componentIndex + 3]) / 255
+
+        guard alpha >= 0.06 else { continue }
+
+        let redStrength = maskByteValue(
+            normalizedStrength: redMaskStrength(
+                red: red,
+                green: green,
+                blue: blue,
+                alpha: alpha
+            )
+        )
+        if redStrength > 0 {
+            redMask[pixelIndex] = redStrength
+            redCount += 1
+            maxRedMaskValue = max(maxRedMaskValue, redStrength)
+        }
+
+        let blueStrength = maskByteValue(
+            normalizedStrength: blueMaskStrength(
+                red: red,
+                green: green,
+                blue: blue,
+                alpha: alpha
+            )
+        )
+        if blueStrength > 0 {
+            blueMask[pixelIndex] = blueStrength
+            blueCount += 1
+            maxBlueMaskValue = max(maxBlueMaskValue, blueStrength)
+        }
+
+        let cyanStrength = maskByteValue(
+            normalizedStrength: cyanMaskStrength(
+                red: red,
+                green: green,
+                blue: blue,
+                alpha: alpha
+            )
+        )
+        if cyanStrength > 0 {
+            cyanMask[pixelIndex] = cyanStrength
+            cyanCount += 1
+            maxCyanMaskValue = max(maxCyanMaskValue, cyanStrength)
+        }
+    }
+
+    let maskSet = DistortionImportedColorMaskSet(
+        red: redCount > 0 ? makeSingleChannelMaskImage(from: redMask, width: width, height: height) : nil,
+        blue: blueCount > 0 ? makeSingleChannelMaskImage(from: blueMask, width: width, height: height) : nil,
+        cyan: cyanCount > 0 ? makeSingleChannelMaskImage(from: cyanMask, width: width, height: height) : nil
+    )
+    print(
+        "Distortion color-map cache miss mapID=\(mapID) renderSize=\(width)x\(height) " +
+        "redCount=\(redCount) blueCount=\(blueCount) cyanCount=\(cyanCount) " +
+        "maxRed=\(maxRedMaskValue) maxBlue=\(maxBlueMaskValue) maxCyan=\(maxCyanMaskValue)"
+    )
+    distortionColorMaskCache.store(maskSet, for: cacheKey)
+    return maskSet
+}
+
+private func redMaskStrength(red: Double, green: Double, blue: Double, alpha: Double) -> Double {
+    guard red > 120, red > green * 1.6, red > blue * 1.6 else {
+        return 0
+    }
+
+    let intensity = normalizedComponent(red, threshold: 120)
+    let dominanceGreen = normalizedDominance(red, other: green, ratio: 1.6)
+    let dominanceBlue = normalizedDominance(red, other: blue, ratio: 1.6)
+    return clamp01(intensity * min(dominanceGreen, dominanceBlue) * alpha)
+}
+
+private func blueMaskStrength(red: Double, green: Double, blue: Double, alpha: Double) -> Double {
+    guard blue > 120, blue > red * 1.6, blue > green * 1.6 else {
+        return 0
+    }
+
+    let intensity = normalizedComponent(blue, threshold: 120)
+    let dominanceRed = normalizedDominance(blue, other: red, ratio: 1.6)
+    let dominanceGreen = normalizedDominance(blue, other: green, ratio: 1.6)
+    return clamp01(intensity * min(dominanceRed, dominanceGreen) * alpha)
+}
+
+private func cyanMaskStrength(red: Double, green: Double, blue: Double, alpha: Double) -> Double {
+    guard green > 100, blue > 100, red < 110, abs(green - blue) < 90 else {
+        return 0
+    }
+
+    let greenIntensity = normalizedComponent(green, threshold: 100)
+    let blueIntensity = normalizedComponent(blue, threshold: 100)
+    let redSuppression = clamp01((110 - red) / 110)
+    let balance = clamp01((90 - abs(green - blue)) / 90)
+    return clamp01(min(greenIntensity, blueIntensity) * redSuppression * balance * alpha)
+}
+
+private func normalizedComponent(_ value: Double, threshold: Double) -> Double {
+    clamp01((value - threshold) / max(255 - threshold, 1))
+}
+
+private func normalizedDominance(_ dominant: Double, other: Double, ratio: Double) -> Double {
+    clamp01((dominant - (other * ratio)) / 255)
+}
+
+private func maskByteValue(normalizedStrength: Double) -> UInt8 {
+    UInt8(clamp01(normalizedStrength) * 255)
+}
+
+private func clamp01(_ value: Double) -> Double {
+    min(max(value, 0), 1)
+}
+
+private func normalizedRGBAData(from cgImage: CGImage) -> [UInt8]? {
+    let width = cgImage.width
+    let height = cgImage.height
+    let bytesPerRow = width * 4
+    var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
+    guard let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+    ) else {
+        return nil
+    }
+
+    context.draw(cgImage, in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
+    return pixels
+}
+
+private func makeSingleChannelMaskImage(from values: [UInt8], width: Int, height: Int) -> CIImage? {
+    guard let provider = CGDataProvider(data: Data(values) as CFData),
+          let cgImage = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 8,
+            bytesPerRow: width,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+          ) else {
+        return nil
+    }
+
+    return CIImage(cgImage: cgImage).cropped(
+        to: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height))
+    )
 }
 
 private func distortionDisplacementScale(

@@ -18,13 +18,15 @@ struct TimelineToolbarView: View {
                 .font(.system(size: 10, weight: .light))
                 .foregroundStyle(Color.accentColor)
 
-            TimelineGadgetButton(
-                systemName: isPlacingClickFocus ? "xmark" : "plus",
-                isActive: isPlacingClickFocus,
-                isEnabled: canEditClickFocusMarkers || isPlacingClickFocus,
-                help: isPlacingClickFocus ? "Cancel Add Click Focus" : "Add Click Focus",
-                action: onToggleAddClickFocus
-            )
+            if !hasSelectedMarker || isPlacingClickFocus {
+                TimelineGadgetButton(
+                    systemName: isPlacingClickFocus ? "xmark" : "plus",
+                    isActive: isPlacingClickFocus,
+                    isEnabled: canEditClickFocusMarkers || isPlacingClickFocus,
+                    help: isPlacingClickFocus ? "Cancel Add Click Focus" : "Add Click Focus",
+                    action: onToggleAddClickFocus
+                )
+            }
 
             if hasSelectedMarker {
                 TimelineGadgetButton(
@@ -108,9 +110,12 @@ struct EffectsTimelineToolbarView: View {
     let hasSelectedMarker: Bool
     let selectedMarker: EffectPlanItem?
     let isDrawingFocusRegion: Bool
+    let showsOverlayToggle: Bool
+    let isShowingOverlay: Bool
     let onAddMarker: () -> Void
     let onDeleteSelectedMarker: () -> Void
     let onToggleFocusRegion: () -> Void
+    let onToggleOverlay: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -118,13 +123,15 @@ struct EffectsTimelineToolbarView: View {
                 .font(.system(size: 10, weight: .light))
                 .foregroundStyle(Color.accentColor)
 
-            TimelineGadgetButton(
-                systemName: "plus",
-                isActive: false,
-                isEnabled: true,
-                help: "Add Effect Marker",
-                action: onAddMarker
-            )
+            if !hasSelectedMarker {
+                TimelineGadgetButton(
+                    systemName: "plus",
+                    isActive: false,
+                    isEnabled: true,
+                    help: "Add Effect Marker",
+                    action: onAddMarker
+                )
+            }
 
             if hasSelectedMarker {
                 TimelineGadgetButton(
@@ -151,6 +158,29 @@ struct EffectsTimelineToolbarView: View {
                     help: isDrawingFocusRegion ? "Save Effect Focus Region" : "Draw Effect Focus Region",
                     action: onToggleFocusRegion
                 )
+
+                if showsOverlayToggle {
+                    Divider()
+                        .frame(height: 14)
+
+                    Text("overlay")
+                        .font(.system(size: 10, weight: .light))
+                        .foregroundStyle(Color.accentColor)
+
+                    Button(action: onToggleOverlay) {
+                        Text("Show Overlay")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(segmentedPillTextColor(isSelected: isShowingOverlay))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(segmentedPillBackgroundColor(isSelected: isShowingOverlay))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Show the imported distortion color map over the video")
+                }
             }
         }
         .padding(.horizontal, 10)

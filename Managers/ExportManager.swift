@@ -52,21 +52,21 @@ final class ExportManager {
                     let clampedProgress = max(0, min(progress, 1))
                     switch phase {
                     case .preparing:
-                        await onPhaseUpdate(.preparing, clampedProgress, "Preparing export…")
+                        onPhaseUpdate(.preparing, clampedProgress, "Preparing export…")
                     case .exporting:
-                        await onPhaseUpdate(.exporting, clampedProgress, "Exporting video…")
+                        onPhaseUpdate(.exporting, clampedProgress, "Exporting video…")
                     case .finalizing:
-                        await onPhaseUpdate(.finalizing, clampedProgress, "Finalizing movie…")
+                        onPhaseUpdate(.finalizing, clampedProgress, "Finalizing movie…")
                     }
                 }
                 guard activeExportOperationID == exportOperationID else { return }
-                await onCompletion(.completed(result.outputURL))
+                onCompletion(.completed(result.outputURL))
             } catch is CancellationError {
                 guard activeExportOperationID == exportOperationID else { return }
-                await onCompletion(.cancelled)
+                onCompletion(.cancelled)
             } catch {
                 guard activeExportOperationID == exportOperationID else { return }
-                await onCompletion(.failed(error))
+                onCompletion(.failed(error))
             }
             if activeExportOperationID == exportOperationID {
                 exportTask = nil

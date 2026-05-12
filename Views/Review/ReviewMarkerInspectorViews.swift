@@ -35,7 +35,7 @@ extension ContentView {
             )
         }
 
-        return VStack(alignment: .leading, spacing: 20) {
+        return ResizableInspectorSplitView {
             VStack(alignment: .leading, spacing: 10) {
                 InspectorSectionHeaderView(title: "Effects")
 
@@ -50,6 +50,7 @@ extension ContentView {
                         selectedMarkerID: viewModel.selectedEffectMarkerID,
                         onSelectMarker: { markerID in
                             guard renamingEffectMarkerID == nil else { return }
+                            finishEffectFocusRegionDrawing()
                             viewModel.startEffectMarkerPreview(markerID)
                         },
                         onToggleMarkerEnabled: viewModel.toggleEffectMarkerEnabled(_:),
@@ -70,15 +71,13 @@ extension ContentView {
                             renamingEffectMarkerID = nil
                         }
                     )
-                    .frame(minHeight: 220)
+                    .frame(minHeight: 220, maxHeight: .infinity)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-            Divider()
-
+        } bottomContent: {
             effectEditorSection
-                .frame(maxWidth: .infinity, alignment: .bottomLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -93,7 +92,7 @@ extension ContentView {
             )
         }
 
-        return VStack(alignment: .leading, spacing: 20) {
+        return ResizableInspectorSplitView {
             VStack(alignment: .leading, spacing: 10) {
                 InspectorSectionHeaderView(title: "Markers")
 
@@ -129,15 +128,13 @@ extension ContentView {
                             renamingMarkerID = nil
                         }
                     )
-                    .frame(minHeight: 220)
+                    .frame(minHeight: 220, maxHeight: .infinity)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-            Divider()
-
+        } bottomContent: {
             markerEditorSection
-                .frame(maxWidth: .infinity, alignment: .bottomLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -489,6 +486,29 @@ extension ContentView {
                     }
                 }
 
+                VStack(alignment: .leading, spacing: 6) {
+                    InspectorSectionHeaderView(title: "Style")
+                    Picker("Effect Style", selection: Binding(
+                        get: { marker.style },
+                        set: { viewModel.setSelectedEffectStyle($0) }
+                    )) {
+                        ForEach(EffectStyle.allCases) { style in
+                            Text(style.displayName).tag(style)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+
+                    if marker.style == .tint {
+                        ColorPicker(
+                            "Tint Color",
+                            selection: effectTintColorBinding(for: marker),
+                            supportsOpacity: false
+                        )
+                        .font(.system(size: 12, weight: .semibold))
+                    }
+                }
+
                 effectAmountEditorSection(for: marker)
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -524,29 +544,6 @@ extension ContentView {
                         phase: .zoomOut,
                         action: viewModel.setSelectedEffectFadeOutDuration
                     )
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    InspectorSectionHeaderView(title: "Style")
-                    Picker("Effect Style", selection: Binding(
-                        get: { marker.style },
-                        set: { viewModel.setSelectedEffectStyle($0) }
-                    )) {
-                        ForEach(EffectStyle.allCases) { style in
-                            Text(style.displayName).tag(style)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-
-                    if marker.style == .tint {
-                        ColorPicker(
-                            "Tint Color",
-                            selection: effectTintColorBinding(for: marker),
-                            supportsOpacity: false
-                        )
-                        .font(.system(size: 12, weight: .semibold))
-                    }
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -769,11 +766,11 @@ extension ContentView {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Picker("Distortion Preset", selection: Binding(
-                    get: { distortion.preset },
-                    set: { viewModel.setSelectedEffectDistortionPreset($0) }
+                    get: { viewModel.distortionPresetSelectionID(for: marker) },
+                    set: { viewModel.setSelectedEffectDistortionPresetSelectionID($0) }
                 )) {
-                    ForEach(DistortionPreset.allCases) { preset in
-                        Text(preset.displayName).tag(preset)
+                    ForEach(viewModel.availableDistortionPresetDescriptors) { descriptor in
+                        Text(descriptor.displayName).tag(descriptor.id)
                     }
                 }
                 .labelsHidden()
@@ -785,11 +782,13 @@ extension ContentView {
                 value: marker.amount,
                 action: viewModel.setSelectedEffectAmount
             )
-            effectAmountSliderRow(
-                title: "Turbulence Size",
-                value: distortion.scale,
-                action: viewModel.setSelectedEffectDistortionScale
-            )
+            if case .preset = distortion.mapSource {
+                effectAmountSliderRow(
+                    title: "Turbulence Size",
+                    value: distortion.scale,
+                    action: viewModel.setSelectedEffectDistortionScale
+                )
+            }
             effectAmountSliderRow(
                 title: "Distortion Blend",
                 value: distortion.backgroundBlend,
@@ -800,6 +799,48 @@ extension ContentView {
                 value: distortion.backgroundBlur,
                 action: viewModel.setSelectedEffectDistortionBackgroundBlur
             )
+
+            if case .importedMap = distortion.mapSource {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("GLOW EFFECTS")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Edge Palette")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Picker(
+                            "Edge Palette",
+                            selection: Binding(
+                                get: { distortion.colorEffectPalette },
+                                set: viewModel.setSelectedEffectDistortionColorEffectPalette
+                            )
+                        ) {
+                            ForEach(DistortionColorEffectPalette.allCases) { palette in
+                                Text(palette.displayName).tag(palette)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+                    effectAmountSliderRow(
+                        title: "Glow Strength",
+                        value: distortion.colorEffectGlowStrength,
+                        action: viewModel.setSelectedEffectDistortionColorGlowStrength
+                    )
+                    effectAmountSliderRow(
+                        title: "Glow Radius",
+                        value: distortion.colorEffectGlowRadius,
+                        action: viewModel.setSelectedEffectDistortionColorGlowRadius
+                    )
+                    effectAmountSliderRow(
+                        title: "Intensity",
+                        value: distortion.colorEffectAnimationIntensity,
+                        action: viewModel.setSelectedEffectDistortionColorAnimationIntensity
+                    )
+                }
+                .padding(.top, 2)
+            }
         }
     }
 

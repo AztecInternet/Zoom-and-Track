@@ -69,7 +69,13 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published var activeRecordingTargetName: String?
     @Published var recordingStartedAt: Date?
     @Published var selectedZoomMarkerID: String?
-    @Published var selectedEffectMarkerID: String?
+    @Published var selectedEffectMarkerID: String? {
+        didSet {
+            if selectedEffectMarkerID != oldValue {
+                isShowingDistortionMapOverlay = false
+            }
+        }
+    }
     @Published var currentPlaybackTime: Double = 0
     @Published var isPlaybackActive = false
     @Published var isRenderingMarkerPreview = false
@@ -81,9 +87,12 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published private(set) var exportStatusMessage: String?
     @Published private(set) var exportedRecordingURL: URL?
     @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
+    @Published private(set) var distortionPresetLibrary: DistortionPresetLibrary = .empty
+    @Published var selectedDistortionPresetLibraryID: String?
     @Published var distortionLoupeNormalizedPoint: CGPoint?
     @Published var distortionLoupeImage: NSImage?
     @Published var isRenderingDistortionLoupe = false
+    @Published var isShowingDistortionMapOverlay = false
     
     private var hasRestoredLastRecording = false
     private var activePlaybackScopeURL: URL?
@@ -107,6 +116,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private var targetRefreshTask: Task<Void, Never>?
     private var distortionLoupeRenderTask: Task<Void, Never>?
     private var distortionLoupeRevision = 0
+    private var distortionOverlayImageCache: [String: NSImage] = [:]
     private let timelineMarkerNudgeInterval = 0.1
 
     private let permissionsService = PermissionsService()
@@ -118,7 +128,7 @@ final class CaptureSetupViewModel: ObservableObject {
         permissionsService: permissionsService,
         screenCaptureService: screenCaptureService
     )
-    nonisolated(unsafe) private let captureMetadataManager: CaptureMetadataManager
+    private let captureMetadataManager: CaptureMetadataManager
     private let playbackTransportManager = PlaybackTransportManager()
     private let timelineScrubManager = TimelineScrubManager()
     private let inputEventCaptureService = InputEventCaptureService()
@@ -163,12 +173,15 @@ final class CaptureSetupViewModel: ObservableObject {
             self?.statusMessage = message
         }
         applyOutputDirectoryResolution()
+        loadDistortionPresetLibrary()
         startAutomaticTargetRefresh()
     }
 
     deinit {
         targetRefreshTask?.cancel()
-        captureMetadataManager.cancelPendingSave()
+        Task { @MainActor [captureMetadataManager] in
+            captureMetadataManager.cancelPendingSave()
+        }
     }
 
     var selectedTarget: ShareableCaptureTarget? {
@@ -236,6 +249,51 @@ final class CaptureSetupViewModel: ObservableObject {
     var isSelectedEffectDistortion: Bool {
         guard let selectedEffectMarker else { return false }
         return selectedEffectMarker.style == .distortion || selectedEffectMarker.style == .heatHazeEdge
+    }
+
+    var canShowSelectedDistortionMapOverlay: Bool {
+        guard let selectedEffectMarker,
+              selectedEffectMarker.style == .distortion,
+              case .importedMap(let mapID) = selectedEffectMarker.distortion?.mapSource,
+              !mapID.isEmpty else {
+            return false
+        }
+        return (try? projectBundleService.distortionImportedMapURL(for: mapID, in: distortionPresetLibrary)) != nil
+    }
+
+    var selectedEffectDistortionOverlayImage: NSImage? {
+        guard let selectedEffectMarker,
+              selectedEffectMarker.style == .distortion,
+              case .importedMap(let mapID) = selectedEffectMarker.distortion?.mapSource else {
+            return nil
+        }
+        return distortionOverlayImage(forMapID: mapID)
+    }
+
+    var availableDistortionPresetDescriptors: [DistortionPresetDescriptor] {
+        DistortionPresetDescriptor.builtInDescriptors + distortionPresetLibrary.presets.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }
+    }
+
+    var selectedDistortionPresetDescriptor: DistortionPresetDescriptor? {
+        let preferredID = selectedDistortionPresetLibraryID
+        if let preferredID,
+           let descriptor = availableDistortionPresetDescriptors.first(where: { $0.id == preferredID }) {
+            return descriptor
+        }
+        return availableDistortionPresetDescriptors.first
+    }
+
+    var distortionImportedMapAssets: [DistortionImportedMapAsset] {
+        distortionPresetLibrary.importedMaps.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }
+    }
+
+    var selectedCustomDistortionPresetDescriptor: DistortionPresetDescriptor? {
+        guard let selectedDistortionPresetLibraryID else { return nil }
+        return distortionPresetLibrary.presets.first(where: { $0.id == selectedDistortionPresetLibraryID })
     }
 
     func load() async {
@@ -331,6 +389,124 @@ final class CaptureSetupViewModel: ObservableObject {
         guard let url = projectBundleService.chooseOutputDirectory() else { return }
         selectedOutputFolderPath = url.path
         statusMessage = "Output folder selected."
+    }
+
+    func selectDistortionPresetLibraryPreset(_ presetID: String) {
+        selectedDistortionPresetLibraryID = presetID
+    }
+
+    func createDistortionPresetFromImportedMap() {
+        guard let sourceURL = projectBundleService.chooseDistortionMapImage() else { return }
+
+        do {
+            let asset = try projectBundleService.importDistortionMap(
+                from: sourceURL,
+                suggestedName: sourceURL.deletingPathExtension().lastPathComponent
+            )
+            distortionPresetLibrary.importedMaps.removeAll { $0.id == asset.id }
+            distortionPresetLibrary.importedMaps.append(asset)
+
+            let template = DistortionPresetDescriptor.builtInDescriptors[0]
+            let baseName = asset.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "Custom Distortion"
+                : asset.displayName
+            let newPreset = DistortionPresetDescriptor(
+                id: UUID().uuidString.lowercased(),
+                displayName: uniqueDistortionPresetName(basedOn: baseName),
+                kind: .user,
+                preset: template.preset,
+                mapSource: .importedMap(id: asset.id),
+                defaultAmount: template.defaultAmount,
+                defaultScale: template.defaultScale,
+                defaultBackgroundBlend: template.defaultBackgroundBlend,
+                defaultBackgroundBlur: template.defaultBackgroundBlur,
+                previewVersion: template.previewVersion
+            )
+            distortionPresetLibrary.presets.append(newPreset)
+            persistDistortionPresetLibrary(statusMessage: "Custom Distortion preset added.")
+            selectedDistortionPresetLibraryID = newPreset.id
+        } catch {
+            statusMessage = "Could not import distortion map: \(error.localizedDescription)"
+        }
+    }
+
+    func duplicateSelectedDistortionPreset() {
+        guard let descriptor = selectedDistortionPresetDescriptor else { return }
+        let duplicate = DistortionPresetDescriptor(
+            id: UUID().uuidString.lowercased(),
+            displayName: uniqueDistortionPresetName(basedOn: "\(descriptor.displayName) Copy"),
+            kind: .user,
+            preset: descriptor.preset,
+            mapSource: descriptor.mapSource,
+            defaultAmount: descriptor.defaultAmount,
+            defaultScale: descriptor.defaultScale,
+            defaultBackgroundBlend: descriptor.defaultBackgroundBlend,
+            defaultBackgroundBlur: descriptor.defaultBackgroundBlur,
+            previewVersion: descriptor.previewVersion
+        )
+        distortionPresetLibrary.presets.append(duplicate)
+        persistDistortionPresetLibrary(statusMessage: "Distortion preset duplicated.")
+        selectedDistortionPresetLibraryID = duplicate.id
+    }
+
+    func deleteSelectedDistortionPreset() {
+        guard let selectedDistortionPresetLibraryID,
+              let index = distortionPresetLibrary.presets.firstIndex(where: { $0.id == selectedDistortionPresetLibraryID }) else {
+            return
+        }
+        distortionPresetLibrary.presets.remove(at: index)
+        persistDistortionPresetLibrary(statusMessage: "Distortion preset deleted.")
+        self.selectedDistortionPresetLibraryID = distortionPresetLibrary.presets.first?.id
+    }
+
+    func renameSelectedDistortionPreset(_ name: String) {
+        guard let selectedDistortionPresetLibraryID,
+              let index = distortionPresetLibrary.presets.firstIndex(where: { $0.id == selectedDistortionPresetLibraryID }) else {
+            return
+        }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        distortionPresetLibrary.presets[index].displayName = trimmed
+        persistDistortionPresetLibrary()
+    }
+
+    func setSelectedDistortionLibraryPresetEnginePreset(_ preset: DistortionPreset) {
+        updateSelectedDistortionPresetLibraryDescriptor { descriptor in
+            descriptor.preset = preset
+            if case .preset = descriptor.mapSource {
+                descriptor.mapSource = .preset(preset)
+            }
+        }
+    }
+
+    func setSelectedDistortionLibraryPresetMapSource(_ mapSource: DistortionMapSource) {
+        updateSelectedDistortionPresetLibraryDescriptor { descriptor in
+            descriptor.mapSource = mapSource
+        }
+    }
+
+    func setSelectedDistortionLibraryPresetDefaultAmount(_ amount: Double) {
+        updateSelectedDistortionPresetLibraryDescriptor { descriptor in
+            descriptor.defaultAmount = min(max(amount, 0), 1)
+        }
+    }
+
+    func setSelectedDistortionLibraryPresetDefaultScale(_ scale: Double) {
+        updateSelectedDistortionPresetLibraryDescriptor { descriptor in
+            descriptor.defaultScale = min(max(scale, 0), 1)
+        }
+    }
+
+    func setSelectedDistortionLibraryPresetDefaultBackgroundBlend(_ blend: Double) {
+        updateSelectedDistortionPresetLibraryDescriptor { descriptor in
+            descriptor.defaultBackgroundBlend = min(max(blend, 0), 1)
+        }
+    }
+
+    func setSelectedDistortionLibraryPresetDefaultBackgroundBlur(_ blur: Double) {
+        updateSelectedDistortionPresetLibraryDescriptor { descriptor in
+            descriptor.defaultBackgroundBlur = min(max(blur, 0), 1)
+        }
     }
 
     func openRecording() {
@@ -730,7 +906,12 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
-    func seekTimelineDirectly(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
+    func seekTimelineDirectly(
+        to seconds: Double,
+        snappedMarkerID: String?,
+        snappedEffectMarkerID: String? = nil,
+        suppressAutoSelectionWhenUnsnapped: Bool = false
+    ) {
         guard let plan = timelineScrubManager.directSeekPlan(
             canUsePlaybackTransport: canUsePlaybackTransport,
             isRenderedPreviewActive: isRenderedPreviewActive,
@@ -755,6 +936,10 @@ final class CaptureSetupViewModel: ObservableObject {
         selectedEffectMarkerID = plan.selectedEffectMarkerID
         if let suppressionInterval = plan.suppressionInterval {
             manualSelectionSuppressionUntil = Date().addingTimeInterval(suppressionInterval)
+        } else if suppressAutoSelectionWhenUnsnapped,
+                  snappedMarkerID == nil,
+                  snappedEffectMarkerID == nil {
+            manualSelectionSuppressionUntil = Date().addingTimeInterval(0.35)
         }
         seekPlayback(to: plan.targetTime)
     }
@@ -938,6 +1123,11 @@ final class CaptureSetupViewModel: ObservableObject {
 
         selectedEffectMarkerID = markerID
         distortionLoupeNormalizedPoint = nil
+        syncDistortionMapOverlayVisibility()
+        if isPlaybackActive {
+            mainPlayer?.pause()
+            isPlaybackActive = false
+        }
         if seekPlaybackHead {
             seekPlayback(to: marker.snapTime)
         } else {
@@ -1123,6 +1313,7 @@ final class CaptureSetupViewModel: ObservableObject {
         } else {
             clearDistortionLoupe()
         }
+        syncDistortionMapOverlayVisibility()
     }
 
     func setSelectedEffectAmount(_ amount: Double) {
@@ -1145,13 +1336,17 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     func setSelectedEffectDistortionPreset(_ preset: DistortionPreset) {
-        updateSelectedEffectMarker { marker in
-            if marker.distortion == nil {
-                marker.distortion = .defaultConfiguration
-            }
-            marker.distortion?.preset = preset
-            marker.distortion?.mapSource = .preset(preset)
+        guard let descriptor = DistortionPresetDescriptor.builtInDescriptors.first(where: { $0.preset == preset }) else {
+            return
         }
+        applyDistortionPresetDescriptorToSelectedEffect(descriptor)
+    }
+
+    func setSelectedEffectDistortionPresetSelectionID(_ presetID: String) {
+        guard let descriptor = availableDistortionPresetDescriptors.first(where: { $0.id == presetID }) else {
+            return
+        }
+        applyDistortionPresetDescriptorToSelectedEffect(descriptor)
     }
 
     func setSelectedEffectDistortionScale(_ scale: Double) {
@@ -1178,6 +1373,51 @@ final class CaptureSetupViewModel: ObservableObject {
                 marker.distortion = .defaultConfiguration
             }
             marker.distortion?.backgroundBlur = min(max(blur, 0), 1)
+        }
+    }
+
+    func setSelectedEffectDistortionColorGlowStrength(_ strength: Double) {
+        updateSelectedEffectMarker { marker in
+            if marker.distortion == nil {
+                marker.distortion = .defaultConfiguration
+            }
+            marker.distortion?.colorEffectGlowStrength = min(max(strength, 0), 1)
+        }
+    }
+
+    func setSelectedEffectDistortionColorGlowRadius(_ radius: Double) {
+        updateSelectedEffectMarker { marker in
+            if marker.distortion == nil {
+                marker.distortion = .defaultConfiguration
+            }
+            marker.distortion?.colorEffectGlowRadius = min(max(radius, 0), 1)
+        }
+    }
+
+    func setSelectedEffectDistortionColorAnimationIntensity(_ intensity: Double) {
+        updateSelectedEffectMarker { marker in
+            if marker.distortion == nil {
+                marker.distortion = .defaultConfiguration
+            }
+            marker.distortion?.colorEffectAnimationIntensity = min(max(intensity, 0), 1)
+        }
+    }
+
+    func setSelectedEffectDistortionColorCoreOpacity(_ opacity: Double) {
+        updateSelectedEffectMarker { marker in
+            if marker.distortion == nil {
+                marker.distortion = .defaultConfiguration
+            }
+            marker.distortion?.colorEffectCoreOpacity = min(max(opacity, 0), 1)
+        }
+    }
+
+    func setSelectedEffectDistortionColorEffectPalette(_ palette: DistortionColorEffectPalette) {
+        updateSelectedEffectMarker { marker in
+            if marker.distortion == nil {
+                marker.distortion = .defaultConfiguration
+            }
+            marker.distortion?.colorEffectPalette = palette
         }
     }
 
@@ -1620,6 +1860,125 @@ final class CaptureSetupViewModel: ObservableObject {
                 statusMessage = message
             }
         }
+    }
+
+    private func loadDistortionPresetLibrary() {
+        do {
+            distortionPresetLibrary = try projectBundleService.loadDistortionPresetLibrary()
+        } catch {
+            distortionPresetLibrary = .empty
+            statusMessage = "Distortion preset library could not be loaded."
+        }
+
+        if selectedDistortionPresetLibraryID == nil {
+            selectedDistortionPresetLibraryID = availableDistortionPresetDescriptors.first?.id
+        }
+    }
+
+    private func persistDistortionPresetLibrary(statusMessage: String? = nil) {
+        do {
+            try projectBundleService.saveDistortionPresetLibrary(distortionPresetLibrary)
+            if let statusMessage {
+                self.statusMessage = statusMessage
+            }
+        } catch {
+            self.statusMessage = "Could not save Distortion preset library: \(error.localizedDescription)"
+        }
+    }
+
+    private func updateSelectedDistortionPresetLibraryDescriptor(
+        _ mutate: (inout DistortionPresetDescriptor) -> Void
+    ) {
+        guard let selectedDistortionPresetLibraryID,
+              let index = distortionPresetLibrary.presets.firstIndex(where: { $0.id == selectedDistortionPresetLibraryID }) else {
+            return
+        }
+        mutate(&distortionPresetLibrary.presets[index])
+        persistDistortionPresetLibrary()
+    }
+
+    private func uniqueDistortionPresetName(basedOn baseName: String) -> String {
+        let existingNames = Set(availableDistortionPresetDescriptors.map { $0.displayName.lowercased() })
+        if !existingNames.contains(baseName.lowercased()) {
+            return baseName
+        }
+
+        var counter = 2
+        while existingNames.contains("\(baseName) \(counter)".lowercased()) {
+            counter += 1
+        }
+        return "\(baseName) \(counter)"
+    }
+
+    func distortionPresetSelectionID(for marker: EffectPlanItem) -> String {
+        if let reference = marker.distortion?.presetReference {
+            switch reference {
+            case .builtIn(let preset):
+                return DistortionPresetDescriptor.builtInDescriptors.first(where: { $0.preset == preset })?.id ?? "builtin-\(preset.rawValue)"
+            case .libraryPreset(let id):
+                return id
+            }
+        }
+
+        if let preset = marker.distortion?.preset {
+            return DistortionPresetDescriptor.builtInDescriptors.first(where: { $0.preset == preset })?.id ?? "builtin-\(preset.rawValue)"
+        }
+
+        return DistortionPresetDescriptor.builtInDescriptors[0].id
+    }
+
+    private func applyDistortionPresetDescriptorToSelectedEffect(_ descriptor: DistortionPresetDescriptor) {
+        let importedMapHash: String?
+        switch descriptor.mapSource {
+        case .preset:
+            importedMapHash = nil
+        case .importedMap(let id):
+            importedMapHash = distortionPresetLibrary.importedMaps.first(where: { $0.id == id })?.contentHash
+        }
+
+        updateSelectedEffectMarker { marker in
+            var distortion = marker.distortion ?? .defaultConfiguration
+            marker.amount = min(max(descriptor.defaultAmount, 0), 1)
+            distortion.presetReference = descriptor.reference
+            distortion.preset = descriptor.preset
+            distortion.mapSource = descriptor.mapSource
+            distortion.scale = min(max(descriptor.defaultScale, 0), 1)
+            distortion.backgroundBlend = min(max(descriptor.defaultBackgroundBlend, 0), 1)
+            distortion.backgroundBlur = min(max(descriptor.defaultBackgroundBlur, 0), 1)
+            distortion.importedMapHash = importedMapHash
+            marker.distortion = distortion
+        }
+        syncDistortionMapOverlayVisibility()
+    }
+
+    func toggleDistortionMapOverlay() {
+        guard canShowSelectedDistortionMapOverlay else {
+            isShowingDistortionMapOverlay = false
+            return
+        }
+        isShowingDistortionMapOverlay.toggle()
+    }
+
+    func hideDistortionMapOverlay() {
+        isShowingDistortionMapOverlay = false
+    }
+
+    private func syncDistortionMapOverlayVisibility() {
+        if !canShowSelectedDistortionMapOverlay {
+            isShowingDistortionMapOverlay = false
+        }
+    }
+
+    private func distortionOverlayImage(forMapID mapID: String) -> NSImage? {
+        if let cached = distortionOverlayImageCache[mapID] {
+            return cached
+        }
+        guard let mapURL = try? projectBundleService.distortionImportedMapURL(for: mapID, in: distortionPresetLibrary),
+              let image = NSImage(contentsOf: mapURL) else {
+            return nil
+        }
+        distortionOverlayImageCache[mapID] = image
+        return image
     }
 
     private func restoreLastRecordingIfNeeded() async {

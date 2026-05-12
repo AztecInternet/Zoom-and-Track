@@ -19,7 +19,7 @@ struct MarkerListTableView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
+        let scrollView = InspectorOverflowHintingScrollView()
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
@@ -51,6 +51,8 @@ struct MarkerListTableView: NSViewRepresentable {
         tableView.addTableColumn(column)
 
         scrollView.documentView = tableView
+        scrollView.observeDocumentView(tableView)
+        scrollView.updateOverflowHintVisibility()
         context.coordinator.tableView = tableView
         return scrollView
     }
@@ -59,6 +61,7 @@ struct MarkerListTableView: NSViewRepresentable {
         context.coordinator.parent = self
         context.coordinator.refreshTableIfNeeded()
         context.coordinator.syncSelection()
+        (nsView as? InspectorOverflowHintingScrollView)?.updateOverflowHintVisibility()
     }
 
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {

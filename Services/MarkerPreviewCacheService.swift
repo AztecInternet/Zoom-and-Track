@@ -5,7 +5,7 @@ import Foundation
 final class MarkerPreviewCacheService {
     private let fileManager = FileManager.default
     private let cacheLifetime: TimeInterval = 7 * 24 * 60 * 60
-    private let previewRenderVersion = 14
+    private let previewRenderVersion = 18
 
     func cachedPreview(
         for recordingURL: URL,
@@ -291,6 +291,15 @@ final class MarkerPreviewCacheService {
 
     private func distortionSignature(for distortion: DistortionConfiguration?) -> String {
         guard let distortion else { return "none" }
+        let presetReference: String
+        switch distortion.presetReference {
+        case .builtIn(let preset):
+            presetReference = "builtIn:\(preset.rawValue)"
+        case .libraryPreset(let id):
+            presetReference = "library:\(id)"
+        case nil:
+            presetReference = "none"
+        }
         let mapSource: String
         switch distortion.mapSource {
         case .preset(let preset):
@@ -299,11 +308,18 @@ final class MarkerPreviewCacheService {
             mapSource = "imported:\(id)"
         }
         return [
+            presetReference,
             distortion.preset.rawValue,
             mapSource,
             String(distortion.scale),
             String(distortion.backgroundBlend),
-            String(distortion.backgroundBlur)
+            String(distortion.backgroundBlur),
+            String(distortion.colorEffectGlowStrength),
+            String(distortion.colorEffectGlowRadius),
+            String(distortion.colorEffectAnimationIntensity),
+            String(distortion.colorEffectCoreOpacity),
+            distortion.colorEffectPalette.rawValue,
+            distortion.importedMapHash ?? "none"
         ].joined(separator: "|")
     }
 

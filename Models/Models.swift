@@ -498,6 +498,52 @@ enum DistortionPreset: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum DistortionPresetKind: String, Codable, CaseIterable, Identifiable {
+    case builtIn
+    case user
+
+    var id: String { rawValue }
+}
+
+enum DistortionPresetReference: Codable, Equatable {
+    case builtIn(DistortionPreset)
+    case libraryPreset(id: String)
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case preset
+        case id
+    }
+
+    private enum Kind: String, Codable {
+        case builtIn
+        case libraryPreset
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(Kind.self, forKey: .kind)
+        switch kind {
+        case .builtIn:
+            self = .builtIn(try container.decode(DistortionPreset.self, forKey: .preset))
+        case .libraryPreset:
+            self = .libraryPreset(id: try container.decode(String.self, forKey: .id))
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .builtIn(let preset):
+            try container.encode(Kind.builtIn, forKey: .kind)
+            try container.encode(preset, forKey: .preset)
+        case .libraryPreset(let id):
+            try container.encode(Kind.libraryPreset, forKey: .kind)
+            try container.encode(id, forKey: .id)
+        }
+    }
+}
+
 enum DistortionMapSource: Codable, Equatable {
     case preset(DistortionPreset)
     case importedMap(id: String)
@@ -537,28 +583,204 @@ enum DistortionMapSource: Codable, Equatable {
     }
 }
 
+struct DistortionImportedMapAsset: Codable, Identifiable, Equatable {
+    var id: String
+    var displayName: String
+    var fileName: String
+    var contentHash: String
+    var pixelWidth: Int?
+    var pixelHeight: Int?
+}
+
+struct DistortionPresetDescriptor: Codable, Identifiable, Equatable {
+    var id: String
+    var displayName: String
+    var kind: DistortionPresetKind
+    var preset: DistortionPreset
+    var mapSource: DistortionMapSource
+    var defaultAmount: Double
+    var defaultScale: Double
+    var defaultBackgroundBlend: Double
+    var defaultBackgroundBlur: Double
+    var previewVersion: Int
+
+    var reference: DistortionPresetReference {
+        switch kind {
+        case .builtIn:
+            return .builtIn(preset)
+        case .user:
+            return .libraryPreset(id: id)
+        }
+    }
+
+    static let builtInDescriptors: [DistortionPresetDescriptor] = [
+        DistortionPresetDescriptor(
+            id: "builtin-atmospheric",
+            displayName: "Atmospheric",
+            kind: .builtIn,
+            preset: .atmospheric,
+            mapSource: .preset(.atmospheric),
+            defaultAmount: 0.6,
+            defaultScale: 0.55,
+            defaultBackgroundBlend: 0.72,
+            defaultBackgroundBlur: 0.18,
+            previewVersion: 1
+        ),
+        DistortionPresetDescriptor(
+            id: "builtin-heat-haze",
+            displayName: "Heat Haze",
+            kind: .builtIn,
+            preset: .heatHaze,
+            mapSource: .preset(.heatHaze),
+            defaultAmount: 0.72,
+            defaultScale: 0.7,
+            defaultBackgroundBlend: 1.0,
+            defaultBackgroundBlur: 0.28,
+            previewVersion: 1
+        )
+    ]
+}
+
+struct DistortionPresetLibrary: Codable, Equatable {
+    var schemaVersion: Int
+    var presets: [DistortionPresetDescriptor]
+    var importedMaps: [DistortionImportedMapAsset]
+
+    static let empty = DistortionPresetLibrary(
+        schemaVersion: 1,
+        presets: [],
+        importedMaps: []
+    )
+}
+
 struct DistortionConfiguration: Codable, Equatable {
+    var presetReference: DistortionPresetReference?
     var preset: DistortionPreset
     var mapSource: DistortionMapSource
     var scale: Double
     var backgroundBlend: Double
     var backgroundBlur: Double
+    var colorEffectGlowStrength: Double
+    var colorEffectGlowRadius: Double
+    var colorEffectAnimationIntensity: Double
+    var colorEffectCoreOpacity: Double
+    var colorEffectPalette: DistortionColorEffectPalette
+    var importedMapHash: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case presetReference
+        case preset
+        case mapSource
+        case scale
+        case backgroundBlend
+        case backgroundBlur
+        case colorEffectGlowStrength
+        case colorEffectGlowRadius
+        case colorEffectAnimationIntensity
+        case colorEffectCoreOpacity
+        case colorEffectPalette
+        case importedMapHash
+    }
+
+    init(
+        presetReference: DistortionPresetReference?,
+        preset: DistortionPreset,
+        mapSource: DistortionMapSource,
+        scale: Double,
+        backgroundBlend: Double,
+        backgroundBlur: Double,
+        colorEffectGlowStrength: Double,
+        colorEffectGlowRadius: Double,
+        colorEffectAnimationIntensity: Double,
+        colorEffectCoreOpacity: Double,
+        colorEffectPalette: DistortionColorEffectPalette,
+        importedMapHash: String?
+    ) {
+        self.presetReference = presetReference
+        self.preset = preset
+        self.mapSource = mapSource
+        self.scale = scale
+        self.backgroundBlend = backgroundBlend
+        self.backgroundBlur = backgroundBlur
+        self.colorEffectGlowStrength = colorEffectGlowStrength
+        self.colorEffectGlowRadius = colorEffectGlowRadius
+        self.colorEffectAnimationIntensity = colorEffectAnimationIntensity
+        self.colorEffectCoreOpacity = colorEffectCoreOpacity
+        self.colorEffectPalette = colorEffectPalette
+        self.importedMapHash = importedMapHash
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = DistortionConfiguration.defaultConfiguration
+        presetReference = try container.decodeIfPresent(DistortionPresetReference.self, forKey: .presetReference)
+        preset = try container.decode(DistortionPreset.self, forKey: .preset)
+        mapSource = try container.decode(DistortionMapSource.self, forKey: .mapSource)
+        scale = try container.decode(Double.self, forKey: .scale)
+        backgroundBlend = try container.decode(Double.self, forKey: .backgroundBlend)
+        backgroundBlur = try container.decode(Double.self, forKey: .backgroundBlur)
+        colorEffectGlowStrength = try container.decodeIfPresent(Double.self, forKey: .colorEffectGlowStrength) ?? defaults.colorEffectGlowStrength
+        colorEffectGlowRadius = try container.decodeIfPresent(Double.self, forKey: .colorEffectGlowRadius) ?? defaults.colorEffectGlowRadius
+        colorEffectAnimationIntensity = try container.decodeIfPresent(Double.self, forKey: .colorEffectAnimationIntensity) ?? defaults.colorEffectAnimationIntensity
+        colorEffectCoreOpacity = try container.decodeIfPresent(Double.self, forKey: .colorEffectCoreOpacity) ?? defaults.colorEffectCoreOpacity
+        colorEffectPalette = try container.decodeIfPresent(DistortionColorEffectPalette.self, forKey: .colorEffectPalette) ?? defaults.colorEffectPalette
+        importedMapHash = try container.decodeIfPresent(String.self, forKey: .importedMapHash)
+    }
 
     static let defaultConfiguration = DistortionConfiguration(
+        presetReference: .builtIn(.atmospheric),
         preset: .atmospheric,
         mapSource: .preset(.atmospheric),
         scale: 0.55,
         backgroundBlend: 0.72,
-        backgroundBlur: 0.18
+        backgroundBlur: 0.18,
+        colorEffectGlowStrength: 0.82,
+        colorEffectGlowRadius: 0.72,
+        colorEffectAnimationIntensity: 0.58,
+        colorEffectCoreOpacity: 0.2,
+        colorEffectPalette: .plasma,
+        importedMapHash: nil
     )
 
     static let legacyHeatHazeConfiguration = DistortionConfiguration(
+        presetReference: .builtIn(.heatHaze),
         preset: .heatHaze,
         mapSource: .preset(.heatHaze),
         scale: 0.7,
         backgroundBlend: 1.0,
-        backgroundBlur: 0.28
+        backgroundBlur: 0.28,
+        colorEffectGlowStrength: 0.82,
+        colorEffectGlowRadius: 0.72,
+        colorEffectAnimationIntensity: 0.58,
+        colorEffectCoreOpacity: 0.2,
+        colorEffectPalette: .plasma,
+        importedMapHash: nil
     )
+}
+
+enum DistortionColorEffectPalette: String, Codable, CaseIterable, Identifiable {
+    case ember
+    case electric
+    case plasma
+    case frost
+    case ghost
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .ember:
+            return "Ember"
+        case .electric:
+            return "Electric"
+        case .plasma:
+            return "Plasma"
+        case .frost:
+            return "Frost"
+        case .ghost:
+            return "Ghost"
+        }
+    }
 }
 
 struct EffectFocusRegion: Codable, Equatable {

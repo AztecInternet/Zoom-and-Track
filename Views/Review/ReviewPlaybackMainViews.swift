@@ -21,12 +21,14 @@ extension ContentView {
         isDrawingNoZoomOverflowRegion: Bool,
         pendingNoZoomOverflowRegion: NoZoomOverflowRegion?,
         isDrawingEffectFocusRegion: Bool,
+        autoCommitsEffectFocusRegionOnRelease: Bool,
         pendingEffectFocusRegion: EffectFocusRegion?,
         placeClickFocusAction: @escaping (CGPoint) -> Void,
         dragSelectedMarkerAction: @escaping (CGPoint) -> Void,
         commitDraggedMarkerAction: @escaping (CGPoint) -> Void,
         updateNoZoomOverflowRegionAction: @escaping (NoZoomOverflowRegion?) -> Void,
-        updateEffectFocusRegionAction: @escaping (EffectFocusRegion?) -> Void
+        updateEffectFocusRegionAction: @escaping (EffectFocusRegion?) -> Void,
+        commitEffectFocusRegionAction: @escaping (EffectFocusRegion?) -> Void
     ) -> some View {
         let safeAspectRatio = max(aspectRatio, 0.1)
 
@@ -38,6 +40,9 @@ extension ContentView {
                 let isMarkerDragActive = draggedMarkerSourcePoint != nil
                 let isOverflowRegionDrawActive = isDrawingNoZoomOverflowRegion
                 let isEffectRegionDrawActive = isDrawingEffectFocusRegion
+                let isDistortionMapOverlayVisible = viewModel.isShowingDistortionMapOverlay &&
+                    editorMode == .effects &&
+                    viewModel.selectedEffectDistortionOverlayImage != nil
                 let previewState = isRenderedPreviewActive
                     ? nil
                     : isMarkerDragActive
@@ -45,6 +50,8 @@ extension ContentView {
                     : isOverflowRegionDrawActive
                     ? nil
                     : isEffectRegionDrawActive
+                    ? nil
+                    : isDistortionMapOverlayVisible
                     ? nil
                     : activeZoomPreviewState(
                         at: currentTime,
@@ -54,6 +61,8 @@ extension ContentView {
                 let activeEffectState = isRenderedPreviewActive
                     ? nil
                     : isEffectRegionDrawActive
+                    ? nil
+                    : isDistortionMapOverlayVisible
                     ? nil
                     : activeEffectPreviewState(
                         at: currentTime,
@@ -70,6 +79,7 @@ extension ContentView {
                     if let summary = viewModel.recordingSummary,
                        let selectedEffectMarker,
                        selectedEffectMarker.style == .distortion,
+                       !isDistortionMapOverlayVisible,
                        !isEffectRegionDrawActive,
                        !isRenderedPreviewActive {
                         RealtimeEffectPreviewSurface(
@@ -81,6 +91,19 @@ extension ContentView {
                             isVisible: true
                         )
                         .frame(width: fittedRect.width, height: fittedRect.height)
+                    }
+
+                    if isDistortionMapOverlayVisible,
+                       let overlayImage = viewModel.selectedEffectDistortionOverlayImage {
+                        Image(nsImage: overlayImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: fittedRect.width, height: fittedRect.height)
+                            .opacity(0.72)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.accentColor.opacity(0.45), lineWidth: 1)
+                            }
                     }
 
                     if let activeEffectState,
@@ -384,14 +407,16 @@ extension ContentView {
                                                     )
                                                     let deltaX = (value.translation.width / max(fittedRect.width, 1)) * contentCoordinateSize.width
                                                     let deltaY = (value.translation.height / max(fittedRect.height, 1)) * contentCoordinateSize.height
-                                                    updateEffectFocusRegionAction(
-                                                        movedEffectFocusRegion(
-                                                            baseRegion,
-                                                            deltaX: deltaX,
-                                                            deltaY: deltaY,
-                                                            contentCoordinateSize: contentCoordinateSize
-                                                        )
+                                                    let movedRegion = movedEffectFocusRegion(
+                                                        baseRegion,
+                                                        deltaX: deltaX,
+                                                        deltaY: deltaY,
+                                                        contentCoordinateSize: contentCoordinateSize
                                                     )
+                                                    updateEffectFocusRegionAction(movedRegion)
+                                                    if autoCommitsEffectFocusRegionOnRelease {
+                                                        commitEffectFocusRegionAction(movedRegion)
+                                                    }
                                                     effectFocusRegionInteractionBase = nil
                                                     activeEffectRegionPrecisionPoint = nil
                                                 }
@@ -452,16 +477,18 @@ extension ContentView {
                                                             x: value.location.x + fittedRect.minX,
                                                             y: value.location.y + fittedRect.minY
                                                         )
-                                                        updateEffectFocusRegionAction(
-                                                            resizedEffectFocusRegion(
-                                                                baseRegion,
-                                                                dragging: handle,
-                                                                to: resizePoint,
-                                                                contentCoordinateSize: contentCoordinateSize,
-                                                                in: geometry.size,
-                                                                videoAspectRatio: safeAspectRatio
-                                                            )
+                                                        let resizedRegion = resizedEffectFocusRegion(
+                                                            baseRegion,
+                                                            dragging: handle,
+                                                            to: resizePoint,
+                                                            contentCoordinateSize: contentCoordinateSize,
+                                                            in: geometry.size,
+                                                            videoAspectRatio: safeAspectRatio
                                                         )
+                                                        updateEffectFocusRegionAction(resizedRegion)
+                                                        if autoCommitsEffectFocusRegionOnRelease {
+                                                            commitEffectFocusRegionAction(resizedRegion)
+                                                        }
                                                         effectFocusRegionInteractionBase = nil
                                                         activeEffectRegionPrecisionPoint = nil
                                                     }
@@ -527,13 +554,15 @@ extension ContentView {
                                     ) else {
                                         return
                                     }
-                                    updateEffectFocusRegionAction(
-                                        effectFocusRegion(
-                                            from: startSourcePoint,
-                                            to: endSourcePoint,
-                                            contentCoordinateSize: contentCoordinateSize
-                                        )
+                                    let drawnRegion = effectFocusRegion(
+                                        from: startSourcePoint,
+                                        to: endSourcePoint,
+                                        contentCoordinateSize: contentCoordinateSize
                                     )
+                                    updateEffectFocusRegionAction(drawnRegion)
+                                    if autoCommitsEffectFocusRegionOnRelease {
+                                        commitEffectFocusRegionAction(drawnRegion)
+                                    }
                                     effectFocusRegionInteractionBase = nil
                                     activeEffectRegionHandle = nil
                                     activeEffectRegionPrecisionPoint = nil
@@ -672,6 +701,7 @@ extension ContentView {
                             if isPlacingClickFocus {
                                 isPlacingClickFocus = false
                             } else {
+                                guard viewModel.selectedZoomMarkerID == nil else { return }
                                 viewModel.cancelPlaybackPreview()
                                 inspectorMode = .markers
                                 isPlaybackInspectorVisible = true
@@ -713,11 +743,21 @@ extension ContentView {
                         hasSelectedMarker: viewModel.selectedEffectMarkerID != nil,
                         selectedMarker: viewModel.selectedEffectMarker,
                         isDrawingFocusRegion: isDrawingEffectFocusRegion,
+                        showsOverlayToggle: viewModel.canShowSelectedDistortionMapOverlay,
+                        isShowingOverlay: viewModel.isShowingDistortionMapOverlay,
                         onAddMarker: {
+                            guard viewModel.selectedEffectMarkerID == nil else { return }
                             viewModel.cancelPlaybackPreview()
                             inspectorMode = .markers
                             isPlaybackInspectorVisible = true
                             viewModel.addEffectMarker()
+                            pendingEffectFocusRegion = nil
+                            effectFocusRegionInteractionBase = nil
+                            activeEffectRegionPrecisionPoint = nil
+                            activeEffectRegionHandle = nil
+                            isDrawingEffectFocusRegion = true
+                            autoCommitsEffectFocusRegionOnRelease = true
+                            isTimelineKeyboardFocused = true
                         },
                         onDeleteSelectedMarker: {
                             viewModel.deleteSelectedEffectMarker()
@@ -725,13 +765,7 @@ extension ContentView {
                         onToggleFocusRegion: {
                             guard let selectedMarker = viewModel.selectedEffectMarker else { return }
                             if isDrawingEffectFocusRegion {
-                                viewModel.setSelectedEffectFocusRegion(
-                                    pendingEffectFocusRegion ?? selectedMarker.focusRegion
-                                )
-                                isDrawingEffectFocusRegion = false
-                                effectFocusRegionInteractionBase = nil
-                                activeEffectRegionPrecisionPoint = nil
-                                activeEffectRegionHandle = nil
+                                finishEffectFocusRegionDrawing(with: pendingEffectFocusRegion ?? selectedMarker.focusRegion)
                             } else {
                                 viewModel.cancelPlaybackPreview()
                                 isPlacingClickFocus = false
@@ -745,11 +779,15 @@ extension ContentView {
                                 activeEffectRegionPrecisionPoint = nil
                                 activeEffectRegionHandle = nil
                                 isDrawingEffectFocusRegion = true
+                                autoCommitsEffectFocusRegionOnRelease = selectedMarker.focusRegion == nil
                                 isTimelineKeyboardFocused = true
                             }
+                        },
+                        onToggleOverlay: {
+                            viewModel.toggleDistortionMapOverlay()
                         }
                     )
-                    .padding(.trailing, 18)
+                        .padding(.trailing, 18)
                 }
                 Text(timecodeString(for: viewModel.currentPlaybackTime))
                     .font(.system(size: 11, design: .monospaced))
@@ -817,6 +855,7 @@ extension ContentView {
                         }
                     },
                     onEffectSelect: { markerID in
+                        finishEffectFocusRegionDrawing()
                         viewModel.selectEffectMarker(markerID, seekPlaybackHead: true)
                     }
                 )
@@ -828,6 +867,7 @@ extension ContentView {
                             let hasMovedEnough = abs(value.translation.width) > 3
 
                             if !isDraggingTimeline && hasMovedEnough {
+                                finishEffectFocusRegionDrawing()
                                 isDraggingTimeline = true
                                 viewModel.beginTimelineScrub()
                             }
@@ -864,10 +904,12 @@ extension ContentView {
                                 )
                                 isDraggingTimeline = false
                             } else if let zoomSnap {
+                                finishEffectFocusRegionDrawing()
                                 isTimelineKeyboardFocused = true
                                 suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
                                 viewModel.selectZoomMarker(zoomSnap.marker.id, seekPlaybackHead: true)
                             } else if let effectSnap {
+                                finishEffectFocusRegionDrawing()
                                 isTimelineKeyboardFocused = true
                                 viewModel.seekTimelineDirectly(
                                     to: targetTime,
@@ -875,10 +917,12 @@ extension ContentView {
                                     snappedEffectMarkerID: effectSnap.marker.id
                                 )
                             } else {
+                                finishEffectFocusRegionDrawing()
                                 viewModel.seekTimelineDirectly(
                                     to: targetTime,
                                     snappedMarkerID: nil,
-                                    snappedEffectMarkerID: nil
+                                    snappedEffectMarkerID: nil,
+                                    suppressAutoSelectionWhenUnsnapped: true
                                 )
                             }
                         }
@@ -986,6 +1030,19 @@ extension ContentView {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(cardBackground)
+    }
+
+    func finishEffectFocusRegionDrawing(with region: EffectFocusRegion? = nil) {
+        guard isDrawingEffectFocusRegion else { return }
+
+        let resolvedRegion = region ?? pendingEffectFocusRegion ?? viewModel.selectedEffectMarker?.focusRegion
+        viewModel.setSelectedEffectFocusRegion(resolvedRegion)
+        pendingEffectFocusRegion = nil
+        isDrawingEffectFocusRegion = false
+        autoCommitsEffectFocusRegionOnRelease = false
+        effectFocusRegionInteractionBase = nil
+        activeEffectRegionPrecisionPoint = nil
+        activeEffectRegionHandle = nil
     }
 
     func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {

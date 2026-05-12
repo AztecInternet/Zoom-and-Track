@@ -1,11 +1,11 @@
 # Project Map
 
-Generated: 2026-05-09 06:35:09
+Generated: 2026-05-12 22:25:40
 
 ## Swift Files
 
 ### App/ContentView.swift
-- Lines: 771
+- Lines: 774
 - Imports:
 - import AppKit
 - import AVFoundation
@@ -14,57 +14,57 @@ Generated: 2026-05-09 06:35:09
 - import UniformTypeIdentifiers
 - Types:
 - Line 12:struct ContentView: View {
-- Line 61:    struct OverlayMapping {
-- Line 70:    struct ZoomPreviewState {
-- Line 75:    struct EffectPreviewState {
-- Line 86:    enum EffectRegionHandle: Hashable {
-- Line 97:    struct ZoomStateEvent {
-- Line 103:    enum MotionDirection {
-- Line 108:    struct MotionProgressSample {
-- Line 150:    enum CaptureInfoField: Hashable {
-- Line 156:    enum MotionTuning {
-- Line 164:    struct LibraryFilterOption: Identifiable {
-- Line 720:struct SharingAnchorView: NSViewRepresentable {
-- Line 742:enum AppTab: String, CaseIterable, Identifiable {
-- Line 764:struct MarkerListEntry: Identifiable {
+- Line 64:    struct OverlayMapping {
+- Line 73:    struct ZoomPreviewState {
+- Line 78:    struct EffectPreviewState {
+- Line 89:    enum EffectRegionHandle: Hashable {
+- Line 100:    struct ZoomStateEvent {
+- Line 106:    enum MotionDirection {
+- Line 111:    struct MotionProgressSample {
+- Line 153:    enum CaptureInfoField: Hashable {
+- Line 159:    enum MotionTuning {
+- Line 167:    struct LibraryFilterOption: Identifiable {
+- Line 723:struct SharingAnchorView: NSViewRepresentable {
+- Line 745:enum AppTab: String, CaseIterable, Identifiable {
+- Line 767:struct MarkerListEntry: Identifiable {
 - Functions / Vars:
-- Line 117:        var time: Double {
-- Line 124:        var zoomMarkerID: String? {
-- Line 133:        var effectMarkerID: String? {
-- Line 142:        var distance: CGFloat {
-- Line 168:        var id: String { label }
-- Line 171:    var body: some View {
-- Line 188:    private var sidebar: some View {
-- Line 208:    private var sidebarBrandHeader: some View {
-- Line 215:    private func sidebarTabRow(_ tab: AppTab) -> some View {
-- Line 242:    private var detailContent: some View {
-- Line 260:    private var reviewView: some View {
-- Line 426:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
-- Line 446:    func mappedOverlayPoint(
-- Line 485:    func infoRow(title: String, value: String) -> some View {
-- Line 496:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
-- Line 508:    var cardBackground: some View {
-- Line 517:    private var detailBackground: some View {
-- Line 530:    private var accentTint: Color {
-- Line 535:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
-- Line 551:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
-- Line 558:    func clearTimelineHover() {
-- Line 567:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
-- Line 572:    func clearEffectTimelineHover() {
-- Line 577:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
-- Line 587:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
-- Line 596:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
-- Line 611:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
-- Line 623:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
-- Line 627:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
-- Line 648:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
-- Line 662:    private func timelinePhase(for marker: ZoomPlanItem, at currentTime: Double) -> MarkerTimingPhase? {
-- Line 707:    private func timelineMarkerTooltip(for marker: ZoomPlanItem, markerNumber: Int, isEnabled: Bool) -> String {
-- Line 723:    func makeNSView(context: Context) -> NSView {
-- Line 731:    func updateNSView(_ nsView: NSView, context: Context) {
-- Line 748:    var id: String { rawValue }
-- Line 750:    var systemImage: String {
-- Line 770:    var id: String { marker.id }
+- Line 120:        var time: Double {
+- Line 127:        var zoomMarkerID: String? {
+- Line 136:        var effectMarkerID: String? {
+- Line 145:        var distance: CGFloat {
+- Line 171:        var id: String { label }
+- Line 174:    var body: some View {
+- Line 191:    private var sidebar: some View {
+- Line 211:    private var sidebarBrandHeader: some View {
+- Line 218:    private func sidebarTabRow(_ tab: AppTab) -> some View {
+- Line 245:    private var detailContent: some View {
+- Line 263:    private var reviewView: some View {
+- Line 429:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
+- Line 449:    func mappedOverlayPoint(
+- Line 488:    func infoRow(title: String, value: String) -> some View {
+- Line 499:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
+- Line 511:    var cardBackground: some View {
+- Line 520:    private var detailBackground: some View {
+- Line 533:    private var accentTint: Color {
+- Line 538:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
+- Line 554:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
+- Line 561:    func clearTimelineHover() {
+- Line 570:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
+- Line 575:    func clearEffectTimelineHover() {
+- Line 580:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
+- Line 590:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
+- Line 599:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
+- Line 614:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
+- Line 626:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
+- Line 630:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
+- Line 651:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
+- Line 665:    private func timelinePhase(for marker: ZoomPlanItem, at currentTime: Double) -> MarkerTimingPhase? {
+- Line 710:    private func timelineMarkerTooltip(for marker: ZoomPlanItem, markerNumber: Int, isEnabled: Bool) -> String {
+- Line 726:    func makeNSView(context: Context) -> NSView {
+- Line 734:    func updateNSView(_ nsView: NSView, context: Context) {
+- Line 751:    var id: String { rawValue }
+- Line 753:    var systemImage: String {
+- Line 773:    var id: String { marker.id }
 - SwiftUI State / Bindings:
 - Line 13:    @Environment(\.colorScheme) var colorScheme
 - Line 14:    @StateObject var viewModel = CaptureSetupViewModel()
@@ -96,21 +96,24 @@ Generated: 2026-05-09 06:35:09
 - Line 40:    @State var isDrawingNoZoomOverflowRegion = false
 - Line 41:    @State var pendingNoZoomOverflowRegion: NoZoomOverflowRegion?
 - Line 42:    @State var isDrawingEffectFocusRegion = false
-- Line 43:    @State var pendingEffectFocusRegion: EffectFocusRegion?
-- Line 44:    @State var effectFocusRegionInteractionBase: EffectFocusRegion?
-- Line 45:    @State var activeEffectRegionPrecisionPoint: CGPoint?
-- Line 46:    @State var activeEffectRegionHandle: EffectRegionHandle?
-- Line 47:    @State var activeTimelineMarkerDragID: String?
-- Line 48:    @State var activeTimelineMarkerDragStartTime: Double?
-- Line 49:    @State var librarySearchText = ""
-- Line 50:    @State var editorMode: ReviewEditorMode = .zoomAndClicks
-- Line 51:    @State var inspectorMode: EditInspectorMode = .markers
-- Line 52:    @State var selectedLibraryCollectionFilter: String?
-- Line 53:    @State var selectedLibraryProjectFilter: String?
-- Line 54:    @State var selectedLibraryTypeFilter: CaptureType?
-- Line 55:    @State var captureInfoTitleDraft = ""
-- Line 56:    @State var captureInfoCollectionDraft = ""
-- Line 57:    @State var captureInfoProjectDraft = ""
+- Line 43:    @State var autoCommitsEffectFocusRegionOnRelease = false
+- Line 44:    @State var pendingEffectFocusRegion: EffectFocusRegion?
+- Line 45:    @State var effectFocusRegionInteractionBase: EffectFocusRegion?
+- Line 46:    @State var activeEffectRegionPrecisionPoint: CGPoint?
+- Line 47:    @State var activeEffectRegionHandle: EffectRegionHandle?
+- Line 48:    @State var activeTimelineMarkerDragID: String?
+- Line 49:    @State var activeTimelineMarkerDragStartTime: Double?
+- Line 50:    @State var librarySearchText = ""
+- Line 51:    @State var editorMode: ReviewEditorMode = .zoomAndClicks
+- Line 52:    @State var inspectorMode: EditInspectorMode = .markers
+- Line 53:    @State var selectedLibraryCollectionFilter: String?
+- Line 54:    @State var selectedLibraryProjectFilter: String?
+- Line 55:    @State var selectedLibraryTypeFilter: CaptureType?
+- Line 56:    @State var selectedLibraryCaptureID: UUID?
+- Line 57:    @State var captureInfoTitleDraft = ""
+- Line 58:    @State var captureInfoCollectionDraft = ""
+- Line 59:    @State var captureInfoProjectDraft = ""
+- Line 60:    @State var isConfirmingDistortionPresetDelete = false
 
 ### App/TutorialCaptureApp.swift
 - Lines: 15
@@ -201,7 +204,7 @@ Generated: 2026-05-09 06:35:09
 - Line 108:    func directSeekPlan(
 
 ### Models/Models.swift
-- Lines: 1658
+- Lines: 1880
 - Imports:
 - import CoreGraphics
 - import Foundation
@@ -228,22 +231,28 @@ Generated: 2026-05-09 06:35:09
 - Line 446:struct NoZoomOverflowRegion: Codable, Equatable {
 - Line 453:enum EffectStyle: String, Codable, CaseIterable, Identifiable {
 - Line 485:enum DistortionPreset: String, Codable, CaseIterable, Identifiable {
-- Line 501:enum DistortionMapSource: Codable, Equatable {
-- Line 540:struct DistortionConfiguration: Codable, Equatable {
-- Line 564:struct EffectFocusRegion: Codable, Equatable {
-- Line 571:struct EffectTintColor: Codable, Equatable {
-- Line 580:struct EffectPlanItem: Codable, Identifiable, Equatable {
-- Line 758:enum ZoomMarkerKind: String, Codable {
-- Line 762:enum ClickPulsePreset: String, Codable, CaseIterable, Identifiable {
-- Line 787:struct ClickPulseConfiguration: Codable, Equatable {
-- Line 808:struct ZoomPlanItem: Codable, Identifiable {
-- Line 1017:struct RecordingInspectionSummary {
-- Line 1053:enum SharedMotionEngine {
-- Line 1054:    enum CoordinateSpace {
-- Line 1059:    struct PreviewState {
-- Line 1064:    struct ClickPulseRenderState {
-- Line 1069:    struct OverlayGeometryResolution {
-- Line 1075:    struct Timeline {
+- Line 501:enum DistortionPresetKind: String, Codable, CaseIterable, Identifiable {
+- Line 508:enum DistortionPresetReference: Codable, Equatable {
+- Line 547:enum DistortionMapSource: Codable, Equatable {
+- Line 586:struct DistortionImportedMapAsset: Codable, Identifiable, Equatable {
+- Line 595:struct DistortionPresetDescriptor: Codable, Identifiable, Equatable {
+- Line 644:struct DistortionPresetLibrary: Codable, Equatable {
+- Line 656:struct DistortionConfiguration: Codable, Equatable {
+- Line 761:enum DistortionColorEffectPalette: String, Codable, CaseIterable, Identifiable {
+- Line 786:struct EffectFocusRegion: Codable, Equatable {
+- Line 793:struct EffectTintColor: Codable, Equatable {
+- Line 802:struct EffectPlanItem: Codable, Identifiable, Equatable {
+- Line 980:enum ZoomMarkerKind: String, Codable {
+- Line 984:enum ClickPulsePreset: String, Codable, CaseIterable, Identifiable {
+- Line 1009:struct ClickPulseConfiguration: Codable, Equatable {
+- Line 1030:struct ZoomPlanItem: Codable, Identifiable {
+- Line 1239:struct RecordingInspectionSummary {
+- Line 1275:enum SharedMotionEngine {
+- Line 1276:    enum CoordinateSpace {
+- Line 1281:    struct PreviewState {
+- Line 1286:    struct ClickPulseRenderState {
+- Line 1291:    struct OverlayGeometryResolution {
+- Line 1297:    struct Timeline {
 - Functions / Vars:
 - Line 31:    var displayTitle: String {
 - Line 136:    func encode(to encoder: Encoder) throws {
@@ -276,95 +285,95 @@ Generated: 2026-05-09 06:35:09
 - Line 467:    var displayName: String {
 - Line 489:    var id: String { rawValue }
 - Line 491:    var displayName: String {
-- Line 527:    func encode(to encoder: Encoder) throws {
-- Line 528:        var container = encoder.container(keyedBy: CodingKeys.self)
-- Line 541:    var preset: DistortionPreset
-- Line 542:    var mapSource: DistortionMapSource
-- Line 543:    var scale: Double
-- Line 544:    var backgroundBlend: Double
-- Line 545:    var backgroundBlur: Double
-- Line 565:    var centerX: Double
-- Line 566:    var centerY: Double
-- Line 567:    var width: Double
-- Line 568:    var height: Double
-- Line 572:    var red: Double
-- Line 573:    var green: Double
-- Line 574:    var blue: Double
-- Line 575:    var alpha: Double
-- Line 581:    var id: String
-- Line 582:    var markerName: String?
-- Line 583:    var sourceEventTimestamp: Double
-- Line 584:    var startTime: Double
-- Line 585:    var holdStartTime: Double
-- Line 586:    var holdEndTime: Double
-- Line 587:    var endTime: Double
-- Line 588:    var enabled: Bool
-- Line 589:    var displayOrder: Int?
-- Line 590:    var style: EffectStyle
-- Line 591:    var amount: Double
-- Line 592:    var blurAmount: Double
-- Line 593:    var darkenAmount: Double
-- Line 594:    var tintAmount: Double
-- Line 595:    var cornerRadius: Double
-- Line 596:    var feather: Double
-- Line 597:    var tintColor: EffectTintColor
-- Line 598:    var focusRegion: EffectFocusRegion?
-- Line 599:    var distortion: DistortionConfiguration?
-- Line 705:    func encode(to encoder: Encoder) throws {
-- Line 706:        var container = encoder.container(keyedBy: CodingKeys.self)
-- Line 728:    var fadeInDuration: Double {
-- Line 732:    var holdDuration: Double {
-- Line 736:    var fadeOutDuration: Double {
-- Line 740:    var snapTime: Double {
-- Line 769:    var id: String { rawValue }
-- Line 771:    var displayName: String {
-- Line 788:    var preset: ClickPulsePreset
-- Line 792:    var duration: Double {
-- Line 809:    var id: String
-- Line 810:    var type: String
-- Line 811:    var markerName: String?
-- Line 812:    var markerKind: ZoomMarkerKind
-- Line 813:    var sourceEventTimestamp: Double
-- Line 814:    var rawX: Double?
-- Line 815:    var rawY: Double?
-- Line 816:    var centerX: Double
-- Line 817:    var centerY: Double
-- Line 818:    var zoomScale: Double
-- Line 819:    var startTime: Double
-- Line 820:    var holdUntil: Double
-- Line 821:    var endTime: Double
-- Line 822:    var leadInTime: Double
-- Line 823:    var zoomInDuration: Double
-- Line 824:    var holdDuration: Double
-- Line 825:    var zoomOutDuration: Double
-- Line 826:    var enabled: Bool
-- Line 827:    var duration: Double
-- Line 828:    var easeStyle: ZoomEaseStyle
-- Line 829:    var zoomType: ZoomType
-- Line 830:    var bounceAmount: Double
-- Line 831:    var clickPulse: ClickPulseConfiguration?
-- Line 832:    var noZoomFallbackMode: NoZoomFallbackMode
-- Line 833:    var noZoomOverflowRegion: NoZoomOverflowRegion?
-- Line 834:    var displayOrder: Int?
-- Line 964:    var totalSegmentDuration: Double {
-- Line 977:    var isClickFocus: Bool {
-- Line 981:    var isClickPulseEnabled: Bool {
-- Line 985:    static func legacyPhaseTiming(totalDuration: Double) -> (leadInTime: Double, zoomInDuration: Double, holdDuration: Double, zoomOutDuration: Double) {
-- Line 1044:    var displayTitle: String {
-- Line 1048:    var displaySubtitle: String {
-- Line 1101:    static func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 1112:    static func zoomTimeline(for marker: ZoomPlanItem) -> Timeline {
-- Line 1145:    static func activeZoomState(
-- Line 1162:        var currentState = PreviewState(scale: 1, normalizedPoint: CGPoint(x: 0.5, y: 0.5))
-- Line 1163:        var restingState = currentState
-- Line 1238:    static func previewOffset(for previewState: PreviewState, outputSize: CGSize) -> CGSize {
-- Line 1254:    static func resolveOverlayPoint(
-- Line 1282:        var point = basePoint
-- Line 1310:    static func clickPulseRenderState(
-- Line 1327:    private static func normalizedPoint(
-- Line 1338:    private static func inOutPreviewState(
-- Line 1383:    private static func inOnlyPreviewState(
-- Line 1410:    private static func outOnlyPreviewState(
+- Line 505:    var id: String { rawValue }
+- Line 534:    func encode(to encoder: Encoder) throws {
+- Line 535:        var container = encoder.container(keyedBy: CodingKeys.self)
+- Line 573:    func encode(to encoder: Encoder) throws {
+- Line 574:        var container = encoder.container(keyedBy: CodingKeys.self)
+- Line 587:    var id: String
+- Line 588:    var displayName: String
+- Line 589:    var fileName: String
+- Line 590:    var contentHash: String
+- Line 591:    var pixelWidth: Int?
+- Line 592:    var pixelHeight: Int?
+- Line 596:    var id: String
+- Line 597:    var displayName: String
+- Line 598:    var kind: DistortionPresetKind
+- Line 599:    var preset: DistortionPreset
+- Line 600:    var mapSource: DistortionMapSource
+- Line 601:    var defaultAmount: Double
+- Line 602:    var defaultScale: Double
+- Line 603:    var defaultBackgroundBlend: Double
+- Line 604:    var defaultBackgroundBlur: Double
+- Line 605:    var previewVersion: Int
+- Line 607:    var reference: DistortionPresetReference {
+- Line 645:    var schemaVersion: Int
+- Line 646:    var presets: [DistortionPresetDescriptor]
+- Line 647:    var importedMaps: [DistortionImportedMapAsset]
+- Line 657:    var presetReference: DistortionPresetReference?
+- Line 658:    var preset: DistortionPreset
+- Line 659:    var mapSource: DistortionMapSource
+- Line 660:    var scale: Double
+- Line 661:    var backgroundBlend: Double
+- Line 662:    var backgroundBlur: Double
+- Line 663:    var colorEffectGlowStrength: Double
+- Line 664:    var colorEffectGlowRadius: Double
+- Line 665:    var colorEffectAnimationIntensity: Double
+- Line 666:    var colorEffectCoreOpacity: Double
+- Line 667:    var colorEffectPalette: DistortionColorEffectPalette
+- Line 668:    var importedMapHash: String?
+- Line 768:    var id: String { rawValue }
+- Line 770:    var displayName: String {
+- Line 787:    var centerX: Double
+- Line 788:    var centerY: Double
+- Line 789:    var width: Double
+- Line 790:    var height: Double
+- Line 794:    var red: Double
+- Line 795:    var green: Double
+- Line 796:    var blue: Double
+- Line 797:    var alpha: Double
+- Line 803:    var id: String
+- Line 804:    var markerName: String?
+- Line 805:    var sourceEventTimestamp: Double
+- Line 806:    var startTime: Double
+- Line 807:    var holdStartTime: Double
+- Line 808:    var holdEndTime: Double
+- Line 809:    var endTime: Double
+- Line 810:    var enabled: Bool
+- Line 811:    var displayOrder: Int?
+- Line 812:    var style: EffectStyle
+- Line 813:    var amount: Double
+- Line 814:    var blurAmount: Double
+- Line 815:    var darkenAmount: Double
+- Line 816:    var tintAmount: Double
+- Line 817:    var cornerRadius: Double
+- Line 818:    var feather: Double
+- Line 819:    var tintColor: EffectTintColor
+- Line 820:    var focusRegion: EffectFocusRegion?
+- Line 821:    var distortion: DistortionConfiguration?
+- Line 927:    func encode(to encoder: Encoder) throws {
+- Line 928:        var container = encoder.container(keyedBy: CodingKeys.self)
+- Line 950:    var fadeInDuration: Double {
+- Line 954:    var holdDuration: Double {
+- Line 958:    var fadeOutDuration: Double {
+- Line 962:    var snapTime: Double {
+- Line 991:    var id: String { rawValue }
+- Line 993:    var displayName: String {
+- Line 1010:    var preset: ClickPulsePreset
+- Line 1014:    var duration: Double {
+- Line 1031:    var id: String
+- Line 1032:    var type: String
+- Line 1033:    var markerName: String?
+- Line 1034:    var markerKind: ZoomMarkerKind
+- Line 1035:    var sourceEventTimestamp: Double
+- Line 1036:    var rawX: Double?
+- Line 1037:    var rawY: Double?
+- Line 1038:    var centerX: Double
+- Line 1039:    var centerY: Double
+- Line 1040:    var zoomScale: Double
+- Line 1041:    var startTime: Double
+- Line 1042:    var holdUntil: Double
+- Line 1043:    var endTime: Double
 
 ### Services/InputEventCaptureService.swift
 - Lines: 141
@@ -392,7 +401,7 @@ Generated: 2026-05-09 06:35:09
 - Line 128:    private func makeRecordedEvent(from pendingEvent: PendingEvent) -> RecordedEvent? {
 
 ### Services/MarkerPreviewCacheService.swift
-- Lines: 399
+- Lines: 415
 - Imports:
 - import AVFoundation
 - import CryptoKit
@@ -411,62 +420,102 @@ Generated: 2026-05-09 06:35:09
 - Line 205:    private func effectCacheKey(
 - Line 254:    private func effectCacheSignature(for effectMarkers: [EffectPlanItem]) -> String {
 - Line 292:    private func distortionSignature(for distortion: DistortionConfiguration?) -> String {
-- Line 310:    private func zoomCacheSignature(for zoomMarkers: [ZoomPlanItem]) -> String {
-- Line 345:    private func renderSize(for recordingURL: URL) async throws -> CGSize {
-- Line 369:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
-- Line 375:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 385:    private func previewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 392:    private func isPlayablePreview(at url: URL) async throws -> Bool {
+- Line 326:    private func zoomCacheSignature(for zoomMarkers: [ZoomPlanItem]) -> String {
+- Line 361:    private func renderSize(for recordingURL: URL) async throws -> CGSize {
+- Line 385:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
+- Line 391:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 401:    private func previewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 408:    private func isPlayablePreview(at url: URL) async throws -> Bool {
 
 ### Services/MarkerPreviewRenderService.swift
-- Lines: 1385
+- Lines: 2364
 - Imports:
 - import AppKit
 - import CoreGraphics
 - import CoreImage
 - import Foundation
 - Types:
-- Line 7:struct RenderedMarkerPreview {
-- Line 591:enum ExportRenderPhase {
-- Line 597:struct ExportRenderResult {
+- Line 33:struct RenderedMarkerPreview {
+- Line 636:enum ExportRenderPhase {
+- Line 642:struct ExportRenderResult {
 - Functions / Vars:
-- Line 19:    func renderPreview(
-- Line 113:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
-- Line 140:            var outputImage = image.cropped(to: outputRect)
-- Line 185:    func renderEffectPreview(
-- Line 274:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
-- Line 301:            var outputImage = image.cropped(to: outputRect)
-- Line 346:    func renderDistortionLoupeFrame(
-- Line 395:        var image = CIImage(cgImage: cgImage).transformed(by: baseOrientationTransform)
-- Line 474:    func makeRealtimeEffectPreviewImage(
-- Line 511:        var image = CIImage(cvPixelBuffer: pixelBuffer).transformed(by: baseOrientationTransform)
-- Line 531:    private func export(
-- Line 539:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
-- Line 545:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 555:    private func effectPreviewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
-- Line 562:    private func normalizedRenderY(for marker: ZoomPlanItem, contentCoordinateSize: CGSize) -> CGFloat {
-- Line 567:    private func logRenderedPreviewDebug(
-- Line 605:    private var activeExportSession: AVAssetExportSession?
-- Line 607:    func cancelExport() {
-- Line 611:    func exportRecording(
-- Line 700:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
-- Line 727:            var outputImage = image.cropped(to: outputRect)
-- Line 775:    private func export(
-- Line 797:    private func stabilizedRenderSize(for sourceSize: CGSize) -> CGSize {
-- Line 823:private func makeClickPulseOverlay(
-- Line 880:private func makeEffectOverlay(
-- Line 936:    var outputImage = sourceImage?.cropped(to: outputRect)
-- Line 1030:private func activeEffectRenderState(
-- Line 1083:private func effectOverlayColor(for state: EffectRenderState) -> NSColor {
-- Line 1100:private func makeDistortionBackgroundDisplacementMap(
-- Line 1186:private func distortionDisplacementScale(
-- Line 1198:private func distortionBackgroundBlurRadius(
-- Line 1205:private func makeRoundedRectMaskImage(
-- Line 1242:private func makeOutsideRegionOverlayImage(
-- Line 1265:private func drawClickPulse(
-- Line 1349:private func strokeCircle(
-- Line 1364:private func fillCircle(
-- Line 1377:private func configureVideoComposition(
+- Line 18:    private var storage: [String: DistortionImportedColorMaskSet] = [:]
+- Line 20:    func value(for key: String) -> DistortionImportedColorMaskSet? {
+- Line 26:    func store(_ value: DistortionImportedColorMaskSet, for key: String) {
+- Line 45:    private var importedDistortionMapCache: [String: CIImage] = [:]
+- Line 47:    private func importedDistortionMapImage(for mapID: String) -> CIImage? {
+- Line 61:    func renderPreview(
+- Line 155:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+- Line 183:            var outputImage = image.cropped(to: outputRect)
+- Line 228:    func renderEffectPreview(
+- Line 317:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+- Line 345:            var outputImage = image.cropped(to: outputRect)
+- Line 390:    func renderDistortionLoupeFrame(
+- Line 438:        var image = CIImage(cgImage: cgImage).transformed(by: baseOrientationTransform)
+- Line 518:    func makeRealtimeEffectPreviewImage(
+- Line 555:        var image = CIImage(cvPixelBuffer: pixelBuffer).transformed(by: baseOrientationTransform)
+- Line 576:    private func export(
+- Line 584:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
+- Line 590:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 600:    private func effectPreviewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 607:    private func normalizedRenderY(for marker: ZoomPlanItem, contentCoordinateSize: CGSize) -> CGFloat {
+- Line 612:    private func logRenderedPreviewDebug(
+- Line 651:    private var importedDistortionMapCache: [String: CIImage] = [:]
+- Line 652:    private var activeExportSession: AVAssetExportSession?
+- Line 654:    private func importedDistortionMapImage(for mapID: String) -> CIImage? {
+- Line 668:    func cancelExport() {
+- Line 672:    func exportRecording(
+- Line 761:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+- Line 789:            var outputImage = image.cropped(to: outputRect)
+- Line 837:    private func export(
+- Line 859:    private func stabilizedRenderSize(for sourceSize: CGSize) -> CGSize {
+- Line 885:private func makeClickPulseOverlay(
+- Line 942:private func makeEffectOverlay(
+- Line 999:    var outputImage = sourceImage?.cropped(to: outputRect)
+- Line 1110:private func activeEffectRenderState(
+- Line 1163:private func effectOverlayColor(for state: EffectRenderState) -> NSColor {
+- Line 1180:private func makeDistortionBackgroundDisplacementMap(
+- Line 1233:private func makeBuiltInDistortionBackgroundDisplacementMap(
+- Line 1297:private func makeDistortionImportedColorEffectOverlay(
+- Line 1438:private func makeMaskedGlowOverlay(
+- Line 1526:private func haloMask(
+- Line 1606:private func colorEffectPaletteDefinition(for palette: DistortionColorEffectPalette) -> DistortionColorPaletteDefinition {
+- Line 1671:private func colorEffectMotionProfile(for palette: DistortionColorEffectPalette) -> DistortionColorMotionProfile {
+- Line 1731:private func normalizedMotionSeed(for string: String) -> Double {
+- Line 1732:    var accumulator: UInt64 = 1469598103934665603
+- Line 1741:private func animatedColorEffectState(
+- Line 1771:private func organicColorGlitchState(
+- Line 1844:private func makeOrganicGlitchGlowOverlay(
+- Line 1922:private func maskedColorPlate(
+- Line 1948:private func fittedDistortionImportedMap(
+- Line 1971:private func importedDistortionColorMasks(
+- Line 1995:    var redMask = [UInt8](repeating: 0, count: width * height)
+- Line 1996:    var blueMask = [UInt8](repeating: 0, count: width * height)
+- Line 1997:    var cyanMask = [UInt8](repeating: 0, count: width * height)
+- Line 1998:    var redCount = 0
+- Line 1999:    var blueCount = 0
+- Line 2000:    var cyanCount = 0
+- Line 2001:    var maxRedMaskValue: UInt8 = 0
+- Line 2002:    var maxBlueMaskValue: UInt8 = 0
+- Line 2003:    var maxCyanMaskValue: UInt8 = 0
+- Line 2071:private func redMaskStrength(red: Double, green: Double, blue: Double, alpha: Double) -> Double {
+- Line 2082:private func blueMaskStrength(red: Double, green: Double, blue: Double, alpha: Double) -> Double {
+- Line 2093:private func cyanMaskStrength(red: Double, green: Double, blue: Double, alpha: Double) -> Double {
+- Line 2105:private func normalizedComponent(_ value: Double, threshold: Double) -> Double {
+- Line 2109:private func normalizedDominance(_ dominant: Double, other: Double, ratio: Double) -> Double {
+- Line 2113:private func maskByteValue(normalizedStrength: Double) -> UInt8 {
+- Line 2117:private func clamp01(_ value: Double) -> Double {
+- Line 2121:private func normalizedRGBAData(from cgImage: CGImage) -> [UInt8]? {
+- Line 2125:    var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
+- Line 2142:private func makeSingleChannelMaskImage(from values: [UInt8], width: Int, height: Int) -> CIImage? {
+- Line 2165:private func distortionDisplacementScale(
+- Line 2177:private func distortionBackgroundBlurRadius(
+- Line 2184:private func makeRoundedRectMaskImage(
+- Line 2221:private func makeOutsideRegionOverlayImage(
+- Line 2244:private func drawClickPulse(
+- Line 2328:private func strokeCircle(
+- Line 2343:private func fillCircle(
+- Line 2356:private func configureVideoComposition(
 
 ### Services/MediaWriterService.swift
 - Lines: 111
@@ -497,76 +546,89 @@ Generated: 2026-05-09 06:35:09
 - Line 14:    func requestScreenRecordingPermission() -> Bool {
 
 ### Services/ProjectBundleService.swift
-- Lines: 987
+- Lines: 1088
 - Imports:
 - import AppKit
 - import AVFoundation
+- import CryptoKit
 - import CoreGraphics
 - import Foundation
+- import ImageIO
+- import UniformTypeIdentifiers
 - Types:
-- Line 11:struct ProjectBundleService {
-- Line 19:    enum OutputDirectoryResolution {
-- Line 25:    enum RecordingBundleResolution {
+- Line 14:struct ProjectBundleService {
+- Line 22:    enum OutputDirectoryResolution {
+- Line 28:    enum RecordingBundleResolution {
 - Functions / Vars:
-- Line 31:    func createWorkspace(outputDirectory: URL? = nil, captureMetadata: CaptureMetadata) throws -> RecordingWorkspace {
-- Line 89:    func finalizeWorkspace(_ workspace: RecordingWorkspace, manifest: ProjectManifest, events: [RecordedEvent]) throws -> URL {
-- Line 123:    func cleanupWorkspace(_ workspace: RecordingWorkspace?) {
-- Line 132:    func chooseOutputDirectory() -> URL? {
-- Line 152:    func resolvedSelectedOutputDirectory() -> URL? {
-- Line 161:    func resolveSelectedOutputDirectory() -> OutputDirectoryResolution {
-- Line 166:        var isStale = false
-- Line 196:    func openRecordingBundle() -> URL? {
-- Line 215:    func loadRecordingInspection(from bundleURL: URL) async throws -> RecordingInspectionSummary {
-- Line 279:    func persistLastRecordingBundle(_ url: URL) -> Bool {
-- Line 287:    func resolveLastRecordingBundle() -> RecordingBundleResolution {
-- Line 309:    func beginPlaybackAccess(for bundleURL: URL) throws -> URL? {
-- Line 329:    func endPlaybackAccess(_ url: URL?) {
-- Line 333:    func saveZoomPlan(_ zoomPlan: ZoomPlanEnvelope, in bundleURL: URL) throws {
-- Line 344:    func updateCaptureMetadata(
-- Line 380:    func libraryRootURL() throws -> URL {
-- Line 387:    func loadLibrarySnapshot() async throws -> CaptureLibrarySnapshot {
-- Line 395:        var notices: [String] = []
-- Line 419:    func registerCaptureInLibrary(_ summary: RecordingInspectionSummary) throws {
-- Line 442:        var items: [CaptureLibraryItem] = []
-- Line 451:    private func moviesDirectory() throws -> URL {
-- Line 458:    private func defaultLibraryRootURL() throws -> URL {
-- Line 462:    private func libraryCapturesDirectory(libraryRoot: URL, collectionName: String, projectName: String) throws -> URL {
-- Line 472:    private func uniqueProjectURL(baseDirectory: URL, projectName: String) -> URL {
-- Line 473:        var candidate = baseDirectory.appendingPathComponent("\(projectName).captureproj", isDirectory: true)
-- Line 474:        var suffix = 2
-- Line 484:    private func sanitizedProjectName(from title: String) -> String {
-- Line 496:    private func relativeBundlePath(for bundleURL: URL, libraryRoot: URL) -> String {
-- Line 505:    private func persistLibraryIndex(_ items: [CaptureLibraryItem], libraryRoot: URL) throws {
-- Line 512:    private func validateIndexedItems(
-- Line 517:        var validatedItems: [CaptureLibraryItem] = []
-- Line 518:        var removedCount = 0
-- Line 538:    private func mergeLibraryItems(
-- Line 543:        var mergedByPath = Dictionary(uniqueKeysWithValues: indexItems.map { ($0.bundleRelativePath, $0) })
-- Line 544:        var restoredCount = 0
-- Line 561:    private func scanLibraryItems(libraryRoot: URL) async throws -> [CaptureLibraryItem] {
-- Line 573:        var items: [CaptureLibraryItem] = []
-- Line 582:    private func loadManifest(from bundleURL: URL) throws -> ProjectManifest {
-- Line 588:    private func resolveManifestURL(in bundleURL: URL) throws -> URL {
-- Line 602:    private func validatedLibraryItem(
-- Line 677:    private func libraryItem(
-- Line 700:    private func fallbackLibraryItem(
-- Line 737:    private func loadRecordingDuration(for bundleURL: URL, recordingFileName: String) async throws -> Double? {
-- Line 744:    private func removeIfExists(_ url: URL) throws {
-- Line 749:    private func loadEventsEnvelope(from url: URL) -> RecordedEventEnvelope {
-- Line 758:    private func loadOrCreateZoomPlan(from url: URL, events: [RecordedEvent], captureSource: CaptureSource) throws -> ZoomPlanEnvelope {
-- Line 771:    private func generateZoomPlan(from events: [RecordedEvent], captureSource: CaptureSource) -> ZoomPlanEnvelope {
-- Line 773:        var zoomItems: [ZoomPlanItem] = []
-- Line 774:        var lastIncludedTimestamp: Double?
-- Line 828:    private func normalizeToVideoCoordinates(event: RecordedEvent, captureSource: CaptureSource) -> CGPoint {
-- Line 852:    private func loadVideoAspectRatio(from asset: AVURLAsset) async throws -> CGFloat {
-- Line 861:    private func loadVideoPixelSize(from asset: AVURLAsset) async throws -> CGSize {
-- Line 880:    private func persistOutputDirectory(_ url: URL) -> Bool {
-- Line 884:    private func persistSecurityScopedURL(_ url: URL, key: String) -> Bool {
-- Line 894:    private func resolveSecurityScopedURL(forKey key: String, invalidMessage: String) -> RecordingBundleResolution {
-- Line 899:        var isStale = false
-- Line 923:    private func defaultOutputDirectorySuggestion() -> URL? {
-- Line 927:    private func stopScopedAccess(for url: URL?) {
-- Line 931:    private func withScopedAccess<T>(to url: URL, required: Bool, operation: () throws -> T) throws -> T {
+- Line 34:    func createWorkspace(outputDirectory: URL? = nil, captureMetadata: CaptureMetadata) throws -> RecordingWorkspace {
+- Line 92:    func finalizeWorkspace(_ workspace: RecordingWorkspace, manifest: ProjectManifest, events: [RecordedEvent]) throws -> URL {
+- Line 126:    func cleanupWorkspace(_ workspace: RecordingWorkspace?) {
+- Line 135:    func chooseOutputDirectory() -> URL? {
+- Line 155:    func resolvedSelectedOutputDirectory() -> URL? {
+- Line 164:    func resolveSelectedOutputDirectory() -> OutputDirectoryResolution {
+- Line 169:        var isStale = false
+- Line 199:    func openRecordingBundle() -> URL? {
+- Line 218:    func loadDistortionPresetLibrary() throws -> DistortionPresetLibrary {
+- Line 228:    func saveDistortionPresetLibrary(_ library: DistortionPresetLibrary) throws {
+- Line 234:    func chooseDistortionMapImage() -> URL? {
+- Line 245:    func importDistortionMap(from sourceURL: URL, suggestedName: String? = nil) throws -> DistortionImportedMapAsset {
+- Line 270:    func distortionImportedMapURL(for mapID: String, in library: DistortionPresetLibrary? = nil) throws -> URL? {
+- Line 279:    func loadRecordingInspection(from bundleURL: URL) async throws -> RecordingInspectionSummary {
+- Line 343:    func persistLastRecordingBundle(_ url: URL) -> Bool {
+- Line 351:    func resolveLastRecordingBundle() -> RecordingBundleResolution {
+- Line 373:    func beginPlaybackAccess(for bundleURL: URL) throws -> URL? {
+- Line 393:    func endPlaybackAccess(_ url: URL?) {
+- Line 397:    func saveZoomPlan(_ zoomPlan: ZoomPlanEnvelope, in bundleURL: URL) throws {
+- Line 408:    func updateCaptureMetadata(
+- Line 444:    func libraryRootURL() throws -> URL {
+- Line 451:    func loadLibrarySnapshot() async throws -> CaptureLibrarySnapshot {
+- Line 459:        var notices: [String] = []
+- Line 483:    func registerCaptureInLibrary(_ summary: RecordingInspectionSummary) throws {
+- Line 506:        var items: [CaptureLibraryItem] = []
+- Line 515:    private func moviesDirectory() throws -> URL {
+- Line 522:    private func defaultLibraryRootURL() throws -> URL {
+- Line 526:    private func libraryCapturesDirectory(libraryRoot: URL, collectionName: String, projectName: String) throws -> URL {
+- Line 536:    private func uniqueProjectURL(baseDirectory: URL, projectName: String) -> URL {
+- Line 537:        var candidate = baseDirectory.appendingPathComponent("\(projectName).captureproj", isDirectory: true)
+- Line 538:        var suffix = 2
+- Line 548:    private func sanitizedProjectName(from title: String) -> String {
+- Line 560:    private func relativeBundlePath(for bundleURL: URL, libraryRoot: URL) -> String {
+- Line 569:    private func persistLibraryIndex(_ items: [CaptureLibraryItem], libraryRoot: URL) throws {
+- Line 576:    private func validateIndexedItems(
+- Line 581:        var validatedItems: [CaptureLibraryItem] = []
+- Line 582:        var removedCount = 0
+- Line 602:    private func mergeLibraryItems(
+- Line 607:        var mergedByPath = Dictionary(uniqueKeysWithValues: indexItems.map { ($0.bundleRelativePath, $0) })
+- Line 608:        var restoredCount = 0
+- Line 625:    private func scanLibraryItems(libraryRoot: URL) async throws -> [CaptureLibraryItem] {
+- Line 637:        var items: [CaptureLibraryItem] = []
+- Line 646:    private func loadManifest(from bundleURL: URL) throws -> ProjectManifest {
+- Line 652:    private func resolveManifestURL(in bundleURL: URL) throws -> URL {
+- Line 666:    private func validatedLibraryItem(
+- Line 741:    private func libraryItem(
+- Line 764:    private func fallbackLibraryItem(
+- Line 801:    private func loadRecordingDuration(for bundleURL: URL, recordingFileName: String) async throws -> Double? {
+- Line 808:    private func removeIfExists(_ url: URL) throws {
+- Line 813:    private func loadEventsEnvelope(from url: URL) -> RecordedEventEnvelope {
+- Line 822:    private func loadOrCreateZoomPlan(from url: URL, events: [RecordedEvent], captureSource: CaptureSource) throws -> ZoomPlanEnvelope {
+- Line 835:    private func generateZoomPlan(from events: [RecordedEvent], captureSource: CaptureSource) -> ZoomPlanEnvelope {
+- Line 837:        var zoomItems: [ZoomPlanItem] = []
+- Line 838:        var lastIncludedTimestamp: Double?
+- Line 892:    private func normalizeToVideoCoordinates(event: RecordedEvent, captureSource: CaptureSource) -> CGPoint {
+- Line 916:    private func loadVideoAspectRatio(from asset: AVURLAsset) async throws -> CGFloat {
+- Line 925:    private func loadVideoPixelSize(from asset: AVURLAsset) async throws -> CGSize {
+- Line 944:    private func persistOutputDirectory(_ url: URL) -> Bool {
+- Line 948:    private func persistSecurityScopedURL(_ url: URL, key: String) -> Bool {
+- Line 958:    private func resolveSecurityScopedURL(forKey key: String, invalidMessage: String) -> RecordingBundleResolution {
+- Line 963:        var isStale = false
+- Line 987:    private func ensureDistortionPresetLibraryDirectories() throws {
+- Line 992:    private func distortionPresetLibraryRootURL() throws -> URL {
+- Line 1006:    private func distortionPresetLibraryFileURL() throws -> URL {
+- Line 1010:    private func distortionPresetMapsDirectoryURL() throws -> URL {
+- Line 1014:    private func distortionMapPixelSize(for url: URL) -> CGSize? {
+- Line 1024:    private func defaultOutputDirectorySuggestion() -> URL? {
+- Line 1028:    private func stopScopedAccess(for url: URL?) {
+- Line 1032:    private func withScopedAccess<T>(to url: URL, required: Bool, operation: () throws -> T) throws -> T {
 
 ### Services/RecordingCoordinator.swift
 - Lines: 190
@@ -611,7 +673,7 @@ Generated: 2026-05-09 06:35:09
 - Line 187:    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
 
 ### ViewModels/CaptureSetupViewModel.swift
-- Lines: 2471
+- Lines: 2830
 - Imports:
 - import Combine
 - import AppKit
@@ -623,125 +685,125 @@ Generated: 2026-05-09 06:35:09
 - Line 27:    enum ExportState: Equatable {
 - Functions / Vars:
 - Line 36:        var isInProgress: Bool {
-- Line 88:    private var hasRestoredLastRecording = false
-- Line 89:    private var activePlaybackScopeURL: URL?
-- Line 90:    private var mainPlaybackTimeObserver: Any?
-- Line 91:    private var previewPlaybackTimeObserver: Any?
-- Line 92:    private var manualSelectionSuppressionUntil: Date?
-- Line 93:    private var previewMarkerID: String?
-- Line 94:    private var previewEndTime: Double?
-- Line 95:    private var previewEffectMarkerID: String?
-- Line 96:    private var previewEffectEndTime: Double?
-- Line 97:    private var wasPlayingBeforeTimelineScrub = false
-- Line 98:    private var isTimelineScrubbing = false
-- Line 99:    private var markerPreviewRenderTask: Task<Void, Never>?
-- Line 100:    private var previewSurfaceTeardownTask: Task<Void, Never>?
-- Line 101:    private var playbackTransitionTask: Task<Void, Never>?
-- Line 102:    private var activeRenderedPreviewURL: URL?
-- Line 103:    private var activeRenderedPreviewShouldDelete = false
-- Line 104:    private var renderedPreviewSourceStartTime: Double?
-- Line 105:    private var renderingPreviewMarkerID: String?
-- Line 106:    private var renderingPreviewEffectMarkerID: String?
-- Line 107:    private var targetRefreshTask: Task<Void, Never>?
-- Line 108:    private var distortionLoupeRenderTask: Task<Void, Never>?
-- Line 109:    private var distortionLoupeRevision = 0
-- Line 174:    var selectedTarget: ShareableCaptureTarget? {
-- Line 178:    var canStartRecording: Bool {
-- Line 182:    var canStopRecording: Bool {
-- Line 186:    var selectedZoomMarker: ZoomPlanItem? {
-- Line 190:    var selectedEffectMarker: EffectPlanItem? {
-- Line 194:    var activePreviewMarkerID: String? {
-- Line 198:    var isRenderedPreviewActive: Bool {
-- Line 202:    var canExportRecording: Bool {
-- Line 206:    var isExportSheetPresented: Bool {
-- Line 210:    var canTriggerMarkerPreview: Bool {
-- Line 219:    var canEditClickFocusMarkers: Bool {
-- Line 227:    var canUsePlaybackTransport: Bool {
-- Line 236:    var isSelectedEffectDistortion: Bool {
-- Line 241:    func load() async {
-- Line 263:    func activateCaptureTarget(_ target: ShareableCaptureTarget) {
-- Line 281:    func requestPermission() async {
-- Line 287:    func startRecording() async {
-- Line 316:    func stopRecording() async {
-- Line 325:    func revealInFinder() {
-- Line 330:    func chooseOutputFolder() {
-- Line 336:    func openRecording() {
-- Line 341:    func exportRecording() {
-- Line 392:    func cancelExport() {
-- Line 398:    func dismissExportSheet() {
-- Line 406:    private func refreshCaptureTargets(silent: Bool) async throws {
-- Line 425:    private func startAutomaticTargetRefresh() {
-- Line 443:    func revealExportInFinder() {
-- Line 448:    func openLibraryCapture(_ item: CaptureLibraryItem) {
-- Line 461:    func revealLibraryCapture(_ item: CaptureLibraryItem) {
-- Line 470:    func startMarkerPreview(_ markerID: String) {
-- Line 574:    func togglePlayback() {
-- Line 606:    func seekPlaybackInteractively(to seconds: Double) {
-- Line 630:    func jumpPlaybackToStart() {
-- Line 653:    func cancelPlaybackPreview() {
-- Line 671:    func beginTimelineScrub() {
-- Line 702:    func updateTimelineScrub(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
-- Line 714:    func endTimelineScrub(at seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
-- Line 733:    func seekTimelineDirectly(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
-- Line 762:    func nudgeSelectedTimelineMarker(by delta: Double) {
-- Line 784:    func nudgeSelectedEffectTimelineMarker(by delta: Double) {
-- Line 810:        var effectMarkers = summary.effectMarkers
-- Line 820:    func setSelectedMarkerEnabled(_ enabled: Bool) {
-- Line 826:    func setMarkerEnabled(_ enabled: Bool, for markerID: String) {
-- Line 832:    func toggleMarkerEnabled(_ markerID: String) {
-- Line 838:    func setMarkerName(_ markerName: String?, for markerID: String) {
-- Line 845:    func setSelectedMarkerZoomScale(_ zoomScale: Double) {
-- Line 851:    func setSelectedMarkerLeadInTime(_ leadInTime: Double) {
-- Line 858:    func setSelectedMarkerZoomInDuration(_ zoomInDuration: Double) {
-- Line 865:    func setSelectedMarkerHoldDuration(_ holdDuration: Double) {
-- Line 872:    func setSelectedMarkerZoomOutDuration(_ zoomOutDuration: Double) {
-- Line 879:    func setSelectedMarkerEaseStyle(_ easeStyle: ZoomEaseStyle) {
-- Line 885:    func setSelectedMarkerZoomType(_ zoomType: ZoomType) {
-- Line 895:    func setSelectedMarkerBounceAmount(_ bounceAmount: Double) {
-- Line 901:    func setSelectedMarkerNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
-- Line 907:    func setSelectedMarkerNoZoomOverflowRegion(_ region: NoZoomOverflowRegion?) {
-- Line 913:    func clearSelectedMarkerNoZoomOverflowRegion() {
-- Line 917:    func setSelectedEffectFocusRegion(_ region: EffectFocusRegion?) {
-- Line 924:        var effectMarkers = summary.effectMarkers
-- Line 929:    func clearSelectedEffectFocusRegion() {
-- Line 933:    func selectEffectMarker(_ markerID: String, seekPlaybackHead: Bool = true) {
-- Line 949:    func selectZoomMarker(_ markerID: String, seekPlaybackHead: Bool = true) {
-- Line 968:    func previewEffectMarker(_ markerID: String) {
-- Line 990:    func startEffectMarkerPreview(_ markerID: String) {
-- Line 1094:    func setSelectedEffectMarkerEnabled(_ enabled: Bool) {
-- Line 1100:    func toggleEffectMarkerEnabled(_ markerID: String) {
-- Line 1106:    func setEffectMarkerName(_ markerName: String?, for markerID: String) {
-- Line 1113:    func setSelectedEffectStyle(_ style: EffectStyle) {
-- Line 1128:    func setSelectedEffectAmount(_ amount: Double) {
-- Line 1134:    func setDistortionLoupePoint(_ point: CGPoint) {
-- Line 1142:    func resetDistortionLoupePointToDefault() {
-- Line 1147:    func setSelectedEffectDistortionPreset(_ preset: DistortionPreset) {
-- Line 1157:    func setSelectedEffectDistortionScale(_ scale: Double) {
-- Line 1166:    func setSelectedEffectDistortionBackgroundBlend(_ blend: Double) {
-- Line 1175:    func setSelectedEffectDistortionBackgroundBlur(_ blur: Double) {
-- Line 1184:    func setSelectedEffectBlurAmount(_ amount: Double) {
-- Line 1194:    func setSelectedEffectDarkenAmount(_ amount: Double) {
-- Line 1204:    func setSelectedEffectTintAmount(_ amount: Double) {
-- Line 1214:    func setSelectedEffectFadeInDuration(_ duration: Double) {
-- Line 1220:    func setSelectedEffectFadeOutDuration(_ duration: Double) {
-- Line 1226:    func setSelectedEffectHoldStartTime(_ time: Double) {
-- Line 1237:    func setSelectedEffectHoldEndTime(_ time: Double) {
-- Line 1248:    func setSelectedEffectHoldDuration(_ duration: Double) {
-- Line 1254:    func setSelectedEffectCornerRadius(_ radius: Double) {
-- Line 1260:    func setSelectedEffectFeather(_ feather: Double) {
-- Line 1266:    func setSelectedEffectTintColor(_ tintColor: EffectTintColor) {
-- Line 1272:    func addEffectMarker(at timestamp: Double? = nil) {
-- Line 1281:        var effectMarkers = summary.effectMarkers
-- Line 1282:        var marker = EffectPlanItem(
-- Line 1308:    func deleteSelectedEffectMarker() {
-- Line 1310:        var effectMarkers = summary.effectMarkers
-- Line 1316:    func reorderEffectMarkerList(to orderedMarkerIDs: [String]) {
-- Line 1319:        var effectMarkers = summary.effectMarkers
-- Line 1321:        var didChange = false
-- Line 1336:    func setDefaultNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
-- Line 1341:    func setSelectedMarkerClickPulseEnabled(_ enabled: Bool) {
-- Line 1352:    func setSelectedMarkerClickPulsePreset(_ preset: ClickPulsePreset) {
-- Line 1363:    func setCurrentCaptureTitle(_ title: String) {
+- Line 97:    private var hasRestoredLastRecording = false
+- Line 98:    private var activePlaybackScopeURL: URL?
+- Line 99:    private var mainPlaybackTimeObserver: Any?
+- Line 100:    private var previewPlaybackTimeObserver: Any?
+- Line 101:    private var manualSelectionSuppressionUntil: Date?
+- Line 102:    private var previewMarkerID: String?
+- Line 103:    private var previewEndTime: Double?
+- Line 104:    private var previewEffectMarkerID: String?
+- Line 105:    private var previewEffectEndTime: Double?
+- Line 106:    private var wasPlayingBeforeTimelineScrub = false
+- Line 107:    private var isTimelineScrubbing = false
+- Line 108:    private var markerPreviewRenderTask: Task<Void, Never>?
+- Line 109:    private var previewSurfaceTeardownTask: Task<Void, Never>?
+- Line 110:    private var playbackTransitionTask: Task<Void, Never>?
+- Line 111:    private var activeRenderedPreviewURL: URL?
+- Line 112:    private var activeRenderedPreviewShouldDelete = false
+- Line 113:    private var renderedPreviewSourceStartTime: Double?
+- Line 114:    private var renderingPreviewMarkerID: String?
+- Line 115:    private var renderingPreviewEffectMarkerID: String?
+- Line 116:    private var targetRefreshTask: Task<Void, Never>?
+- Line 117:    private var distortionLoupeRenderTask: Task<Void, Never>?
+- Line 118:    private var distortionLoupeRevision = 0
+- Line 119:    private var distortionOverlayImageCache: [String: NSImage] = [:]
+- Line 187:    var selectedTarget: ShareableCaptureTarget? {
+- Line 191:    var canStartRecording: Bool {
+- Line 195:    var canStopRecording: Bool {
+- Line 199:    var selectedZoomMarker: ZoomPlanItem? {
+- Line 203:    var selectedEffectMarker: EffectPlanItem? {
+- Line 207:    var activePreviewMarkerID: String? {
+- Line 211:    var isRenderedPreviewActive: Bool {
+- Line 215:    var canExportRecording: Bool {
+- Line 219:    var isExportSheetPresented: Bool {
+- Line 223:    var canTriggerMarkerPreview: Bool {
+- Line 232:    var canEditClickFocusMarkers: Bool {
+- Line 240:    var canUsePlaybackTransport: Bool {
+- Line 249:    var isSelectedEffectDistortion: Bool {
+- Line 254:    var canShowSelectedDistortionMapOverlay: Bool {
+- Line 264:    var selectedEffectDistortionOverlayImage: NSImage? {
+- Line 273:    var availableDistortionPresetDescriptors: [DistortionPresetDescriptor] {
+- Line 279:    var selectedDistortionPresetDescriptor: DistortionPresetDescriptor? {
+- Line 288:    var distortionImportedMapAssets: [DistortionImportedMapAsset] {
+- Line 294:    var selectedCustomDistortionPresetDescriptor: DistortionPresetDescriptor? {
+- Line 299:    func load() async {
+- Line 321:    func activateCaptureTarget(_ target: ShareableCaptureTarget) {
+- Line 339:    func requestPermission() async {
+- Line 345:    func startRecording() async {
+- Line 374:    func stopRecording() async {
+- Line 383:    func revealInFinder() {
+- Line 388:    func chooseOutputFolder() {
+- Line 394:    func selectDistortionPresetLibraryPreset(_ presetID: String) {
+- Line 398:    func createDistortionPresetFromImportedMap() {
+- Line 433:    func duplicateSelectedDistortionPreset() {
+- Line 452:    func deleteSelectedDistortionPreset() {
+- Line 462:    func renameSelectedDistortionPreset(_ name: String) {
+- Line 473:    func setSelectedDistortionLibraryPresetEnginePreset(_ preset: DistortionPreset) {
+- Line 482:    func setSelectedDistortionLibraryPresetMapSource(_ mapSource: DistortionMapSource) {
+- Line 488:    func setSelectedDistortionLibraryPresetDefaultAmount(_ amount: Double) {
+- Line 494:    func setSelectedDistortionLibraryPresetDefaultScale(_ scale: Double) {
+- Line 500:    func setSelectedDistortionLibraryPresetDefaultBackgroundBlend(_ blend: Double) {
+- Line 506:    func setSelectedDistortionLibraryPresetDefaultBackgroundBlur(_ blur: Double) {
+- Line 512:    func openRecording() {
+- Line 517:    func exportRecording() {
+- Line 568:    func cancelExport() {
+- Line 574:    func dismissExportSheet() {
+- Line 582:    private func refreshCaptureTargets(silent: Bool) async throws {
+- Line 601:    private func startAutomaticTargetRefresh() {
+- Line 619:    func revealExportInFinder() {
+- Line 624:    func openLibraryCapture(_ item: CaptureLibraryItem) {
+- Line 637:    func revealLibraryCapture(_ item: CaptureLibraryItem) {
+- Line 646:    func startMarkerPreview(_ markerID: String) {
+- Line 750:    func togglePlayback() {
+- Line 782:    func seekPlaybackInteractively(to seconds: Double) {
+- Line 806:    func jumpPlaybackToStart() {
+- Line 829:    func cancelPlaybackPreview() {
+- Line 847:    func beginTimelineScrub() {
+- Line 878:    func updateTimelineScrub(to seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
+- Line 890:    func endTimelineScrub(at seconds: Double, snappedMarkerID: String?, snappedEffectMarkerID: String? = nil) {
+- Line 909:    func seekTimelineDirectly(
+- Line 947:    func nudgeSelectedTimelineMarker(by delta: Double) {
+- Line 969:    func nudgeSelectedEffectTimelineMarker(by delta: Double) {
+- Line 995:        var effectMarkers = summary.effectMarkers
+- Line 1005:    func setSelectedMarkerEnabled(_ enabled: Bool) {
+- Line 1011:    func setMarkerEnabled(_ enabled: Bool, for markerID: String) {
+- Line 1017:    func toggleMarkerEnabled(_ markerID: String) {
+- Line 1023:    func setMarkerName(_ markerName: String?, for markerID: String) {
+- Line 1030:    func setSelectedMarkerZoomScale(_ zoomScale: Double) {
+- Line 1036:    func setSelectedMarkerLeadInTime(_ leadInTime: Double) {
+- Line 1043:    func setSelectedMarkerZoomInDuration(_ zoomInDuration: Double) {
+- Line 1050:    func setSelectedMarkerHoldDuration(_ holdDuration: Double) {
+- Line 1057:    func setSelectedMarkerZoomOutDuration(_ zoomOutDuration: Double) {
+- Line 1064:    func setSelectedMarkerEaseStyle(_ easeStyle: ZoomEaseStyle) {
+- Line 1070:    func setSelectedMarkerZoomType(_ zoomType: ZoomType) {
+- Line 1080:    func setSelectedMarkerBounceAmount(_ bounceAmount: Double) {
+- Line 1086:    func setSelectedMarkerNoZoomFallbackMode(_ fallbackMode: NoZoomFallbackMode) {
+- Line 1092:    func setSelectedMarkerNoZoomOverflowRegion(_ region: NoZoomOverflowRegion?) {
+- Line 1098:    func clearSelectedMarkerNoZoomOverflowRegion() {
+- Line 1102:    func setSelectedEffectFocusRegion(_ region: EffectFocusRegion?) {
+- Line 1109:        var effectMarkers = summary.effectMarkers
+- Line 1114:    func clearSelectedEffectFocusRegion() {
+- Line 1118:    func selectEffectMarker(_ markerID: String, seekPlaybackHead: Bool = true) {
+- Line 1139:    func selectZoomMarker(_ markerID: String, seekPlaybackHead: Bool = true) {
+- Line 1158:    func previewEffectMarker(_ markerID: String) {
+- Line 1180:    func startEffectMarkerPreview(_ markerID: String) {
+- Line 1284:    func setSelectedEffectMarkerEnabled(_ enabled: Bool) {
+- Line 1290:    func toggleEffectMarkerEnabled(_ markerID: String) {
+- Line 1296:    func setEffectMarkerName(_ markerName: String?, for markerID: String) {
+- Line 1303:    func setSelectedEffectStyle(_ style: EffectStyle) {
+- Line 1319:    func setSelectedEffectAmount(_ amount: Double) {
+- Line 1325:    func setDistortionLoupePoint(_ point: CGPoint) {
+- Line 1333:    func resetDistortionLoupePointToDefault() {
+- Line 1338:    func setSelectedEffectDistortionPreset(_ preset: DistortionPreset) {
+- Line 1345:    func setSelectedEffectDistortionPresetSelectionID(_ presetID: String) {
+- Line 1352:    func setSelectedEffectDistortionScale(_ scale: Double) {
+- Line 1361:    func setSelectedEffectDistortionBackgroundBlend(_ blend: Double) {
+- Line 1370:    func setSelectedEffectDistortionBackgroundBlur(_ blur: Double) {
+- Line 1379:    func setSelectedEffectDistortionColorGlowStrength(_ strength: Double) {
+- Line 1388:    func setSelectedEffectDistortionColorGlowRadius(_ radius: Double) {
+- Line 1397:    func setSelectedEffectDistortionColorAnimationIntensity(_ intensity: Double) {
+- Line 1406:    func setSelectedEffectDistortionColorCoreOpacity(_ opacity: Double) {
 - SwiftUI State / Bindings:
 - Line 46:    @Published var displays: [ShareableCaptureTarget] = []
 - Line 47:    @Published var windows: [ShareableCaptureTarget] = []
@@ -763,21 +825,24 @@ Generated: 2026-05-09 06:35:09
 - Line 69:    @Published var activeRecordingTargetName: String?
 - Line 70:    @Published var recordingStartedAt: Date?
 - Line 71:    @Published var selectedZoomMarkerID: String?
-- Line 72:    @Published var selectedEffectMarkerID: String?
-- Line 73:    @Published var currentPlaybackTime: Double = 0
-- Line 74:    @Published var isPlaybackActive = false
-- Line 75:    @Published var isRenderingMarkerPreview = false
-- Line 76:    @Published var markerPreviewStatusMessage: String?
-- Line 77:    @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
-- Line 78:    @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
-- Line 79:    @Published private(set) var exportState: ExportState = .idle
-- Line 80:    @Published private(set) var exportProgress: Double = 0
-- Line 81:    @Published private(set) var exportStatusMessage: String?
-- Line 82:    @Published private(set) var exportedRecordingURL: URL?
-- Line 83:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
-- Line 84:    @Published var distortionLoupeNormalizedPoint: CGPoint?
-- Line 85:    @Published var distortionLoupeImage: NSImage?
-- Line 86:    @Published var isRenderingDistortionLoupe = false
+- Line 72:    @Published var selectedEffectMarkerID: String? {
+- Line 79:    @Published var currentPlaybackTime: Double = 0
+- Line 80:    @Published var isPlaybackActive = false
+- Line 81:    @Published var isRenderingMarkerPreview = false
+- Line 82:    @Published var markerPreviewStatusMessage: String?
+- Line 83:    @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
+- Line 84:    @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
+- Line 85:    @Published private(set) var exportState: ExportState = .idle
+- Line 86:    @Published private(set) var exportProgress: Double = 0
+- Line 87:    @Published private(set) var exportStatusMessage: String?
+- Line 88:    @Published private(set) var exportedRecordingURL: URL?
+- Line 89:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
+- Line 90:    @Published private(set) var distortionPresetLibrary: DistortionPresetLibrary = .empty
+- Line 91:    @Published var selectedDistortionPresetLibraryID: String?
+- Line 92:    @Published var distortionLoupeNormalizedPoint: CGPoint?
+- Line 93:    @Published var distortionLoupeImage: NSImage?
+- Line 94:    @Published var isRenderingDistortionLoupe = false
+- Line 95:    @Published var isShowingDistortionMapOverlay = false
 
 ### Views/Capture/CaptureSetupViews.swift
 - Lines: 287
@@ -794,34 +859,34 @@ Generated: 2026-05-09 06:35:09
 - Line 241:    func targetRow(_ target: ShareableCaptureTarget) -> some View {
 
 ### Views/Library/LibraryViews.swift
-- Lines: 479
+- Lines: 502
 - Imports:
 - import SwiftUI
 - Types:
 - Line 3:extension ContentView {
 - Functions / Vars:
 - Line 4:    var libraryView: some View {
-- Line 94:    var filteredLibraryItems: [CaptureLibraryItem] {
-- Line 103:    func libraryCaptureRow(_ item: CaptureLibraryItem) -> some View {
-- Line 185:    var librarySearchField: some View {
-- Line 219:    func libraryMetadataPill(text: String, systemName: String) -> some View {
-- Line 231:    var hasActiveLibraryFilters: Bool {
-- Line 235:    func matchesLibrarySearch(_ item: CaptureLibraryItem) -> Bool {
-- Line 247:    func matchesLibraryCollectionFilter(_ item: CaptureLibraryItem) -> Bool {
-- Line 252:    func matchesLibraryProjectFilter(_ item: CaptureLibraryItem) -> Bool {
-- Line 257:    func matchesLibraryTypeFilter(_ item: CaptureLibraryItem) -> Bool {
-- Line 262:    var libraryFilterRail: some View {
-- Line 300:    var libraryCollectionOptions: [LibraryFilterOption] {
-- Line 311:    var libraryProjectOptions: [LibraryFilterOption] {
-- Line 322:    var libraryTypeOptions: [CaptureType: Int] {
-- Line 331:    func buildLibraryFilterOptions(
-- Line 341:    func libraryFilterSection(
-- Line 391:    var libraryTypeSection: some View {
-- Line 426:    func activeLibraryFilterChip(title: String, removeAction: @escaping () -> Void) -> some View {
-- Line 450:    func toggleLibraryCollectionFilter(_ collectionName: String) {
-- Line 462:    func toggleLibraryProjectFilter(_ projectName: String) {
-- Line 470:    func toggleLibraryTypeFilter(_ type: CaptureType) {
-- Line 474:    func clearLibraryFilters() {
+- Line 104:    var filteredLibraryItems: [CaptureLibraryItem] {
+- Line 113:    func libraryCaptureRow(_ item: CaptureLibraryItem) -> some View {
+- Line 208:    var librarySearchField: some View {
+- Line 242:    func libraryMetadataPill(text: String, systemName: String) -> some View {
+- Line 254:    var hasActiveLibraryFilters: Bool {
+- Line 258:    func matchesLibrarySearch(_ item: CaptureLibraryItem) -> Bool {
+- Line 270:    func matchesLibraryCollectionFilter(_ item: CaptureLibraryItem) -> Bool {
+- Line 275:    func matchesLibraryProjectFilter(_ item: CaptureLibraryItem) -> Bool {
+- Line 280:    func matchesLibraryTypeFilter(_ item: CaptureLibraryItem) -> Bool {
+- Line 285:    var libraryFilterRail: some View {
+- Line 323:    var libraryCollectionOptions: [LibraryFilterOption] {
+- Line 334:    var libraryProjectOptions: [LibraryFilterOption] {
+- Line 345:    var libraryTypeOptions: [CaptureType: Int] {
+- Line 354:    func buildLibraryFilterOptions(
+- Line 364:    func libraryFilterSection(
+- Line 414:    var libraryTypeSection: some View {
+- Line 449:    func activeLibraryFilterChip(title: String, removeAction: @escaping () -> Void) -> some View {
+- Line 473:    func toggleLibraryCollectionFilter(_ collectionName: String) {
+- Line 485:    func toggleLibraryProjectFilter(_ projectName: String) {
+- Line 493:    func toggleLibraryTypeFilter(_ type: CaptureType) {
+- Line 497:    func clearLibraryFilters() {
 
 ### Views/Review/CaptureInfoInspectorViews.swift
 - Lines: 292
@@ -842,7 +907,7 @@ Generated: 2026-05-09 06:35:09
 - Line 271:    func captureTypeChips(selectedType: CaptureType) -> some View {
 
 ### Views/Review/EffectsEditorViews.swift
-- Lines: 822
+- Lines: 815
 - Imports:
 - import AppKit
 - import SwiftUI
@@ -850,8 +915,8 @@ Generated: 2026-05-09 06:35:09
 - Line 82:struct EffectTimelineSegmentLayout: Identifiable {
 - Line 94:struct EffectTimelineSegmentView: View {
 - Line 195:struct EffectsTimelineTrackView: View {
-- Line 342:struct EffectListEntry: Identifiable {
-- Line 351:struct EffectListTableView: NSViewRepresentable {
+- Line 332:struct EffectListEntry: Identifiable {
+- Line 341:struct EffectListTableView: NSViewRepresentable {
 - Functions / Vars:
 - Line 4:func effectTimelineSegmentLayouts(for markers: [EffectPlanItem], duration: Double) -> [EffectTimelineSegmentLayout] {
 - Line 7:    var laneEndRatios = Array(repeating: -Double.infinity, count: maxLaneCount)
@@ -861,44 +926,44 @@ Generated: 2026-05-09 06:35:09
 - Line 105:    var body: some View {
 - Line 209:    var body: some View {
 - Line 253:private func effectTimelineTooltipOverlay(
-- Line 316:private func effectTooltipAmountSummary(for marker: EffectPlanItem) -> String {
-- Line 332:private func timecodeString(for seconds: Double) -> String {
-- Line 348:    var id: String { marker.id }
-- Line 363:    func makeCoordinator() -> Coordinator {
-- Line 367:    func makeNSView(context: Context) -> NSScrollView {
-- Line 404:    func updateNSView(_ nsView: NSScrollView, context: Context) {
-- Line 411:        var parent: EffectListTableView
-- Line 413:        private var isProgrammaticSelectionChange = false
-- Line 414:        private var draggedMarkerID: String?
-- Line 415:        private var lastRenderedEntryIDs: [String] = []
-- Line 416:        private var lastRenderedSelectionID: String?
-- Line 417:        private var lastRenderedHighlightSignature: String = ""
-- Line 418:        private var lastRenderedRenamingMarkerID: String?
-- Line 425:        func handleTableViewAction(_ sender: Any?) {
-- Line 435:        func numberOfRows(in tableView: NSTableView) -> Int {
-- Line 439:        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-- Line 443:        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-- Line 469:        func tableViewSelectionDidChange(_ notification: Notification) {
-- Line 482:        func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
-- Line 491:        func tableView(
-- Line 501:        func tableView(
-- Line 513:            var reordered = markerIDs
-- Line 522:        func syncSelection() {
-- Line 539:        func refreshTableIfNeeded() {
-- Line 582:    var body: some View {
-- Line 737:    private var dragGrip: some View {
-- Line 759:    private func timecodeString(_ seconds: Double) -> String {
-- Line 769:    private func effectAmountSummary(for marker: EffectPlanItem) -> String {
-- Line 810:    func update(rootView: EffectListCellContent) {
+- Line 306:private func effectTooltipAmountSummary(for marker: EffectPlanItem) -> String {
+- Line 322:private func timecodeString(for seconds: Double) -> String {
+- Line 338:    var id: String { marker.id }
+- Line 353:    func makeCoordinator() -> Coordinator {
+- Line 357:    func makeNSView(context: Context) -> NSScrollView {
+- Line 396:    func updateNSView(_ nsView: NSScrollView, context: Context) {
+- Line 404:        var parent: EffectListTableView
+- Line 406:        private var isProgrammaticSelectionChange = false
+- Line 407:        private var draggedMarkerID: String?
+- Line 408:        private var lastRenderedEntryIDs: [String] = []
+- Line 409:        private var lastRenderedSelectionID: String?
+- Line 410:        private var lastRenderedHighlightSignature: String = ""
+- Line 411:        private var lastRenderedRenamingMarkerID: String?
+- Line 418:        func handleTableViewAction(_ sender: Any?) {
+- Line 428:        func numberOfRows(in tableView: NSTableView) -> Int {
+- Line 432:        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+- Line 436:        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+- Line 462:        func tableViewSelectionDidChange(_ notification: Notification) {
+- Line 475:        func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
+- Line 484:        func tableView(
+- Line 494:        func tableView(
+- Line 506:            var reordered = markerIDs
+- Line 515:        func syncSelection() {
+- Line 532:        func refreshTableIfNeeded() {
+- Line 575:    var body: some View {
+- Line 730:    private var dragGrip: some View {
+- Line 752:    private func timecodeString(_ seconds: Double) -> String {
+- Line 762:    private func effectAmountSummary(for marker: EffectPlanItem) -> String {
+- Line 803:    func update(rootView: EffectListCellContent) {
 - SwiftUI State / Bindings:
-- Line 357:    @Binding var renamingMarkerID: String?
-- Line 358:    @Binding var markerNameDraft: String
-- Line 574:    @Binding var renamingMarkerID: String?
-- Line 575:    @Binding var markerNameDraft: String
-- Line 580:    @State private var isRenameButtonHovered = false
+- Line 347:    @Binding var renamingMarkerID: String?
+- Line 348:    @Binding var markerNameDraft: String
+- Line 567:    @Binding var renamingMarkerID: String?
+- Line 568:    @Binding var markerNameDraft: String
+- Line 573:    @State private var isRenameButtonHovered = false
 
 ### Views/Review/MarkerListTableViews.swift
-- Lines: 490
+- Lines: 493
 - Imports:
 - import AppKit
 - import SwiftUI
@@ -908,43 +973,43 @@ Generated: 2026-05-09 06:35:09
 - Functions / Vars:
 - Line 17:    func makeCoordinator() -> Coordinator {
 - Line 21:    func makeNSView(context: Context) -> NSScrollView {
-- Line 58:    func updateNSView(_ nsView: NSScrollView, context: Context) {
-- Line 65:        var parent: MarkerListTableView
-- Line 67:        private var isProgrammaticSelectionChange = false
-- Line 68:        private var draggedMarkerID: String?
-- Line 69:        private var lastRenderedEntryIDs: [String] = []
-- Line 70:        private var lastRenderedSelectionID: String?
-- Line 71:        private var lastRenderedHighlightSignature: String = ""
-- Line 72:        private var lastRenderedRenamingMarkerID: String?
-- Line 79:        func handleTableViewAction(_ sender: Any?) {
-- Line 89:        func numberOfRows(in tableView: NSTableView) -> Int {
-- Line 93:        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-- Line 97:        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-- Line 123:        func tableViewSelectionDidChange(_ notification: Notification) {
-- Line 136:        func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
-- Line 145:        func tableView(
-- Line 155:        func tableView(
-- Line 167:            var reordered = markerIDs
-- Line 176:        func syncSelection() {
-- Line 193:        func refreshTableIfNeeded() {
-- Line 234:    var body: some View {
-- Line 365:    private var dragGrip: some View {
-- Line 387:    private func timecodeString(_ seconds: Double) -> String {
-- Line 420:    func update(rootView: MarkerListCellContent) {
-- Line 438:    func validateDrop(info: DropInfo) -> Bool {
-- Line 442:    func dropEntered(info: DropInfo) {
-- Line 455:    func dropUpdated(info: DropInfo) -> DropProposal? {
-- Line 462:    func performDrop(info: DropInfo) -> Bool {
-- Line 485:    func dropExited(info: DropInfo) {
+- Line 60:    func updateNSView(_ nsView: NSScrollView, context: Context) {
+- Line 68:        var parent: MarkerListTableView
+- Line 70:        private var isProgrammaticSelectionChange = false
+- Line 71:        private var draggedMarkerID: String?
+- Line 72:        private var lastRenderedEntryIDs: [String] = []
+- Line 73:        private var lastRenderedSelectionID: String?
+- Line 74:        private var lastRenderedHighlightSignature: String = ""
+- Line 75:        private var lastRenderedRenamingMarkerID: String?
+- Line 82:        func handleTableViewAction(_ sender: Any?) {
+- Line 92:        func numberOfRows(in tableView: NSTableView) -> Int {
+- Line 96:        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+- Line 100:        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+- Line 126:        func tableViewSelectionDidChange(_ notification: Notification) {
+- Line 139:        func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
+- Line 148:        func tableView(
+- Line 158:        func tableView(
+- Line 170:            var reordered = markerIDs
+- Line 179:        func syncSelection() {
+- Line 196:        func refreshTableIfNeeded() {
+- Line 237:    var body: some View {
+- Line 368:    private var dragGrip: some View {
+- Line 390:    private func timecodeString(_ seconds: Double) -> String {
+- Line 423:    func update(rootView: MarkerListCellContent) {
+- Line 441:    func validateDrop(info: DropInfo) -> Bool {
+- Line 445:    func dropEntered(info: DropInfo) {
+- Line 458:    func dropUpdated(info: DropInfo) -> DropProposal? {
+- Line 465:    func performDrop(info: DropInfo) -> Bool {
+- Line 488:    func dropExited(info: DropInfo) {
 - SwiftUI State / Bindings:
 - Line 11:    @Binding var renamingMarkerID: String?
 - Line 12:    @Binding var markerNameDraft: String
-- Line 226:    @Binding var renamingMarkerID: String?
-- Line 227:    @Binding var markerNameDraft: String
-- Line 232:    @State private var isRenameButtonHovered = false
-- Line 433:    @Binding var previewOrder: [String]?
-- Line 434:    @Binding var draggedMarkerID: String?
-- Line 435:    @Binding var dropTargetMarkerID: String?
+- Line 229:    @Binding var renamingMarkerID: String?
+- Line 230:    @Binding var markerNameDraft: String
+- Line 235:    @State private var isRenameButtonHovered = false
+- Line 436:    @Binding var previewOrder: [String]?
+- Line 437:    @Binding var draggedMarkerID: String?
+- Line 438:    @Binding var dropTargetMarkerID: String?
 
 ### Views/Review/RealtimeEffectPreviewSurface.swift
 - Lines: 237
@@ -995,24 +1060,79 @@ Generated: 2026-05-09 06:35:09
 - Line 123:func accentContrastingTextColor() -> Color {
 
 ### Views/Review/ReviewInspectorViews.swift
-- Lines: 99
+- Lines: 718
 - Imports:
+- import AppKit
 - import SwiftUI
 - Types:
-- Line 3:enum EditInspectorMode: String, CaseIterable, Identifiable {
-- Line 10:struct InspectorSectionHeaderView: View {
-- Line 21:struct EffectsInspectorPlaceholderView: View {
-- Line 47:struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
+- Line 4:enum EditInspectorMode: String, CaseIterable, Identifiable {
+- Line 11:struct InspectorSectionHeaderView: View {
+- Line 22:struct EffectsInspectorPlaceholderView: View {
+- Line 62:struct InspectorOverflowHintView: View {
+- Line 98:struct ResizableInspectorSplitView<TopContent: View, BottomContent: View>: View {
+- Line 661:struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
 - Functions / Vars:
-- Line 7:    var id: String { rawValue }
-- Line 13:    var body: some View {
-- Line 24:    var body: some View {
-- Line 68:    var body: some View {
+- Line 8:    var id: String { rawValue }
+- Line 14:    var body: some View {
+- Line 25:    var body: some View {
+- Line 55:    var body: some View {
+- Line 63:    var body: some View {
+- Line 79:    var contentHeight: CGFloat
+- Line 80:    var contentOffset: CGFloat
+- Line 81:    var viewportHeight: CGFloat
+- Line 91:    var body: some View {
+- Line 118:    var body: some View {
+- Line 143:    func makeCoordinator() -> Coordinator { Coordinator() }
+- Line 145:    func makeNSView(context: Context) -> NSScrollView {
+- Line 149:    func updateNSView(_ nsView: NSScrollView, context: Context) {
+- Line 155:        private var boundsObserver: NSObjectProtocol?
+- Line 163:        func makeScrollView(rootView: AnyView) -> NSScrollView {
+- Line 184:        func update(scrollView: NSScrollView, rootView: AnyView) {
+- Line 192:        private func installBoundsObserver(for scrollView: NSScrollView) {
+- Line 203:        private func updateLayout(for scrollView: NSScrollView) {
+- Line 217:        private func publishMetrics(for scrollView: NSScrollView) {
+- Line 225:    private var currentWidth: CGFloat = 0
+- Line 240:    var contentFittingHeight: CGFloat {
+- Line 247:    func update(rootView: AnyView) {
+- Line 251:    func updateWidth(_ width: CGFloat) {
+- Line 263:    private var boundsObserver: NSObjectProtocol?
+- Line 264:    private var documentFrameObserver: NSObjectProtocol?
+- Line 266:    private var isHintVisible = false
+- Line 267:    private var hadHiddenContentBelow = false
+- Line 268:    private var hideWorkItem: DispatchWorkItem?
+- Line 269:    private var suppressTriggersUntil = Date.distantPast
+- Line 270:    private var lastObservedContentOffset: CGFloat = 0
+- Line 296:    private func setupOverflowHint() {
+- Line 313:    func observeDocumentView(_ documentView: NSView?) {
+- Line 346:    private func layoutHintView() {
+- Line 359:    func updateOverflowHintVisibility(animated: Bool = true) {
+- Line 388:    private func handleBoundsChanged() {
+- Line 400:    private func triggerHintIfAllowed(animated: Bool) {
+- Line 405:    private func showHint(animated: Bool) {
+- Line 427:    private func hideHint(animated: Bool) {
+- Line 475:    func makeCoordinator() -> Coordinator {
+- Line 479:    func makeNSView(context: Context) -> InspectorSplitView {
+- Line 488:    func updateNSView(_ nsView: InspectorSplitView, context: Context) {
+- Line 503:        private var isApplyingProgrammaticLayout = false
+- Line 504:        private var pendingTopSectionFraction: CGFloat?
+- Line 505:        private var minTopHeight: CGFloat = 180
+- Line 506:        private var minBottomHeight: CGFloat = 220
+- Line 512:        func makeSplitView(
+- Line 544:        func update(
+- Line 559:        func splitViewDidResizeSubviews(_ notification: Notification) {
+- Line 585:        func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+- Line 589:        func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+- Line 593:        private func applyLayout(to splitView: NSSplitView, desiredFraction: CGFloat) {
+- Line 612:        private func install(hostingView: NSHostingView<AnyView>, in container: NSView, rootView: AnyView) {
+- Line 682:    var body: some View {
 - SwiftUI State / Bindings:
-- Line 49:    @Binding var inspectorMode: EditInspectorMode
+- Line 99:    @State private var topSectionFraction: CGFloat = 0.42
+- Line 455:    @Binding var topSectionFraction: CGFloat
+- Line 500:        @Binding private var topSectionFraction: CGFloat
+- Line 663:    @Binding var inspectorMode: EditInspectorMode
 
 ### Views/Review/ReviewMarkerInspectorViews.swift
-- Lines: 924
+- Lines: 965
 - Imports:
 - import AppKit
 - import SwiftUI
@@ -1021,28 +1141,28 @@ Generated: 2026-05-09 06:35:09
 - Functions / Vars:
 - Line 5:    func markerInspectorCard(_ summary: RecordingInspectionSummary) -> some View {
 - Line 27:    func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
-- Line 85:    func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
-- Line 144:    func markerListRow(
-- Line 264:    func markerListDragPreview(
-- Line 284:    var markerEditorSection: some View {
-- Line 478:    var effectEditorSection: some View {
-- Line 599:    func markerDisplayNumber(for marker: ZoomPlanItem) -> Int {
-- Line 607:    func timingSliderRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
-- Line 642:    func pointTimingRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
-- Line 707:    func setSelectedEffectHoldStartTimeAndFollowPlayback(_ time: Double) {
-- Line 716:    func setSelectedEffectHoldEndTimeAndFollowPlayback(_ time: Double) {
-- Line 726:    func effectAmountEditorSection(for marker: EffectPlanItem) -> some View {
-- Line 764:    func distortionEditorSection(for marker: EffectPlanItem) -> some View {
-- Line 806:    func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
-- Line 827:    func markerTypeSymbol(for zoomType: ZoomType) -> String {
-- Line 848:    private var currentSelectionLabel: String {
-- Line 855:    var body: some View {
-- Line 904:    private func clickPulseRow(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+- Line 84:    func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 141:    func markerListRow(
+- Line 261:    func markerListDragPreview(
+- Line 281:    var markerEditorSection: some View {
+- Line 475:    var effectEditorSection: some View {
+- Line 596:    func markerDisplayNumber(for marker: ZoomPlanItem) -> Int {
+- Line 604:    func timingSliderRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
+- Line 639:    func pointTimingRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
+- Line 704:    func setSelectedEffectHoldStartTimeAndFollowPlayback(_ time: Double) {
+- Line 713:    func setSelectedEffectHoldEndTimeAndFollowPlayback(_ time: Double) {
+- Line 723:    func effectAmountEditorSection(for marker: EffectPlanItem) -> some View {
+- Line 761:    func distortionEditorSection(for marker: EffectPlanItem) -> some View {
+- Line 847:    func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
+- Line 868:    func markerTypeSymbol(for zoomType: ZoomType) -> String {
+- Line 889:    private var currentSelectionLabel: String {
+- Line 896:    var body: some View {
+- Line 945:    private func clickPulseRow(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
 - SwiftUI State / Bindings:
-- Line 846:    @State private var isPopoverPresented = false
+- Line 887:    @State private var isPopoverPresented = false
 
 ### Views/Review/ReviewPlaybackMainViews.swift
-- Lines: 1020
+- Lines: 1077
 - Imports:
 - import AVFoundation
 - import SwiftUI
@@ -1050,8 +1170,9 @@ Generated: 2026-05-09 06:35:09
 - Line 4:extension ContentView {
 - Functions / Vars:
 - Line 5:    func playbackVideoCard(
-- Line 644:    func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
-- Line 991:    func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {
+- Line 673:    func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
+- Line 1035:    func finishEffectFocusRegionDrawing(with region: EffectFocusRegion? = nil) {
+- Line 1048:    func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {
 
 ### Views/Review/ReviewPlaybackPreviewViews.swift
 - Lines: 803
@@ -1155,21 +1276,21 @@ Generated: 2026-05-09 06:35:09
 - Line 116:    func effectTimelineSnapTarget(
 
 ### Views/Review/TimelineToolbarControls.swift
-- Lines: 243
+- Lines: 273
 - Imports:
 - import SwiftUI
 - Types:
 - Line 3:struct TimelineToolbarView: View {
-- Line 107:struct EffectsTimelineToolbarView: View {
-- Line 169:struct TimelineGadgetButton: View {
+- Line 109:struct EffectsTimelineToolbarView: View {
+- Line 199:struct TimelineGadgetButton: View {
 - Functions / Vars:
 - Line 15:    var body: some View {
-- Line 115:    var body: some View {
-- Line 199:    var body: some View {
-- Line 222:private func gadgetForegroundColor(
+- Line 120:    var body: some View {
+- Line 229:    var body: some View {
+- Line 252:private func gadgetForegroundColor(
 
 ### Views/Review/ZoomAndClicksEditorViews.swift
-- Lines: 623
+- Lines: 613
 - Imports:
 - import AppKit
 - import SwiftUI
@@ -1182,32 +1303,36 @@ Generated: 2026-05-09 06:35:09
 - Line 25:    var laneEndRatios = Array(repeating: -Double.infinity, count: maxLaneCount)
 - Line 64:func timelineSegment(
 - Line 210:func timelineMarkerTooltipOverlay(
-- Line 300:private func timelineSegmentBar(
-- Line 370:private func timelinePhaseBlock(color: Color, width: CGFloat) -> some View {
-- Line 377:private func selectedTimelinePhaseOverlay(
-- Line 431:private func phaseWidth(from start: Double, to end: Double, timelineStart: Double, timelineEnd: Double, totalWidth: CGFloat) -> CGFloat {
-- Line 438:private func phaseX(for time: Double, timeline: (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double), width: CGFloat) -> CGFloat {
-- Line 444:private func phaseDividerTimes(for marker: ZoomPlanItem, timeline: (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double)) -> [Double] {
-- Line 459:private func timelinePhaseBoundsMap(
-- Line 464:    var items: [(phase: MarkerTimingPhase, width: CGFloat)] = []
-- Line 489:private func phaseStartOffset(
-- Line 509:private func timelinePhaseCenterX(for marker: ZoomPlanItem, phase: MarkerTimingPhase, duration: Double, width: CGFloat) -> CGFloat {
-- Line 517:private func timelinePhaseBounds(for marker: ZoomPlanItem, phase: MarkerTimingPhase) -> (start: Double, end: Double) {
-- Line 533:private func timelineLane(for startRatio: Double, endRatio: Double, laneEndRatios: inout [Double]) -> Int {
-- Line 551:private func timelineSegmentWindow(for marker: ZoomPlanItem) -> (start: Double, end: Double) {
-- Line 566:private func zoomTimeline(for marker: ZoomPlanItem) -> (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double) {
-- Line 602:private func markerTypeSymbol(for zoomType: ZoomType) -> String {
-- Line 615:private func timecodeString(for seconds: Double) -> String {
+- Line 290:private func timelineSegmentBar(
+- Line 360:private func timelinePhaseBlock(color: Color, width: CGFloat) -> some View {
+- Line 367:private func selectedTimelinePhaseOverlay(
+- Line 421:private func phaseWidth(from start: Double, to end: Double, timelineStart: Double, timelineEnd: Double, totalWidth: CGFloat) -> CGFloat {
+- Line 428:private func phaseX(for time: Double, timeline: (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double), width: CGFloat) -> CGFloat {
+- Line 434:private func phaseDividerTimes(for marker: ZoomPlanItem, timeline: (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double)) -> [Double] {
+- Line 449:private func timelinePhaseBoundsMap(
+- Line 454:    var items: [(phase: MarkerTimingPhase, width: CGFloat)] = []
+- Line 479:private func phaseStartOffset(
+- Line 499:private func timelinePhaseCenterX(for marker: ZoomPlanItem, phase: MarkerTimingPhase, duration: Double, width: CGFloat) -> CGFloat {
+- Line 507:private func timelinePhaseBounds(for marker: ZoomPlanItem, phase: MarkerTimingPhase) -> (start: Double, end: Double) {
+- Line 523:private func timelineLane(for startRatio: Double, endRatio: Double, laneEndRatios: inout [Double]) -> Int {
+- Line 541:private func timelineSegmentWindow(for marker: ZoomPlanItem) -> (start: Double, end: Double) {
+- Line 556:private func zoomTimeline(for marker: ZoomPlanItem) -> (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double) {
+- Line 592:private func markerTypeSymbol(for zoomType: ZoomType) -> String {
+- Line 605:private func timecodeString(for seconds: Double) -> String {
 
 ### Views/Settings/SettingsViews.swift
-- Lines: 86
+- Lines: 217
 - Imports:
 - import SwiftUI
 - Types:
 - Line 3:extension ContentView {
 - Functions / Vars:
 - Line 4:    var settingsView: some View {
-- Line 76:    func settingsCard(title: String, body: AnyView) -> some View {
+- Line 81:    func settingsCard(title: String, body: AnyView) -> some View {
+- Line 92:    var distortionPresetsSettingsCardBody: some View {
+- Line 127:    var distortionPresetDetailEditor: some View {
+- Line 201:    func distortionMapSourceSummary(for descriptor: DistortionPresetDescriptor) -> String {
+- Line 211:    func distortionImportedMapDetails(for descriptor: DistortionPresetDescriptor) -> DistortionImportedMapAsset? {
 
 ### Views/Shared/ExportProgressSheetViews.swift
 - Lines: 100

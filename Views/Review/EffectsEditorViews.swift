@@ -282,16 +282,6 @@ private func effectTimelineTooltipOverlay(
         Text(marker.enabled ? "Enabled" : "Disabled")
             .font(.system(size: 11))
             .foregroundStyle(marker.enabled ? .primary : .secondary)
-        Divider()
-        Text("hoveredEffectTimelineMarkerID: \(hoveredEffectTimelineMarkerID ?? "nil")")
-            .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(.secondary)
-        Text("displayed marker id: \(markerID)")
-            .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(.secondary)
-        Text("displayed marker number: \(markerNumber)")
-            .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(.secondary)
     }
     .padding(.horizontal, 10)
     .padding(.vertical, 8)
@@ -365,7 +355,7 @@ struct EffectListTableView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
+        let scrollView = InspectorOverflowHintingScrollView()
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
@@ -397,6 +387,8 @@ struct EffectListTableView: NSViewRepresentable {
         tableView.addTableColumn(column)
 
         scrollView.documentView = tableView
+        scrollView.observeDocumentView(tableView)
+        scrollView.updateOverflowHintVisibility()
         context.coordinator.tableView = tableView
         return scrollView
     }
@@ -405,6 +397,7 @@ struct EffectListTableView: NSViewRepresentable {
         context.coordinator.parent = self
         context.coordinator.refreshTableIfNeeded()
         context.coordinator.syncSelection()
+        (nsView as? InspectorOverflowHintingScrollView)?.updateOverflowHintVisibility()
     }
 
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {

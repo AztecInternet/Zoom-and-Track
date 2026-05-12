@@ -40,6 +40,7 @@ struct ContentView: View {
     @State var isDrawingNoZoomOverflowRegion = false
     @State var pendingNoZoomOverflowRegion: NoZoomOverflowRegion?
     @State var isDrawingEffectFocusRegion = false
+    @State var autoCommitsEffectFocusRegionOnRelease = false
     @State var pendingEffectFocusRegion: EffectFocusRegion?
     @State var effectFocusRegionInteractionBase: EffectFocusRegion?
     @State var activeEffectRegionPrecisionPoint: CGPoint?
@@ -52,9 +53,11 @@ struct ContentView: View {
     @State var selectedLibraryCollectionFilter: String?
     @State var selectedLibraryProjectFilter: String?
     @State var selectedLibraryTypeFilter: CaptureType?
+    @State var selectedLibraryCaptureID: UUID?
     @State var captureInfoTitleDraft = ""
     @State var captureInfoCollectionDraft = ""
     @State var captureInfoProjectDraft = ""
+    @State var isConfirmingDistortionPresetDelete = false
     @FocusState var focusedCaptureInfoField: CaptureInfoField?
     @FocusState var isTimelineKeyboardFocused: Bool
 
@@ -336,6 +339,7 @@ struct ContentView: View {
                                 isDrawingNoZoomOverflowRegion: editorMode == .zoomAndClicks ? isDrawingNoZoomOverflowRegion : false,
                                 pendingNoZoomOverflowRegion: editorMode == .zoomAndClicks ? pendingNoZoomOverflowRegion : nil,
                                 isDrawingEffectFocusRegion: editorMode == .effects ? isDrawingEffectFocusRegion : false,
+                                autoCommitsEffectFocusRegionOnRelease: editorMode == .effects ? autoCommitsEffectFocusRegionOnRelease : false,
                                 pendingEffectFocusRegion: editorMode == .effects ? pendingEffectFocusRegion : nil,
                                 placeClickFocusAction: { sourcePoint in
                                     viewModel.addClickFocusMarker(at: sourcePoint)
@@ -354,6 +358,9 @@ struct ContentView: View {
                                 },
                                 updateEffectFocusRegionAction: { region in
                                     pendingEffectFocusRegion = region
+                                },
+                                commitEffectFocusRegionAction: { region in
+                                    finishEffectFocusRegionDrawing(with: region)
                                 }
                             )
                                 .frame(height: videoHeight)
@@ -385,15 +392,11 @@ struct ContentView: View {
                         playbackScrubTime = viewModel.currentPlaybackTime
                     }
                     .onChange(of: editorMode) {
+                        finishEffectFocusRegionDrawing()
                         isPlacingClickFocus = false
                         pendingMarkerDragSourcePoint = nil
                         isDrawingNoZoomOverflowRegion = false
                         pendingNoZoomOverflowRegion = nil
-                        isDrawingEffectFocusRegion = false
-                        pendingEffectFocusRegion = nil
-                        effectFocusRegionInteractionBase = nil
-                        activeEffectRegionPrecisionPoint = nil
-                        activeEffectRegionHandle = nil
                         activeTimelineMarkerDragID = nil
                         activeTimelineMarkerDragStartTime = nil
                         renamingEffectMarkerID = nil

@@ -60,27 +60,37 @@ extension ContentView {
                         }
                     }
 
-                    if filteredItems.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("No captures match current filters")
-                                .font(.headline)
-                            Text(hasActiveLibraryFilters ? "Try clearing one or more filters." : "Create a capture or adjust the library root in Settings.")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(20)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .background(cardBackground)
-                    } else {
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 12) {
-                                ForEach(filteredItems) { item in
-                                    libraryCaptureRow(item)
-                                }
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Previously Captured Projects")
+                            .font(.system(size: 16, weight: .semibold))
+
+                        Text("Double click a project to open it in the editor.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+
+                        if filteredItems.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("No captures match current filters")
+                                    .font(.headline)
+                                Text(hasActiveLibraryFilters ? "Try clearing one or more filters." : "Create a capture or adjust the library root in Settings.")
+                                    .foregroundStyle(.secondary)
                             }
-                            .padding(16)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        } else {
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 12) {
+                                    ForEach(filteredItems) { item in
+                                        libraryCaptureRow(item)
+                                    }
+                                }
+                                .padding(.top, 2)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .background(cardBackground)
                     }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(cardBackground)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
@@ -101,7 +111,9 @@ extension ContentView {
     }
 
     func libraryCaptureRow(_ item: CaptureLibraryItem) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+        let isSelected = selectedLibraryCaptureID == item.id
+
+        return HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(item.title)
                     .font(.system(size: 14, weight: .semibold))
@@ -110,19 +122,40 @@ extension ContentView {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
 
-                Button {
-                    viewModel.revealLibraryCapture(item)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.forward.folder.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("Reveal in Finder")
-                            .font(.system(size: 11, weight: .semibold))
+                HStack(spacing: 12) {
+                    Button {
+                        viewModel.revealLibraryCapture(item)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.forward.folder.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Reveal in Finder")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.accentColor)
                     }
-                    .foregroundStyle(Color.accentColor)
+                    .buttonStyle(.plain)
+                    .help("Reveal in Finder")
+
+                    Button {
+                        guard item.canOpenInEditor else { return }
+                        selectedLibraryCaptureID = item.id
+                        inspectorMode = .captureInfo
+                        viewModel.openLibraryCapture(item)
+                        selectedTab = .review
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Edit Info")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(item.canOpenInEditor ? Color.accentColor : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!item.canOpenInEditor)
+                    .help("Open Capture Info in the editor")
                 }
-                .buttonStyle(.plain)
-                .help("Reveal in Finder")
 
                 HStack(spacing: 10) {
                     libraryMetadataPill(text: item.captureType.displayName, systemName: "tag")
@@ -146,39 +179,29 @@ extension ContentView {
             }
 
             Spacer(minLength: 12)
-
-            VStack(alignment: .trailing, spacing: 8) {
-                Spacer(minLength: 0)
-                Button {
-                    viewModel.openLibraryCapture(item)
-                    selectedTab = .review
-                } label: {
-                    Label("Edit Screen Capture", systemImage: "play.rectangle")
-                        .font(.system(size: 12, weight: .semibold))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .foregroundStyle(accentContrastingTextColor())
-                        .background(
-                            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .fill(Color.accentColor)
-                        )
-                }
-                .buttonStyle(.plain)
-                .opacity(item.canOpenInEditor ? 1 : 0.45)
-                .disabled(!item.canOpenInEditor)
-            }
-            .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.58))
+                .fill(isSelected ? Color.accentColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor).opacity(0.58))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.secondary.opacity(0.10), lineWidth: 1)
+                .stroke(isSelected ? Color.accentColor.opacity(0.45) : Color.secondary.opacity(0.10), lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedLibraryCaptureID = item.id
+        }
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                guard item.canOpenInEditor else { return }
+                selectedLibraryCaptureID = item.id
+                viewModel.openLibraryCapture(item)
+                selectedTab = .review
+            }
         )
     }
 

@@ -219,7 +219,7 @@ extension ContentView {
                 ? "Zoom & Click bars are shown as grey reference guides while editing effects."
                 : isDrawingNoZoomOverflowRegion
                 ? "←/→/↑/↓ to nudge the overflow region, ⌥ + Arrow for 10x speed"
-                : "Click a Marker to preview it, ←/→ to nudge 0.1s"
+                : "Click a marker to preview it, click empty timeline to clear selection, ←/→ to nudge 0.1s"
             )
                 .font(.system(size: 10, weight: .light))
                 .foregroundStyle(.secondary)

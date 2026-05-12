@@ -5,8 +5,11 @@
 
 import AppKit
 import AVFoundation
+import CryptoKit
 import CoreGraphics
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 struct ProjectBundleService {
     private let fileManager = FileManager.default
@@ -210,6 +213,67 @@ struct ProjectBundleService {
         }
 
         return url
+    }
+
+    func loadDistortionPresetLibrary() throws -> DistortionPresetLibrary {
+        let libraryURL = try distortionPresetLibraryFileURL()
+        guard fileManager.fileExists(atPath: libraryURL.path) else {
+            return .empty
+        }
+
+        let data = try Data(contentsOf: libraryURL)
+        return try JSONDecoder().decode(DistortionPresetLibrary.self, from: data)
+    }
+
+    func saveDistortionPresetLibrary(_ library: DistortionPresetLibrary) throws {
+        try ensureDistortionPresetLibraryDirectories()
+        let data = try JSONEncoder.manifestEncoder.encode(library)
+        try data.write(to: distortionPresetLibraryFileURL(), options: .atomic)
+    }
+
+    func chooseDistortionMapImage() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.image]
+        panel.prompt = "Import Map"
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    func importDistortionMap(from sourceURL: URL, suggestedName: String? = nil) throws -> DistortionImportedMapAsset {
+        try ensureDistortionPresetLibraryDirectories()
+
+        let data = try Data(contentsOf: sourceURL)
+        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        let mapID = UUID().uuidString.lowercased()
+        let fileExtension = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension.lowercased()
+        let fileName = "\(mapID).\(fileExtension)"
+        let destinationURL = try distortionPresetMapsDirectoryURL().appendingPathComponent(fileName)
+        try data.write(to: destinationURL, options: .atomic)
+
+        let trimmedSuggestedName = suggestedName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = (trimmedSuggestedName?.isEmpty == false ? trimmedSuggestedName : sourceURL.deletingPathExtension().lastPathComponent) ?? "Imported Map"
+        let dimensions = distortionMapPixelSize(for: destinationURL)
+
+        return DistortionImportedMapAsset(
+            id: mapID,
+            displayName: displayName,
+            fileName: fileName,
+            contentHash: hash,
+            pixelWidth: dimensions.map { Int($0.width) },
+            pixelHeight: dimensions.map { Int($0.height) }
+        )
+    }
+
+    func distortionImportedMapURL(for mapID: String, in library: DistortionPresetLibrary? = nil) throws -> URL? {
+        let resolvedLibrary = try library ?? loadDistortionPresetLibrary()
+        guard let asset = resolvedLibrary.importedMaps.first(where: { $0.id == mapID }) else {
+            return nil
+        }
+        let url = try distortionPresetMapsDirectoryURL().appendingPathComponent(asset.fileName)
+        return fileManager.fileExists(atPath: url.path) ? url : nil
     }
 
     func loadRecordingInspection(from bundleURL: URL) async throws -> RecordingInspectionSummary {
@@ -918,6 +982,43 @@ struct ProjectBundleService {
             UserDefaults.standard.removeObject(forKey: key)
             return .invalid(invalidMessage)
         }
+    }
+
+    private func ensureDistortionPresetLibraryDirectories() throws {
+        try fileManager.createDirectory(at: try distortionPresetLibraryRootURL(), withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: try distortionPresetMapsDirectoryURL(), withIntermediateDirectories: true)
+    }
+
+    private func distortionPresetLibraryRootURL() throws -> URL {
+        let applicationSupportURL = try fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let rootURL = applicationSupportURL
+            .appendingPathComponent("FlowTrack Capture", isDirectory: true)
+            .appendingPathComponent("DistortionPresets", isDirectory: true)
+        try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        return rootURL
+    }
+
+    private func distortionPresetLibraryFileURL() throws -> URL {
+        try distortionPresetLibraryRootURL().appendingPathComponent("library.json")
+    }
+
+    private func distortionPresetMapsDirectoryURL() throws -> URL {
+        try distortionPresetLibraryRootURL().appendingPathComponent("Maps", isDirectory: true)
+    }
+
+    private func distortionMapPixelSize(for url: URL) -> CGSize? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? NSNumber,
+              let height = properties[kCGImagePropertyPixelHeight] as? NSNumber else {
+            return nil
+        }
+        return CGSize(width: width.doubleValue, height: height.doubleValue)
     }
 
     private func defaultOutputDirectorySuggestion() -> URL? {
