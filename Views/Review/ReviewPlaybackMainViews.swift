@@ -875,6 +875,14 @@ extension ContentView {
                             let effectSnap = editorMode == .effects
                                 ? effectTimelineSnapTarget(at: endX, width: width, duration: duration, markers: summary.effectMarkers)
                                 : nil
+                            let effectHit = editorMode == .effects
+                                ? effectTimelineHitTarget(
+                                    at: value.location,
+                                    width: width,
+                                    verticalOrigin: segmentOriginY,
+                                    layouts: effectLayouts
+                                )
+                                : nil
                             let targetTime = zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: endX, width: width, duration: duration)
 
                             if isDraggingTimeline {
@@ -889,6 +897,10 @@ extension ContentView {
                                 isTimelineKeyboardFocused = true
                                 suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
                                 viewModel.selectZoomMarker(zoomSnap.marker.id, seekPlaybackHead: true)
+                            } else if let effectHit {
+                                finishEffectFocusRegionDrawing()
+                                isTimelineKeyboardFocused = true
+                                viewModel.selectEffectMarker(effectHit.id, seekPlaybackHead: true)
                             } else if let effectSnap {
                                 finishEffectFocusRegionDrawing()
                                 isTimelineKeyboardFocused = true

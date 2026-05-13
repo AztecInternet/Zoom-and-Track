@@ -132,4 +132,31 @@ extension ContentView {
 
         return (nearest.0, nearest.0.snapTime)
     }
+
+    func effectTimelineHitTarget(
+        at point: CGPoint,
+        width: CGFloat,
+        verticalOrigin: CGFloat,
+        layouts: [EffectTimelineSegmentLayout]
+    ) -> EffectPlanItem? {
+        let laneHeight: CGFloat = 9
+        let laneSpacing: CGFloat = 4
+        let minimumHitWidth: CGFloat = 18
+        let verticalHitSlop: CGFloat = 8
+
+        return layouts.reversed().first { layout in
+            let startX = CGFloat(layout.startRatio) * width
+            let endX = CGFloat(layout.endRatio) * width
+            let actualBarWidth = max(endX - startX, 1)
+            let hitWidth = max(actualBarWidth, minimumHitWidth)
+            let hitPadding = max((hitWidth - actualBarWidth) / 2, 0)
+            let minX = startX - hitPadding
+            let maxX = endX + hitPadding
+            let laneY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
+            let minY = laneY - verticalHitSlop
+            let maxY = laneY + laneHeight + verticalHitSlop
+
+            return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
+        }?.marker
+    }
 }

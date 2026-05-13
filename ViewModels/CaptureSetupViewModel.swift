@@ -100,6 +100,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private var mainPlaybackTimeObserver: Any?
     private var previewPlaybackTimeObserver: Any?
     private var manualSelectionSuppressionUntil: Date?
+    private var isEffectMarkerSelectionPinned = false
     private var previewMarkerID: String?
     private var previewEndTime: Double?
     private var previewEffectMarkerID: String?
@@ -135,6 +136,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private let inputEventCaptureService = InputEventCaptureService()
     private let markerPreviewRenderService = MarkerPreviewRenderService()
     private let markerPreviewCacheService = MarkerPreviewCacheService()
+    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
     private let exportManager = ExportManager()
     private let previewTransitionFadeInDuration: TimeInterval = 0.12
     private let previewTransitionHoldDuration: TimeInterval = 1.0
@@ -886,6 +888,7 @@ final class CaptureSetupViewModel: ObservableObject {
         ) else { return }
         selectedZoomMarkerID = plan.selectedZoomMarkerID
         selectedEffectMarkerID = plan.selectedEffectMarkerID
+        isEffectMarkerSelectionPinned = snappedEffectMarkerID != nil && plan.selectedEffectMarkerID != nil
         seekPlayback(to: plan.targetTime)
     }
 
@@ -899,6 +902,7 @@ final class CaptureSetupViewModel: ObservableObject {
         ) else { return }
         selectedZoomMarkerID = plan.selectedZoomMarkerID
         selectedEffectMarkerID = plan.selectedEffectMarkerID
+        isEffectMarkerSelectionPinned = snappedEffectMarkerID != nil && plan.selectedEffectMarkerID != nil
         seekPlayback(to: plan.targetTime)
         isTimelineScrubbing = plan.isTimelineScrubbing
         manualSelectionSuppressionUntil = Date().addingTimeInterval(plan.suppressionInterval)
@@ -936,6 +940,7 @@ final class CaptureSetupViewModel: ObservableObject {
         }
         selectedZoomMarkerID = plan.selectedZoomMarkerID
         selectedEffectMarkerID = plan.selectedEffectMarkerID
+        isEffectMarkerSelectionPinned = snappedEffectMarkerID != nil && plan.selectedEffectMarkerID != nil
         if let suppressionInterval = plan.suppressionInterval {
             manualSelectionSuppressionUntil = Date().addingTimeInterval(suppressionInterval)
         } else if suppressAutoSelectionWhenUnsnapped,
@@ -1124,6 +1129,7 @@ final class CaptureSetupViewModel: ObservableObject {
         }
 
         selectedEffectMarkerID = markerID
+        isEffectMarkerSelectionPinned = true
         distortionLoupeNormalizedPoint = nil
         syncDistortionMapOverlayVisibility()
         if isPlaybackActive {
@@ -1171,6 +1177,7 @@ final class CaptureSetupViewModel: ObservableObject {
         playbackPresentationMode = .normal
 
         selectedEffectMarkerID = markerID
+        isEffectMarkerSelectionPinned = true
         previewEffectMarkerID = markerID
         previewEffectEndTime = marker.endTime
         manualSelectionSuppressionUntil = Date().addingTimeInterval(max(marker.endTime - marker.startTime, 0.35) + 0.15)
@@ -1190,6 +1197,7 @@ final class CaptureSetupViewModel: ObservableObject {
         }
         guard marker.enabled else {
             selectedEffectMarkerID = markerID
+            isEffectMarkerSelectionPinned = true
             return
         }
 
@@ -1206,6 +1214,7 @@ final class CaptureSetupViewModel: ObservableObject {
         }
         stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: true)
         selectedEffectMarkerID = markerID
+        isEffectMarkerSelectionPinned = true
         renderingPreviewEffectMarkerID = markerID
         isRenderingMarkerPreview = false
         markerPreviewStatusMessage = nil
@@ -1423,6 +1432,70 @@ final class CaptureSetupViewModel: ObservableObject {
         }
     }
 
+    func saveSelectedDistortionAsCreatorDefault() {
+        saveCurrentEffectStyleAsCreatorDefault()
+    }
+
+    func applyCreatorDistortionDefaultsToSelectedEffect() {
+        applyCreatorDefaultsToSelectedEffectStyle()
+    }
+
+    func saveCurrentEffectStyleAsCreatorDefault() {
+        guard let marker = selectedEffectMarker,
+              [.blur, .darken, .tint, .distortion].contains(marker.style) else {
+            return
+        }
+
+        var defaults = creatorEffectDefaultsService.loadCreatorEffectDefaults()
+        switch marker.style {
+        case .blur:
+            defaults.blur = BlurEffectDefault(blurAmount: min(max(marker.blurAmount, 0), 1))
+        case .darken:
+            defaults.darken = DarkenEffectDefault(darkenAmount: min(max(marker.darkenAmount, 0), 1))
+        case .tint:
+            defaults.tint = TintEffectDefault(
+                tintAmount: min(max(marker.tintAmount, 0), 1),
+                tintColor: marker.tintColor
+            )
+        case .distortion:
+            guard let distortion = marker.distortion else { return }
+            defaults.distortion = DistortionEffectDefault(
+                amount: min(max(marker.amount, 0), 1),
+                configuration: distortion
+            )
+        case .blurDarken, .heatHazeEdge:
+            return
+        }
+        try? creatorEffectDefaultsService.saveCreatorEffectDefaults(defaults)
+    }
+
+    func applyCreatorDefaultsToSelectedEffectStyle() {
+        let defaults = creatorEffectDefaultsService.loadCreatorEffectDefaults()
+        updateSelectedEffectMarker { marker in
+            switch marker.style {
+            case .blur:
+                let blurAmount = min(max(defaults.blur.blurAmount, 0), 1)
+                marker.blurAmount = blurAmount
+                marker.amount = blurAmount
+            case .darken:
+                let darkenAmount = min(max(defaults.darken.darkenAmount, 0), 1)
+                marker.darkenAmount = darkenAmount
+                marker.amount = darkenAmount
+            case .tint:
+                let tintAmount = min(max(defaults.tint.tintAmount, 0), 1)
+                marker.tintAmount = tintAmount
+                marker.amount = tintAmount
+                marker.tintColor = defaults.tint.tintColor
+            case .distortion:
+                marker.amount = min(max(defaults.distortion.amount, 0), 1)
+                marker.distortion = defaults.distortion.configuration
+            case .blurDarken, .heatHazeEdge:
+                return
+            }
+        }
+        syncDistortionMapOverlayVisibility()
+    }
+
     func setSelectedEffectBlurAmount(_ amount: Double) {
         updateSelectedEffectMarker { marker in
             let clampedAmount = min(max(amount, 0), 1)
@@ -1544,6 +1617,7 @@ final class CaptureSetupViewModel: ObservableObject {
         syncEffectTiming(&marker, maxDuration: summary.duration)
         effectMarkers.append(marker)
         selectedEffectMarkerID = marker.id
+        isEffectMarkerSelectionPinned = true
         saveEffectMarkers(effectMarkers, basedOn: summary)
     }
 
@@ -1552,6 +1626,7 @@ final class CaptureSetupViewModel: ObservableObject {
         var effectMarkers = summary.effectMarkers
         effectMarkers.removeAll { $0.id == selectedEffectMarkerID }
         self.selectedEffectMarkerID = nil
+        isEffectMarkerSelectionPinned = false
         saveEffectMarkers(effectMarkers, basedOn: summary)
     }
 
@@ -2836,10 +2911,17 @@ final class CaptureSetupViewModel: ObservableObject {
     private func updateSelectedEffectMarkerForTime(_ currentTime: Double) {
         guard let summary = recordingSummary, !summary.effectMarkers.isEmpty else {
             selectedEffectMarkerID = nil
+            isEffectMarkerSelectionPinned = false
             return
         }
 
         if let manualSelectionSuppressionUntil, Date() < manualSelectionSuppressionUntil {
+            return
+        }
+
+        if isEffectMarkerSelectionPinned,
+           let selectedEffectMarkerID,
+           summary.effectMarkers.contains(where: { $0.id == selectedEffectMarkerID }) {
             return
         }
 
@@ -2857,11 +2939,13 @@ final class CaptureSetupViewModel: ObservableObject {
 
         guard let markerID = markers.last(where: { currentTime >= $0.startTime && currentTime <= $0.endTime })?.id else {
             selectedEffectMarkerID = nil
+            isEffectMarkerSelectionPinned = false
             return
         }
 
         if selectedEffectMarkerID != markerID {
             selectedEffectMarkerID = markerID
         }
+        isEffectMarkerSelectionPinned = false
     }
 }

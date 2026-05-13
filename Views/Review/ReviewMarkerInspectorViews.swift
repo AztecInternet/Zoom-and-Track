@@ -487,7 +487,29 @@ extension ContentView {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    InspectorSectionHeaderView(title: "Style")
+                    HStack {
+                        InspectorSectionHeaderView(title: "Style")
+                        Spacer()
+                        if supportsCreatorDefaults(marker.style) {
+                            Menu {
+                                Button("Save Current as Default") {
+                                    viewModel.saveCurrentEffectStyleAsCreatorDefault()
+                                }
+                                Button("Reset Effect to Defaults") {
+                                    viewModel.applyCreatorDefaultsToSelectedEffectStyle()
+                                }
+                            } label: {
+                                Image(systemName: "gearshape.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.accentColor)
+                                    .frame(width: 28, height: 24)
+                                    .contentShape(Rectangle())
+                            }
+                            .menuStyle(.button)
+                            .buttonStyle(.borderless)
+                            .help("Effect default actions")
+                        }
+                    }
                     Picker("Effect Style", selection: Binding(
                         get: { marker.style },
                         set: { viewModel.setSelectedEffectStyle($0) }
@@ -590,6 +612,15 @@ extension ContentView {
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    func supportsCreatorDefaults(_ style: EffectStyle) -> Bool {
+        switch style {
+        case .blur, .darken, .tint, .distortion:
+            return true
+        case .blurDarken, .heatHazeEdge:
+            return false
         }
     }
 

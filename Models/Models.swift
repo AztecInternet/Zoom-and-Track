@@ -847,6 +847,79 @@ struct DistortionConfiguration: Codable, Equatable {
     )
 }
 
+struct DistortionEffectDefault: Codable, Equatable {
+    var amount: Double
+    var configuration: DistortionConfiguration
+
+    static let `default` = DistortionEffectDefault(
+        amount: 0.55,
+        configuration: .defaultConfiguration
+    )
+}
+
+struct BlurEffectDefault: Codable, Equatable {
+    var blurAmount: Double
+
+    static let `default` = BlurEffectDefault(blurAmount: 0.55)
+}
+
+struct DarkenEffectDefault: Codable, Equatable {
+    var darkenAmount: Double
+
+    static let `default` = DarkenEffectDefault(darkenAmount: 0.55)
+}
+
+struct TintEffectDefault: Codable, Equatable {
+    var tintAmount: Double
+    var tintColor: EffectTintColor
+
+    static let `default` = TintEffectDefault(
+        tintAmount: 0.55,
+        tintColor: .defaultTint
+    )
+}
+
+struct CreatorEffectDefaults: Codable, Equatable {
+    var distortion: DistortionEffectDefault
+    var blur: BlurEffectDefault
+    var darken: DarkenEffectDefault
+    var tint: TintEffectDefault
+
+    private enum CodingKeys: String, CodingKey {
+        case distortion
+        case blur
+        case darken
+        case tint
+    }
+
+    static let `default` = CreatorEffectDefaults(
+        distortion: .default,
+        blur: .default,
+        darken: .default,
+        tint: .default
+    )
+
+    init(
+        distortion: DistortionEffectDefault = .default,
+        blur: BlurEffectDefault = .default,
+        darken: DarkenEffectDefault = .default,
+        tint: TintEffectDefault = .default
+    ) {
+        self.distortion = distortion
+        self.blur = blur
+        self.darken = darken
+        self.tint = tint
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        distortion = try container.decodeIfPresent(DistortionEffectDefault.self, forKey: .distortion) ?? .default
+        blur = try container.decodeIfPresent(BlurEffectDefault.self, forKey: .blur) ?? .default
+        darken = try container.decodeIfPresent(DarkenEffectDefault.self, forKey: .darken) ?? .default
+        tint = try container.decodeIfPresent(TintEffectDefault.self, forKey: .tint) ?? .default
+    }
+}
+
 enum DistortionColorEffectPalette: String, Codable, CaseIterable, Identifiable {
     case ember
     case electric
