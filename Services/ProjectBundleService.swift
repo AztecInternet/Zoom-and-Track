@@ -324,6 +324,7 @@ struct ProjectBundleService {
             recordingURL: recordingURL,
             videoAspectRatio: videoAspectRatio,
             contentCoordinateSize: videoPixelSize,
+            compositionLayout: manifest.compositionLayout,
             captureSourceKind: manifest.captureSource.kind,
             captureSourceTitle: manifest.captureSource.title,
             totalEventCount: envelope.events.count,
@@ -426,6 +427,7 @@ struct ProjectBundleService {
             createdAt: existingManifest.createdAt,
             updatedAt: updatedAt,
             captureSource: existingManifest.captureSource,
+            compositionLayout: existingManifest.compositionLayout,
             recordingFileName: existingManifest.recordingFileName,
             eventFileName: existingManifest.eventFileName
         )

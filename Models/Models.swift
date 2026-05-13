@@ -63,6 +63,89 @@ struct CaptureSource: Codable {
     let scaleFactor: Double?
 }
 
+enum OutputAspectRatio: String, Codable, Equatable, CaseIterable, Identifiable {
+    case widescreen16x9
+    case vertical9x16
+    case square1x1
+    case classic4x3
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .widescreen16x9:
+            return "16:9"
+        case .vertical9x16:
+            return "9:16"
+        case .square1x1:
+            return "1:1"
+        case .classic4x3:
+            return "4:3"
+        }
+    }
+
+    var width: Double {
+        switch self {
+        case .widescreen16x9:
+            return 16
+        case .vertical9x16:
+            return 9
+        case .square1x1:
+            return 1
+        case .classic4x3:
+            return 4
+        }
+    }
+
+    var height: Double {
+        switch self {
+        case .widescreen16x9:
+            return 9
+        case .vertical9x16:
+            return 16
+        case .square1x1:
+            return 1
+        case .classic4x3:
+            return 3
+        }
+    }
+
+    var ratio: Double {
+        width / height
+    }
+}
+
+struct CompositionLayout: Codable, Equatable {
+    static let `default` = CompositionLayout()
+    static let sourceScaleRange = 0.5...3.0
+    static let sourceOffsetRange = -1.0...1.0
+
+    var outputAspectRatio: OutputAspectRatio
+    var sourceScale: Double
+    var sourceOffsetX: Double
+    var sourceOffsetY: Double
+
+    init(
+        outputAspectRatio: OutputAspectRatio = .widescreen16x9,
+        sourceScale: Double = 1.0,
+        sourceOffsetX: Double = 0.0,
+        sourceOffsetY: Double = 0.0
+    ) {
+        self.outputAspectRatio = outputAspectRatio
+        self.sourceScale = Self.clampedSourceScale(sourceScale)
+        self.sourceOffsetX = Self.clampedSourceOffset(sourceOffsetX)
+        self.sourceOffsetY = Self.clampedSourceOffset(sourceOffsetY)
+    }
+
+    static func clampedSourceScale(_ scale: Double) -> Double {
+        min(max(scale, sourceScaleRange.lowerBound), sourceScaleRange.upperBound)
+    }
+
+    static func clampedSourceOffset(_ offset: Double) -> Double {
+        min(max(offset, sourceOffsetRange.lowerBound), sourceOffsetRange.upperBound)
+    }
+}
+
 struct ProjectManifest: Codable {
     let captureID: UUID
     let name: String
@@ -73,6 +156,7 @@ struct ProjectManifest: Codable {
     let createdAt: Date
     let updatedAt: Date
     let captureSource: CaptureSource
+    let compositionLayout: CompositionLayout
     let recordingFileName: String
     let eventFileName: String
 
@@ -87,6 +171,7 @@ struct ProjectManifest: Codable {
         case createdAt
         case updatedAt
         case captureSource
+        case compositionLayout
         case recordingFileName
         case eventFileName
     }
@@ -101,6 +186,7 @@ struct ProjectManifest: Codable {
         createdAt: Date,
         updatedAt: Date,
         captureSource: CaptureSource,
+        compositionLayout: CompositionLayout = .default,
         recordingFileName: String,
         eventFileName: String
     ) {
@@ -113,6 +199,7 @@ struct ProjectManifest: Codable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.captureSource = captureSource
+        self.compositionLayout = compositionLayout
         self.recordingFileName = recordingFileName
         self.eventFileName = eventFileName
     }
@@ -129,6 +216,7 @@ struct ProjectManifest: Codable {
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
         captureSource = try container.decode(CaptureSource.self, forKey: .captureSource)
+        compositionLayout = try container.decodeIfPresent(CompositionLayout.self, forKey: .compositionLayout) ?? .default
         recordingFileName = try container.decode(String.self, forKey: .recordingFileName)
         eventFileName = try container.decode(String.self, forKey: .eventFileName)
     }
@@ -144,6 +232,7 @@ struct ProjectManifest: Codable {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(captureSource, forKey: .captureSource)
+        try container.encode(compositionLayout, forKey: .compositionLayout)
         try container.encode(recordingFileName, forKey: .recordingFileName)
         try container.encode(eventFileName, forKey: .eventFileName)
     }
@@ -1249,6 +1338,7 @@ struct RecordingInspectionSummary {
     let recordingURL: URL
     let videoAspectRatio: CGFloat
     let contentCoordinateSize: CGSize
+    let compositionLayout: CompositionLayout
     let captureSourceKind: CaptureTargetKind
     let captureSourceTitle: String
     let totalEventCount: Int
@@ -1262,6 +1352,62 @@ struct RecordingInspectionSummary {
     let duration: Double?
     let zoomMarkers: [ZoomPlanItem]
     let effectMarkers: [EffectPlanItem]
+
+    init(
+        bundleURL: URL,
+        bundleName: String,
+        captureID: UUID,
+        collectionName: String,
+        projectName: String,
+        captureType: CaptureType,
+        captureTitle: String,
+        createdAt: Date,
+        updatedAt: Date,
+        recordingURL: URL,
+        videoAspectRatio: CGFloat,
+        contentCoordinateSize: CGSize,
+        compositionLayout: CompositionLayout = .default,
+        captureSourceKind: CaptureTargetKind,
+        captureSourceTitle: String,
+        totalEventCount: Int,
+        cursorMovedCount: Int,
+        leftMouseDownCount: Int,
+        leftMouseUpCount: Int,
+        rightMouseDownCount: Int,
+        rightMouseUpCount: Int,
+        firstEventTimestamp: Double?,
+        lastEventTimestamp: Double?,
+        duration: Double?,
+        zoomMarkers: [ZoomPlanItem],
+        effectMarkers: [EffectPlanItem]
+    ) {
+        self.bundleURL = bundleURL
+        self.bundleName = bundleName
+        self.captureID = captureID
+        self.collectionName = collectionName
+        self.projectName = projectName
+        self.captureType = captureType
+        self.captureTitle = captureTitle
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.recordingURL = recordingURL
+        self.videoAspectRatio = videoAspectRatio
+        self.contentCoordinateSize = contentCoordinateSize
+        self.compositionLayout = compositionLayout
+        self.captureSourceKind = captureSourceKind
+        self.captureSourceTitle = captureSourceTitle
+        self.totalEventCount = totalEventCount
+        self.cursorMovedCount = cursorMovedCount
+        self.leftMouseDownCount = leftMouseDownCount
+        self.leftMouseUpCount = leftMouseUpCount
+        self.rightMouseDownCount = rightMouseDownCount
+        self.rightMouseUpCount = rightMouseUpCount
+        self.firstEventTimestamp = firstEventTimestamp
+        self.lastEventTimestamp = lastEventTimestamp
+        self.duration = duration
+        self.zoomMarkers = zoomMarkers
+        self.effectMarkers = effectMarkers
+    }
 
     var displayTitle: String {
         captureTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? bundleName : captureTitle

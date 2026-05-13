@@ -19,6 +19,7 @@ final class RecordingCoordinator {
     private var workspace: RecordingWorkspace?
     private var currentTarget: ShareableCaptureTarget?
     private var currentCaptureMetadata: CaptureMetadata?
+    private var currentCompositionLayout: CompositionLayout?
     private var isStopping = false
 
     init(
@@ -33,7 +34,12 @@ final class RecordingCoordinator {
         self.inputEventCaptureService = inputEventCaptureService
     }
 
-    func startRecording(target: ShareableCaptureTarget, outputDirectory: URL?, captureMetadata: CaptureMetadata) async {
+    func startRecording(
+        target: ShareableCaptureTarget,
+        outputDirectory: URL?,
+        captureMetadata: CaptureMetadata,
+        compositionLayout: CompositionLayout
+    ) async {
         guard workspace == nil else { return }
 
         do {
@@ -52,6 +58,7 @@ final class RecordingCoordinator {
             self.workspace = workspace
             currentTarget = target
             currentCaptureMetadata = captureMetadata
+            currentCompositionLayout = compositionLayout
             isStopping = false
 
             inputEventCaptureService.start()
@@ -104,7 +111,7 @@ final class RecordingCoordinator {
     }
 
     private func finalizeProject() async throws -> URL {
-        guard let workspace, let currentTarget, let currentCaptureMetadata else {
+        guard let workspace, let currentTarget, let currentCaptureMetadata, let currentCompositionLayout else {
             throw NSError(domain: "RecordingCoordinator", code: 2, userInfo: [NSLocalizedDescriptionKey: "Recording state is incomplete."])
         }
 
@@ -132,6 +139,7 @@ final class RecordingCoordinator {
                 pointsHeight: currentTarget.pointsHeight,
                 scaleFactor: currentTarget.scaleFactor
             ),
+            compositionLayout: currentCompositionLayout,
             recordingFileName: "recording.mov",
             eventFileName: "events.json"
         )
@@ -180,6 +188,7 @@ final class RecordingCoordinator {
         workspace = nil
         currentTarget = nil
         currentCaptureMetadata = nil
+        currentCompositionLayout = nil
         isStopping = false
         mediaWriterService.onSessionStart = nil
     }

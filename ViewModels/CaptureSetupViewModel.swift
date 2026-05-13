@@ -56,6 +56,7 @@ final class CaptureSetupViewModel: ObservableObject {
         didSet { persistLastUsedCaptureMetadata() }
     }
     @Published var captureTitle: String = ""
+    @Published var compositionLayout: CompositionLayout = .default
     @Published private(set) var libraryItems: [CaptureLibraryItem] = []
     @Published private(set) var libraryStatusMessage: String?
     @Published var sessionState: RecordingSessionState = .idle
@@ -367,7 +368,8 @@ final class CaptureSetupViewModel: ObservableObject {
         await recordingCoordinator.startRecording(
             target: selectedTarget,
             outputDirectory: projectBundleService.resolvedSelectedOutputDirectory(),
-            captureMetadata: currentCaptureMetadata
+            captureMetadata: currentCaptureMetadata,
+            compositionLayout: compositionLayout
         )
     }
 
@@ -1618,6 +1620,41 @@ final class CaptureSetupViewModel: ObservableObject {
     func setCurrentCaptureType(_ captureType: CaptureType) {
         self.captureType = captureType
         scheduleMetadataSave()
+    }
+
+    func setCompositionAspectRatio(_ aspectRatio: OutputAspectRatio) {
+        compositionLayout = CompositionLayout(
+            outputAspectRatio: aspectRatio,
+            sourceScale: compositionLayout.sourceScale,
+            sourceOffsetX: compositionLayout.sourceOffsetX,
+            sourceOffsetY: compositionLayout.sourceOffsetY
+        )
+    }
+
+    func setCompositionSourceScale(_ scale: Double) {
+        compositionLayout = CompositionLayout(
+            outputAspectRatio: compositionLayout.outputAspectRatio,
+            sourceScale: scale,
+            sourceOffsetX: compositionLayout.sourceOffsetX,
+            sourceOffsetY: compositionLayout.sourceOffsetY
+        )
+    }
+
+    func setCompositionSourceOffset(x: Double, y: Double) {
+        compositionLayout = CompositionLayout(
+            outputAspectRatio: compositionLayout.outputAspectRatio,
+            sourceScale: compositionLayout.sourceScale,
+            sourceOffsetX: x,
+            sourceOffsetY: y
+        )
+    }
+
+    func resetCompositionSourceTransform() {
+        compositionLayout = CompositionLayout(outputAspectRatio: compositionLayout.outputAspectRatio)
+    }
+
+    func resetCompositionLayout() {
+        compositionLayout = .default
     }
 
     func deleteSelectedMarker() {
