@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import AVKit
 import SwiftUI
 
@@ -727,8 +728,193 @@ extension ContentView {
         }
     }
 
+    var precisionLoupeFrameSize: CGSize {
+        CGSize(width: 214, height: 174)
+    }
+
+    func precisionLoupeFrame(
+        in fittedRect: CGRect,
+        offset: CGSize
+    ) -> CGRect {
+        let defaultFrame = defaultPrecisionLoupeFrame(in: fittedRect)
+        let offsetFrame = defaultFrame.offsetBy(dx: offset.width, dy: offset.height)
+        return clampedPrecisionLoupeFrame(offsetFrame, in: fittedRect)
+    }
+
+    func positionedPrecisionLoupe(
+        player: AVPlayer,
+        fittedRect: CGRect,
+        focusPoint: CGPoint,
+        offset: CGSize
+    ) -> some View {
+        let loupeFrame = precisionLoupeFrame(in: fittedRect, offset: offset)
+        return effectRegionPrecisionLoupe(
+            player: player,
+            stillFrame: activePrecisionLoupeFrame,
+            fittedRect: fittedRect,
+            focusPoint: focusPoint
+        )
+        .position(x: loupeFrame.midX, y: loupeFrame.midY)
+    }
+
+    func updateClickPointPrecisionLoupe(at point: CGPoint, fittedRect: CGRect) {
+        activeClickPointPrecisionPoint = point
+        preparePrecisionLoupeFrameIfNeeded()
+        withAnimation(.interactiveSpring(response: 0.18, dampingFraction: 0.82)) {
+            activeClickPointLoupeOffset = repelledPrecisionLoupeOffset(
+                for: point,
+                fittedRect: fittedRect,
+                currentOffset: activeClickPointLoupeOffset
+            )
+        }
+    }
+
+    func resetClickPointPrecisionLoupe() {
+        activeClickPointPrecisionPoint = nil
+        activeClickPointLoupeOffset = .zero
+        clearPrecisionLoupeFrame()
+    }
+
+    func updateEffectRegionPrecisionLoupe(at point: CGPoint, fittedRect: CGRect) {
+        activeEffectRegionPrecisionPoint = point
+        preparePrecisionLoupeFrameIfNeeded()
+        withAnimation(.interactiveSpring(response: 0.18, dampingFraction: 0.82)) {
+            activeEffectRegionLoupeOffset = repelledPrecisionLoupeOffset(
+                for: point,
+                fittedRect: fittedRect,
+                currentOffset: activeEffectRegionLoupeOffset
+            )
+        }
+    }
+
+    func updateEffectRegionPrecisionLoupeOffset(for point: CGPoint, fittedRect: CGRect) {
+        preparePrecisionLoupeFrameIfNeeded()
+        withAnimation(.interactiveSpring(response: 0.18, dampingFraction: 0.82)) {
+            activeEffectRegionLoupeOffset = repelledPrecisionLoupeOffset(
+                for: point,
+                fittedRect: fittedRect,
+                currentOffset: activeEffectRegionLoupeOffset
+            )
+        }
+    }
+
+    func resetEffectRegionPrecisionLoupe() {
+        activeEffectRegionPrecisionPoint = nil
+        activeEffectRegionHandle = nil
+        activeEffectRegionLoupeOffset = .zero
+        clearPrecisionLoupeFrame()
+    }
+
+    func preparePrecisionLoupeFrameIfNeeded() {
+        guard activePrecisionLoupeFrame == nil,
+              precisionLoupeFrameTask == nil,
+              let recordingURL = viewModel.recordingSummary?.recordingURL else {
+            return
+        }
+
+        let playbackTime = viewModel.currentPlaybackTime
+        precisionLoupeFrameTask = Task {
+            let asset = AVURLAsset(url: recordingURL)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
+            let time = CMTime(seconds: playbackTime, preferredTimescale: 600)
+
+            guard let cgImage = try? await generator.image(at: time).image else {
+                await MainActor.run {
+                    precisionLoupeFrameTask = nil
+                }
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                activePrecisionLoupeFrame = PrecisionLoupeFrame(
+                    image: NSImage(cgImage: cgImage, size: .zero),
+                    playbackTime: playbackTime
+                )
+                precisionLoupeFrameTask = nil
+            }
+        }
+    }
+
+    func clearPrecisionLoupeFrame() {
+        precisionLoupeFrameTask?.cancel()
+        precisionLoupeFrameTask = nil
+        activePrecisionLoupeFrame = nil
+    }
+
+    private func defaultPrecisionLoupeFrame(in fittedRect: CGRect) -> CGRect {
+        let size = precisionLoupeFrameSize
+        return CGRect(
+            x: fittedRect.maxX - size.width - 22,
+            y: fittedRect.minY + 22,
+            width: size.width,
+            height: size.height
+        )
+    }
+
+    private func repelledPrecisionLoupeOffset(
+        for pointerPoint: CGPoint,
+        fittedRect: CGRect,
+        currentOffset: CGSize,
+        comfortDistance: CGFloat = 34
+    ) -> CGSize {
+        let defaultFrame = defaultPrecisionLoupeFrame(in: fittedRect)
+        let currentFrame = precisionLoupeFrame(in: fittedRect, offset: currentOffset)
+        let expandedFrame = currentFrame.insetBy(dx: -comfortDistance, dy: -comfortDistance)
+
+        guard expandedFrame.contains(pointerPoint) else {
+            return currentOffset
+        }
+
+        let centre = CGPoint(x: currentFrame.midX, y: currentFrame.midY)
+        var vector = CGVector(dx: centre.x - pointerPoint.x, dy: centre.y - pointerPoint.y)
+        let length = max(sqrt((vector.dx * vector.dx) + (vector.dy * vector.dy)), 0.001)
+        if length < 0.01 {
+            vector = CGVector(dx: -1, dy: 1)
+        } else {
+            vector = CGVector(dx: vector.dx / length, dy: vector.dy / length)
+        }
+
+        let nearestX = min(max(pointerPoint.x, currentFrame.minX), currentFrame.maxX)
+        let nearestY = min(max(pointerPoint.y, currentFrame.minY), currentFrame.maxY)
+        let edgeDistance = hypot(pointerPoint.x - nearestX, pointerPoint.y - nearestY)
+        let proximity = min(max((comfortDistance - edgeDistance) / comfortDistance, 0), 1)
+        let pushDistance: CGFloat = 96 * proximity
+
+        let proposedOffset = CGSize(
+            width: currentOffset.width + (vector.dx * pushDistance),
+            height: currentOffset.height + (vector.dy * pushDistance)
+        )
+        let proposedFrame = defaultFrame.offsetBy(dx: proposedOffset.width, dy: proposedOffset.height)
+        let clampedFrame = clampedPrecisionLoupeFrame(proposedFrame, in: fittedRect)
+        return CGSize(
+            width: clampedFrame.minX - defaultFrame.minX,
+            height: clampedFrame.minY - defaultFrame.minY
+        )
+    }
+
+    private func clampedPrecisionLoupeFrame(
+        _ frame: CGRect,
+        in fittedRect: CGRect
+    ) -> CGRect {
+        let maxX = max(fittedRect.minX, fittedRect.maxX - frame.width)
+        let maxY = max(fittedRect.minY, fittedRect.maxY - frame.height)
+        return CGRect(
+            x: min(max(frame.minX, fittedRect.minX), maxX),
+            y: min(max(frame.minY, fittedRect.minY), maxY),
+            width: frame.width,
+            height: frame.height
+        )
+    }
+
     func effectRegionPrecisionLoupe(
         player: AVPlayer,
+        stillFrame: PrecisionLoupeFrame?,
         fittedRect: CGRect,
         focusPoint: CGPoint
     ) -> some View {
@@ -744,35 +930,35 @@ extension ContentView {
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.92))
 
-            PlaybackVideoLayerSurface(player: player)
-                .frame(width: fittedRect.width, height: fittedRect.height)
-                .scaleEffect(loupeScale, anchor: .topLeading)
-                .offset(
-                    x: (-localX * loupeScale) + (loupeSize.width / 2),
-                    y: (-localY * loupeScale) + (loupeSize.height / 2)
-                )
-                .frame(width: loupeSize.width, height: loupeSize.height, alignment: .topLeading)
-                .clipped()
-                .overlay {
-                    Rectangle()
-                        .stroke(Color.white.opacity(0.9), lineWidth: 1)
-                        .frame(width: 22, height: 22)
-                }
-                .overlay {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.85))
-                        .frame(width: 1, height: loupeSize.height)
-                }
-                .overlay {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.85))
-                        .frame(width: loupeSize.width, height: 1)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.orange, lineWidth: 2)
-                )
+            precisionLoupeSource(
+                player: player,
+                stillFrame: stillFrame,
+                fittedRect: fittedRect,
+                loupeSize: loupeSize,
+                loupeScale: loupeScale,
+                localX: localX,
+                localY: localY
+            )
+            .overlay {
+                Rectangle()
+                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                    .frame(width: 22, height: 22)
+            }
+            .overlay {
+                Rectangle()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: 1, height: loupeSize.height)
+            }
+            .overlay {
+                Rectangle()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: loupeSize.width, height: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.orange, lineWidth: 2)
+            )
         }
         .padding(12)
         .background(
@@ -783,6 +969,40 @@ extension ContentView {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
         )
+    }
+
+    @ViewBuilder
+    private func precisionLoupeSource(
+        player: AVPlayer,
+        stillFrame: PrecisionLoupeFrame?,
+        fittedRect: CGRect,
+        loupeSize: CGSize,
+        loupeScale: CGFloat,
+        localX: CGFloat,
+        localY: CGFloat
+    ) -> some View {
+        if let stillFrame {
+            Image(nsImage: stillFrame.image)
+                .resizable()
+                .frame(width: fittedRect.width, height: fittedRect.height)
+                .scaleEffect(loupeScale, anchor: .topLeading)
+                .offset(
+                    x: (-localX * loupeScale) + (loupeSize.width / 2),
+                    y: (-localY * loupeScale) + (loupeSize.height / 2)
+                )
+                .frame(width: loupeSize.width, height: loupeSize.height, alignment: .topLeading)
+                .clipped()
+        } else {
+            PlaybackVideoLayerSurface(player: player)
+                .frame(width: fittedRect.width, height: fittedRect.height)
+                .scaleEffect(loupeScale, anchor: .topLeading)
+                .offset(
+                    x: (-localX * loupeScale) + (loupeSize.width / 2),
+                    y: (-localY * loupeScale) + (loupeSize.height / 2)
+                )
+                .frame(width: loupeSize.width, height: loupeSize.height, alignment: .topLeading)
+                .clipped()
+        }
     }
 
 

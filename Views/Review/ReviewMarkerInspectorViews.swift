@@ -543,6 +543,7 @@ extension ContentView {
                         value: marker.holdStartTime,
                         range: 0...maxTimelineTime,
                         phase: .leadIn,
+                        activeHoldPoint: .holdStart,
                         action: setSelectedEffectHoldStartTimeAndFollowPlayback
                     )
                     pointTimingRow(
@@ -550,6 +551,7 @@ extension ContentView {
                         value: marker.holdEndTime,
                         range: 0...maxTimelineTime,
                         phase: .hold,
+                        activeHoldPoint: .holdEnd,
                         action: setSelectedEffectHoldEndTimeAndFollowPlayback
                     )
                     timingSliderRow(
@@ -667,7 +669,14 @@ extension ContentView {
         }
     }
 
-    func pointTimingRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
+    func pointTimingRow(
+        title: String,
+        value: Double,
+        range: ClosedRange<Double>,
+        phase: MarkerTimingPhase,
+        activeHoldPoint: ActiveEffectHoldPoint,
+        action: @escaping (Double) -> Void
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
@@ -677,14 +686,15 @@ extension ContentView {
                 PrecisionTimeField(
                     value: value,
                     range: range,
-                    action: action,
+                    action: { newValue in
+                        beginEffectHoldTimingEdit(activeHoldPoint, phase)
+                        action(newValue)
+                    },
                     onBeginEditing: {
-                        inspectorFocusedTimingPhase = phase
+                        beginEffectHoldTimingEdit(activeHoldPoint, phase)
                     },
                     onEndEditing: {
-                        if inspectorFocusedTimingPhase == phase {
-                            inspectorFocusedTimingPhase = nil
-                        }
+                        endEffectHoldTimingEdit(activeHoldPoint, phase)
                     }
                 )
                 .frame(width: 72, height: 22)
@@ -715,21 +725,76 @@ extension ContentView {
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
-                            inspectorFocusedTimingPhase = phase
+                            beginEffectHoldTimingEdit(activeHoldPoint, phase)
                             let localX = min(max(value.location.x - handleInset, 0), usableWidth)
                             let newFraction = usableWidth <= 0 ? 0 : localX / usableWidth
                             let newValue = lowerBound + (span * newFraction)
                             action(newValue)
                         }
                         .onEnded { _ in
-                            if inspectorFocusedTimingPhase == phase {
-                                inspectorFocusedTimingPhase = nil
-                            }
+                            endEffectHoldTimingEdit(activeHoldPoint, phase)
                         }
                 )
             }
             .frame(height: 18)
         }
+    }
+
+    func beginEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
+        realtimeEffectPreviewResumeTask?.cancel()
+        realtimeEffectPreviewResumeTask = nil
+        activeEffectHoldPoint = holdPoint
+        inspectorFocusedTimingPhase = phase
+        suppressRealtimeEffectPreviewDuringTimingEdit = true
+    }
+
+    func endEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
+        if inspectorFocusedTimingPhase == phase {
+            inspectorFocusedTimingPhase = nil
+        }
+        seekPlaybackToActiveEffectHoldPoint(holdPoint)
+        scheduleRealtimeEffectPreviewResume(for: holdPoint)
+    }
+
+    func seekPlaybackToActiveEffectHoldPoint(_ holdPoint: ActiveEffectHoldPoint) {
+        guard let marker = viewModel.selectedEffectMarker else { return }
+        switch holdPoint {
+        case .holdStart:
+            viewModel.seekPlaybackInteractively(to: marker.holdStartTime)
+        case .holdEnd:
+            viewModel.seekPlaybackInteractively(to: marker.holdEndTime)
+        }
+    }
+
+    func scheduleRealtimeEffectPreviewResume(for holdPoint: ActiveEffectHoldPoint) {
+        realtimeEffectPreviewResumeTask?.cancel()
+        realtimeEffectPreviewResumeTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 160_000_000)
+            guard !Task.isCancelled, activeEffectHoldPoint == holdPoint else { return }
+            suppressRealtimeEffectPreviewDuringTimingEdit = false
+            realtimeEffectPreviewResumeTask = nil
+        }
+    }
+
+    func nudgeActiveEffectHoldPoint(by delta: Double) {
+        guard let activeEffectHoldPoint else { return }
+        beginEffectHoldTimingEdit(
+            activeEffectHoldPoint,
+            activeEffectHoldPoint == .holdStart ? .leadIn : .hold
+        )
+
+        let currentMarker = viewModel.selectedEffectMarker
+        switch activeEffectHoldPoint {
+        case .holdStart:
+            let currentTime = currentMarker?.holdStartTime ?? viewModel.currentPlaybackTime
+            setSelectedEffectHoldStartTimeAndFollowPlayback(currentTime + delta)
+        case .holdEnd:
+            let currentTime = currentMarker?.holdEndTime ?? viewModel.currentPlaybackTime
+            setSelectedEffectHoldEndTimeAndFollowPlayback(currentTime + delta)
+        }
+
+        seekPlaybackToActiveEffectHoldPoint(activeEffectHoldPoint)
+        scheduleRealtimeEffectPreviewResume(for: activeEffectHoldPoint)
     }
 
     func setSelectedEffectHoldStartTimeAndFollowPlayback(_ time: Double) {

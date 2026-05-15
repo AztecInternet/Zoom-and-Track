@@ -43,6 +43,7 @@ extension ContentView {
                 let isDistortionMapOverlayVisible = viewModel.isShowingDistortionMapOverlay &&
                     editorMode == .effects &&
                     viewModel.selectedEffectDistortionOverlayImage != nil
+                let shouldSuppressRealtimeEffectPreview = suppressRealtimeEffectPreviewDuringTimingEdit
                 let previewState = isRenderedPreviewActive
                     ? nil
                     : isMarkerDragActive
@@ -59,6 +60,8 @@ extension ContentView {
                         contentCoordinateSize: contentCoordinateSize
                     )
                 let activeEffectState = isRenderedPreviewActive
+                    ? nil
+                    : shouldSuppressRealtimeEffectPreview
                     ? nil
                     : isEffectRegionDrawActive
                     ? nil
@@ -79,6 +82,7 @@ extension ContentView {
                     if let summary = viewModel.recordingSummary,
                        let selectedEffectMarker,
                        selectedEffectMarker.style == .distortion,
+                       !shouldSuppressRealtimeEffectPreview,
                        !isDistortionMapOverlayVisible,
                        !isEffectRegionDrawActive,
                        !isRenderedPreviewActive {
@@ -196,8 +200,10 @@ extension ContentView {
                                     in: geometry.size,
                                     videoAspectRatio: safeAspectRatio
                                 ) else {
+                                    resetClickPointPrecisionLoupe()
                                     return
                                 }
+                                updateClickPointPrecisionLoupe(at: value.location, fittedRect: fittedRect)
                                 dragSelectedMarkerAction(sourcePoint)
                             }
                             .onEnded { value in
@@ -208,9 +214,11 @@ extension ContentView {
                                     videoAspectRatio: safeAspectRatio
                                 ) else {
                                     pendingMarkerDragSourcePoint = nil
+                                    resetClickPointPrecisionLoupe()
                                     return
                                 }
                                 commitDraggedMarkerAction(sourcePoint)
+                                resetClickPointPrecisionLoupe()
                             }
                     )
                 }
@@ -237,6 +245,18 @@ extension ContentView {
                         .position(x: fittedRect.midX, y: fittedRect.midY)
                         .gesture(
                             DragGesture(minimumDistance: 0, coordinateSpace: .named("videoOverlay"))
+                                .onChanged { value in
+                                    guard sourcePoint(
+                                        for: value.location,
+                                        contentCoordinateSize: contentCoordinateSize,
+                                        in: geometry.size,
+                                        videoAspectRatio: safeAspectRatio
+                                    ) != nil else {
+                                        resetClickPointPrecisionLoupe()
+                                        return
+                                    }
+                                    updateClickPointPrecisionLoupe(at: value.location, fittedRect: fittedRect)
+                                }
                                 .onEnded { value in
                                     guard let sourcePoint = sourcePoint(
                                         for: value.location,
@@ -244,9 +264,11 @@ extension ContentView {
                                         in: geometry.size,
                                         videoAspectRatio: safeAspectRatio
                                     ) else {
+                                        resetClickPointPrecisionLoupe()
                                         return
                                     }
                                     placeClickFocusAction(sourcePoint)
+                                    resetClickPointPrecisionLoupe()
                                 }
                         )
                 }
@@ -383,10 +405,10 @@ extension ContentView {
                                                         effectFocusRegionInteractionBase = baseRegion
                                                     }
                                                     activeEffectRegionHandle = nil
-                                                    activeEffectRegionPrecisionPoint = CGPoint(
+                                                    updateEffectRegionPrecisionLoupe(at: CGPoint(
                                                         x: overlayRect.midX + value.translation.width,
                                                         y: overlayRect.midY + value.translation.height
-                                                    )
+                                                    ), fittedRect: fittedRect)
                                                     let deltaX = (value.translation.width / max(fittedRect.width, 1)) * contentCoordinateSize.width
                                                     let deltaY = (value.translation.height / max(fittedRect.height, 1)) * contentCoordinateSize.height
                                                     updateEffectFocusRegionAction(
@@ -401,10 +423,10 @@ extension ContentView {
                                                 .onEnded { value in
                                                     let baseRegion = effectFocusRegionInteractionBase ?? region
                                                     activeEffectRegionHandle = nil
-                                                    activeEffectRegionPrecisionPoint = CGPoint(
+                                                    updateEffectRegionPrecisionLoupe(at: CGPoint(
                                                         x: overlayRect.midX + value.translation.width,
                                                         y: overlayRect.midY + value.translation.height
-                                                    )
+                                                    ), fittedRect: fittedRect)
                                                     let deltaX = (value.translation.width / max(fittedRect.width, 1)) * contentCoordinateSize.width
                                                     let deltaY = (value.translation.height / max(fittedRect.height, 1)) * contentCoordinateSize.height
                                                     let movedRegion = movedEffectFocusRegion(
@@ -418,7 +440,7 @@ extension ContentView {
                                                         commitEffectFocusRegionAction(movedRegion)
                                                     }
                                                     effectFocusRegionInteractionBase = nil
-                                                    activeEffectRegionPrecisionPoint = nil
+                                                    resetEffectRegionPrecisionLoupe()
                                                 }
                                         )
 
@@ -454,6 +476,10 @@ extension ContentView {
                                                         }
                                                         activeEffectRegionHandle = handle
                                                         activeEffectRegionPrecisionPoint = nil
+                                                        updateEffectRegionPrecisionLoupeOffset(
+                                                            for: handlePoint,
+                                                            fittedRect: fittedRect
+                                                        )
                                                         let resizePoint = CGPoint(
                                                             x: value.location.x + fittedRect.minX,
                                                             y: value.location.y + fittedRect.minY
@@ -471,8 +497,6 @@ extension ContentView {
                                                     }
                                                     .onEnded { value in
                                                         let baseRegion = effectFocusRegionInteractionBase ?? region
-                                                        activeEffectRegionHandle = nil
-                                                        activeEffectRegionPrecisionPoint = nil
                                                         let resizePoint = CGPoint(
                                                             x: value.location.x + fittedRect.minX,
                                                             y: value.location.y + fittedRect.minY
@@ -490,7 +514,7 @@ extension ContentView {
                                                             commitEffectFocusRegionAction(resizedRegion)
                                                         }
                                                         effectFocusRegionInteractionBase = nil
-                                                        activeEffectRegionPrecisionPoint = nil
+                                                        resetEffectRegionPrecisionLoupe()
                                                     }
                                             )
                                     }
@@ -538,7 +562,7 @@ extension ContentView {
                                         )
                                     )
                                     activeEffectRegionHandle = nil
-                                    activeEffectRegionPrecisionPoint = value.location
+                                    updateEffectRegionPrecisionLoupe(at: value.location, fittedRect: fittedRect)
                                 }
                                 .onEnded { value in
                                     guard let startSourcePoint = sourcePoint(
@@ -564,8 +588,7 @@ extension ContentView {
                                         commitEffectFocusRegionAction(drawnRegion)
                                     }
                                     effectFocusRegionInteractionBase = nil
-                                    activeEffectRegionHandle = nil
-                                    activeEffectRegionPrecisionPoint = nil
+                                    resetEffectRegionPrecisionLoupe()
                                 }
                         )
                 }
@@ -586,14 +609,22 @@ extension ContentView {
 
                 if isEffectRegionDrawActive,
                    let focusPoint {
-                    effectRegionPrecisionLoupe(
+                    positionedPrecisionLoupe(
                         player: mainPlayer,
                         fittedRect: fittedRect,
-                        focusPoint: focusPoint
+                        focusPoint: focusPoint,
+                        offset: activeEffectRegionLoupeOffset
                     )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.top, 22)
-                    .padding(.trailing, 22)
+                    .allowsHitTesting(false)
+                }
+
+                if let focusPoint = activeClickPointPrecisionPoint {
+                    positionedPrecisionLoupe(
+                        player: mainPlayer,
+                        fittedRect: fittedRect,
+                        focusPoint: focusPoint,
+                        offset: activeClickPointLoupeOffset
+                    )
                     .allowsHitTesting(false)
                 }
             }
@@ -681,12 +712,14 @@ extension ContentView {
                         onToggleAddClickFocus: {
                             if isPlacingClickFocus {
                                 isPlacingClickFocus = false
+                                resetClickPointPrecisionLoupe()
                             } else {
                                 guard viewModel.selectedZoomMarkerID == nil else { return }
                                 viewModel.cancelPlaybackPreview()
                                 inspectorMode = .markers
                                 isPlaybackInspectorVisible = true
                                 pendingMarkerDragSourcePoint = nil
+                                resetClickPointPrecisionLoupe()
                                 isPlacingClickFocus = true
                             }
                         },
@@ -712,6 +745,7 @@ extension ContentView {
                                 isPlaybackInspectorVisible = true
                                 isPlacingClickFocus = false
                                 pendingMarkerDragSourcePoint = nil
+                                resetClickPointPrecisionLoupe()
                                 pendingNoZoomOverflowRegion = selectedMarker.noZoomOverflowRegion
                                 isDrawingNoZoomOverflowRegion = true
                                 isTimelineKeyboardFocused = true
@@ -734,8 +768,7 @@ extension ContentView {
                             viewModel.addEffectMarker()
                             pendingEffectFocusRegion = nil
                             effectFocusRegionInteractionBase = nil
-                            activeEffectRegionPrecisionPoint = nil
-                            activeEffectRegionHandle = nil
+                            resetEffectRegionPrecisionLoupe()
                             isDrawingEffectFocusRegion = true
                             autoCommitsEffectFocusRegionOnRelease = true
                             isTimelineKeyboardFocused = true
@@ -751,14 +784,14 @@ extension ContentView {
                                 viewModel.cancelPlaybackPreview()
                                 isPlacingClickFocus = false
                                 pendingMarkerDragSourcePoint = nil
+                                resetClickPointPrecisionLoupe()
                                 isDrawingNoZoomOverflowRegion = false
                                 pendingNoZoomOverflowRegion = nil
                                 inspectorMode = .markers
                                 isPlaybackInspectorVisible = true
                                 pendingEffectFocusRegion = selectedMarker.focusRegion
                                 effectFocusRegionInteractionBase = nil
-                                activeEffectRegionPrecisionPoint = nil
-                                activeEffectRegionHandle = nil
+                                resetEffectRegionPrecisionLoupe()
                                 isDrawingEffectFocusRegion = true
                                 autoCommitsEffectFocusRegionOnRelease = selectedMarker.focusRegion == nil
                                 isTimelineKeyboardFocused = true
@@ -797,6 +830,7 @@ extension ContentView {
                     hoveredTooltipAnchor: hoveredTimelineTooltipAnchor,
                     hoveredEffectTimelineMarkerID: hoveredEffectTimelineMarkerID,
                     selectedEffectMarkerID: viewModel.selectedEffectMarkerID,
+                    activeEffectHoldPoint: activeEffectHoldPoint,
                     hoveredEffectTooltipMarker: hoveredEffectTooltipEntry?.marker,
                     hoveredEffectTooltipMarkerNumber: hoveredEffectTooltipEntry?.markerNumber,
                     hoveredEffectTooltipAnchor: hoveredEffectTimelineTooltipAnchor,
@@ -972,6 +1006,23 @@ extension ContentView {
 
             if editorMode == .effects {
                 guard viewModel.selectedEffectMarkerID != nil else { return .ignored }
+                if activeEffectHoldPoint != nil {
+                    let nudgeAmount = keyPress.modifiers.contains(.command)
+                        ? 0.01
+                        : keyPress.modifiers.contains(.option)
+                        ? 1.0
+                        : 0.1
+                    switch keyPress.key {
+                    case .leftArrow:
+                        nudgeActiveEffectHoldPoint(by: -nudgeAmount)
+                        return .handled
+                    case .rightArrow:
+                        nudgeActiveEffectHoldPoint(by: nudgeAmount)
+                        return .handled
+                    default:
+                        return .ignored
+                    }
+                }
                 switch keyPress.key {
                 case .leftArrow:
                     viewModel.nudgeSelectedEffectTimelineMarker(by: -1)
@@ -1034,8 +1085,7 @@ extension ContentView {
         isDrawingEffectFocusRegion = false
         autoCommitsEffectFocusRegionOnRelease = false
         effectFocusRegionInteractionBase = nil
-        activeEffectRegionPrecisionPoint = nil
-        activeEffectRegionHandle = nil
+        resetEffectRegionPrecisionLoupe()
     }
 
     func playbackInfoPopover(_ summary: RecordingInspectionSummary) -> some View {

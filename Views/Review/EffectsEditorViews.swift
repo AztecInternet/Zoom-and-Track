@@ -99,6 +99,7 @@ struct EffectTimelineSegmentView: View {
     let isHovered: Bool
     let isEnabled: Bool
     let isPlaybackHighlighted: Bool
+    let activeHoldPoint: ContentView.ActiveEffectHoldPoint?
     let onHoverChanged: (Bool, CGPoint?) -> Void
     let onSelect: () -> Void
 
@@ -112,11 +113,12 @@ struct EffectTimelineSegmentView: View {
         let endX = CGFloat(layout.endRatio) * width
         let actualBarWidth = max(endX - startX, 1)
         let hitTargetWidth = max(actualBarWidth, 18)
+        let effectsAccent = FlowTrackAccent.color(for: .effects)
         let baseColor: Color = isSelected
-            ? .accentColor
-            : (isEnabled ? Color.orange.opacity(0.82) : Color.secondary.opacity(0.35))
-        let barColor = isPlaybackHighlighted ? Color.accentColor : baseColor
-        let hoverHighlightColor = (isSelected ? Color.accentColor : baseColor).opacity(isHovered ? (isEnabled ? 0.22 : 0.12) : 0)
+            ? effectsAccent
+            : (isEnabled ? effectsAccent.opacity(0.82) : Color.secondary.opacity(0.35))
+        let barColor = isPlaybackHighlighted ? effectsAccent : baseColor
+        let hoverHighlightColor = (isSelected ? effectsAccent : baseColor).opacity(isHovered ? (isEnabled ? 0.22 : 0.12) : 0)
         let hoverTargetHeight: CGFloat = laneHeight
         let hoverAnchor = CGPoint(x: startX + (actualBarWidth / 2), y: max(laneY - 20, 10))
         let highlightedBarWidth = actualBarWidth + 10
@@ -155,13 +157,13 @@ struct EffectTimelineSegmentView: View {
             .position(x: localBarCenterX, y: localCenterY)
 
             Capsule(style: .continuous)
-                .fill(Color.white.opacity(isSelected ? 0.92 : 0.72))
-                .frame(width: 3, height: isSelected ? 20 : 16)
+                .fill(activeHoldPoint == .holdStart ? Color.accentColor : Color.white.opacity(isSelected ? 0.92 : 0.72))
+                .frame(width: activeHoldPoint == .holdStart ? 5 : 3, height: activeHoldPoint == .holdStart ? 24 : (isSelected ? 20 : 16))
                 .position(x: localHoldStartX, y: localCenterY)
 
             Capsule(style: .continuous)
-                .fill(Color.white.opacity(isSelected ? 0.92 : 0.72))
-                .frame(width: 3, height: isSelected ? 20 : 16)
+                .fill(activeHoldPoint == .holdEnd ? Color.accentColor : Color.white.opacity(isSelected ? 0.92 : 0.72))
+                .frame(width: activeHoldPoint == .holdEnd ? 5 : 3, height: activeHoldPoint == .holdEnd ? 24 : (isSelected ? 20 : 16))
                 .position(x: localHoldEndX, y: localCenterY)
 
             if isHovered {
@@ -199,6 +201,7 @@ struct EffectsTimelineTrackView: View {
     let timelineInteractionSuppressed: Bool
     let hoveredEffectTimelineMarkerID: String?
     let selectedEffectMarkerID: String?
+    let activeEffectHoldPoint: ContentView.ActiveEffectHoldPoint?
     let hoveredTooltipMarker: EffectPlanItem?
     let hoveredTooltipMarkerNumber: Int?
     let hoveredTooltipAnchor: CGPoint?
@@ -217,6 +220,7 @@ struct EffectsTimelineTrackView: View {
                     isHovered: !timelineInteractionSuppressed && hoveredEffectTimelineMarkerID == layout.marker.id,
                     isEnabled: layout.marker.enabled,
                     isPlaybackHighlighted: playbackHighlightProvider(layout.marker),
+                    activeHoldPoint: selectedEffectMarkerID == layout.marker.id ? activeEffectHoldPoint : nil,
                     onHoverChanged: { isHovering, anchor in
                         onHoverChanged(layout.marker.id, isHovering, anchor)
                     },
@@ -535,7 +539,7 @@ struct EffectListTableView: NSViewRepresentable {
             let entryIDs = parent.entries.map(\.id)
             let selectionID = parent.selectedMarkerID
             let highlightSignature = parent.entries.map {
-                "\($0.id):\($0.isSelected):\($0.isPlaybackHighlighted):\($0.marker.markerName ?? ""):\($0.marker.enabled):\($0.marker.style.rawValue):\($0.marker.amount):\($0.marker.blurAmount):\($0.marker.darkenAmount):\($0.marker.tintAmount):\($0.marker.fadeInDuration):\($0.marker.fadeOutDuration):\($0.marker.cornerRadius):\($0.marker.feather)"
+                "\($0.id):\($0.isSelected):\($0.isPlaybackHighlighted):\($0.marker.markerName ?? ""):\($0.marker.enabled):\($0.marker.style.rawValue):\($0.marker.holdStartTime):\($0.marker.holdEndTime)"
             }.joined(separator: "|")
             let renamingMarkerID = parent.renamingMarkerID
 
@@ -579,14 +583,14 @@ private struct EffectListCellContent: View {
             : "Unnamed Effect"
         let isRenaming = renamingMarkerID == entry.id
         let backgroundFill: Color = entry.isPlaybackHighlighted
-            ? Color.accentColor.opacity(0.20)
+            ? FlowTrackAccent.subtleFill(for: .effects, opacity: 0.20)
             : entry.isSelected
-            ? Color.accentColor.opacity(0.12)
+            ? FlowTrackAccent.subtleFill(for: .effects, opacity: 0.12)
             : Color.clear
         let strokeColor: Color = entry.isPlaybackHighlighted
-            ? Color.accentColor.opacity(0.55)
+            ? FlowTrackAccent.selectedStroke(for: .effects, opacity: 0.55)
             : entry.isSelected
-            ? Color.accentColor.opacity(0.35)
+            ? FlowTrackAccent.selectedStroke(for: .effects)
             : Color.secondary.opacity(0.08)
 
         HStack(alignment: .top, spacing: 10) {
@@ -659,41 +663,19 @@ private struct EffectListCellContent: View {
                     Spacer(minLength: 0)
                 }
 
-                HStack(spacing: 12) {
-                    Label {
-                        Text(effectAmountSummary(for: marker))
-                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                    } icon: {
-                        Image(systemName: "dial.medium")
-                    }
-
-                    Label {
-                        Text(String(format: "%.2fs / %.2fs", marker.fadeInDuration, marker.fadeOutDuration))
-                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                    } icon: {
-                        Image(systemName: "timer")
-                    }
-
-                    Label {
-                        Text(String(format: "%.2fs", max(marker.holdDuration, 0.05)))
-                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                    } icon: {
-                        Image(systemName: "pause.rectangle")
-                    }
-
-                    Label {
-                        Text(String(format: "%.0f", marker.cornerRadius))
-                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                    } icon: {
-                        Image(systemName: "roundedcorners")
-                    }
-
-                    Label {
-                        Text(String(format: "%.0f", marker.feather))
-                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                    } icon: {
-                        Image(systemName: "drop.degreesign")
-                    }
+                HStack(spacing: 8) {
+                    Image(systemName: "timeline.selection")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(FlowTrackAccent.color(for: .effects))
+                    Text(timecodeString(marker.holdStartTime))
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .fixedSize(horizontal: true, vertical: false)
+                    Image(systemName: "arrowshape.left.arrowshape.right.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text(timecodeString(marker.holdEndTime))
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
@@ -713,7 +695,7 @@ private struct EffectListCellContent: View {
         .overlay(alignment: .leading) {
             if entry.isPlaybackHighlighted {
                 Capsule(style: .continuous)
-                    .fill(Color.accentColor)
+                    .fill(FlowTrackAccent.color(for: .effects))
                     .frame(width: 4)
                     .padding(.vertical, 8)
                     .padding(.leading, 2)
@@ -759,22 +741,6 @@ private struct EffectListCellContent: View {
         return String(format: "%02d:%02d:%02d:%02d", hours, minutes, secs, frames)
     }
 
-    private func effectAmountSummary(for marker: EffectPlanItem) -> String {
-        switch marker.style {
-        case .blur:
-            return String(format: "B %.0f%%", marker.blurAmount * 100)
-        case .darken:
-            return String(format: "D %.0f%%", marker.darkenAmount * 100)
-        case .distortion, .heatHazeEdge:
-            let preset = (marker.distortion ?? .defaultConfiguration).preset
-            let label = preset == .atmospheric ? "A" : "H"
-            return String(format: "%@ %.0f%%", label, marker.amount * 100)
-        case .tint:
-            return String(format: "T %.0f%%", marker.tintAmount * 100)
-        case .blurDarken:
-            return String(format: "B %.0f%% D %.0f%%", marker.blurAmount * 100, marker.darkenAmount * 100)
-        }
-    }
 }
 
 private final class EffectListHostingCellView: NSTableCellView {

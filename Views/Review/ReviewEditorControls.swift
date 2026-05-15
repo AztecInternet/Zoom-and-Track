@@ -15,7 +15,7 @@ struct ReviewEditorModeControlStrip: View {
         HStack(spacing: 10) {
             Text("editor")
                 .font(.system(size: 10, weight: .light))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(FlowTrackAccent.color(for: editorMode.accentRole))
 
             HStack(spacing: 2) {
                 ForEach(ReviewEditorMode.allCases) { mode in
@@ -65,7 +65,7 @@ struct EffectsPlaceholderControlStrip: View {
         HStack(spacing: 10) {
             Text("effects")
                 .font(.system(size: 10, weight: .light))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(FlowTrackAccent.color(for: .effects))
 
             HStack(spacing: 2) {
                 Text("mode")
@@ -124,4 +124,15 @@ func accentContrastingTextColor() -> Color {
     let accent = NSColor.controlAccentColor.usingColorSpace(.deviceRGB) ?? .systemBlue
     let brightness = (0.299 * accent.redComponent) + (0.587 * accent.greenComponent) + (0.114 * accent.blueComponent)
     return brightness > 0.7 ? Color.black.opacity(0.8) : .white
+}
+
+extension ReviewEditorMode {
+    var accentRole: FlowTrackAccentRole {
+        switch self {
+        case .zoomAndClicks:
+            return .zoomAndClicks
+        case .effects:
+            return .effects
+        }
+    }
 }

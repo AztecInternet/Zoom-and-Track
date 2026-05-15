@@ -37,14 +37,22 @@ struct ContentView: View {
     @State var exportShareAnchorView: NSView?
     @State var isPlacingClickFocus = false
     @State var pendingMarkerDragSourcePoint: CGPoint?
+    @State var activeClickPointPrecisionPoint: CGPoint?
+    @State var activeClickPointLoupeOffset: CGSize = .zero
+    @State var activePrecisionLoupeFrame: PrecisionLoupeFrame?
+    @State var precisionLoupeFrameTask: Task<Void, Never>?
     @State var isDrawingNoZoomOverflowRegion = false
     @State var pendingNoZoomOverflowRegion: NoZoomOverflowRegion?
     @State var isDrawingEffectFocusRegion = false
+    @State var suppressRealtimeEffectPreviewDuringTimingEdit = false
+    @State var activeEffectHoldPoint: ActiveEffectHoldPoint?
+    @State var realtimeEffectPreviewResumeTask: Task<Void, Never>?
     @State var autoCommitsEffectFocusRegionOnRelease = false
     @State var pendingEffectFocusRegion: EffectFocusRegion?
     @State var effectFocusRegionInteractionBase: EffectFocusRegion?
     @State var activeEffectRegionPrecisionPoint: CGPoint?
     @State var activeEffectRegionHandle: EffectRegionHandle?
+    @State var activeEffectRegionLoupeOffset: CGSize = .zero
     @State var activeTimelineMarkerDragID: String?
     @State var activeTimelineMarkerDragStartTime: Double?
     @State var librarySearchText = ""
@@ -86,6 +94,11 @@ struct ContentView: View {
         let tintColor: Color
     }
 
+    struct PrecisionLoupeFrame {
+        let image: NSImage
+        let playbackTime: Double
+    }
+
     enum EffectRegionHandle: Hashable {
         case topLeading
         case topCenter
@@ -95,6 +108,11 @@ struct ContentView: View {
         case bottomLeading
         case bottomCenter
         case bottomTrailing
+    }
+
+    enum ActiveEffectHoldPoint {
+        case holdStart
+        case holdEnd
     }
 
     struct ZoomStateEvent {
@@ -344,6 +362,7 @@ struct ContentView: View {
                                 placeClickFocusAction: { sourcePoint in
                                     viewModel.addClickFocusMarker(at: sourcePoint)
                                     pendingMarkerDragSourcePoint = nil
+                                    resetClickPointPrecisionLoupe()
                                     isPlacingClickFocus = false
                                 },
                                 dragSelectedMarkerAction: { sourcePoint in
@@ -352,6 +371,7 @@ struct ContentView: View {
                                 commitDraggedMarkerAction: { sourcePoint in
                                     viewModel.moveSelectedMarker(to: sourcePoint)
                                     pendingMarkerDragSourcePoint = nil
+                                    resetClickPointPrecisionLoupe()
                                 },
                                 updateNoZoomOverflowRegionAction: { region in
                                     pendingNoZoomOverflowRegion = region
@@ -386,6 +406,7 @@ struct ContentView: View {
                         isScrubbingPlayback = false
                         isPlacingClickFocus = false
                         pendingMarkerDragSourcePoint = nil
+                        resetClickPointPrecisionLoupe()
                     }
                     .onChange(of: viewModel.currentPlaybackTime) {
                         guard !isScrubbingPlayback else { return }
@@ -395,6 +416,7 @@ struct ContentView: View {
                         finishEffectFocusRegionDrawing()
                         isPlacingClickFocus = false
                         pendingMarkerDragSourcePoint = nil
+                        resetClickPointPrecisionLoupe()
                         isDrawingNoZoomOverflowRegion = false
                         pendingNoZoomOverflowRegion = nil
                         activeTimelineMarkerDragID = nil

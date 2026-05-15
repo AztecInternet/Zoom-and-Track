@@ -46,6 +46,7 @@
 		DD88BC972FABDFD800BFFBBF /* TimelineScrubManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD88BC962FABDFD800BFFBBF /* TimelineScrubManager.swift */; };
 		DD88BC9B2FAEF0BC00BFFBBF /* RealtimeEffectPreviewSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD88BC9A2FAEF0BC00BFFBBF /* RealtimeEffectPreviewSurface.swift */; };
 		DDA524B92FB47F36001B74F0 /* CreatorEffectDefaultsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA524B82FB47F36001B74F0 /* CreatorEffectDefaultsService.swift */; };
+		DDA524BB2FB664F2001B74F0 /* FlowTrackAccent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA524BA2FB664F2001B74F0 /* FlowTrackAccent.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -89,6 +90,7 @@
 		DD88BC9A2FAEF0BC00BFFBBF /* RealtimeEffectPreviewSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeEffectPreviewSurface.swift; sourceTree = "<group>"; };
 		DD9203042F9D6A80003C3C1A /* FlowTrack Capture.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "FlowTrack Capture.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DDA524B82FB47F36001B74F0 /* CreatorEffectDefaultsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatorEffectDefaultsService.swift; sourceTree = "<group>"; };
+		DDA524BA2FB664F2001B74F0 /* FlowTrackAccent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackAccent.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -234,6 +236,7 @@
 			children = (
 				DD88BC902FABCCC800BFFBBF /* TimecodeFormatting.swift */,
 				DD88BC922FABD3E600BFFBBF /* ExportProgressSheetViews.swift */,
+				DDA524BA2FB664F2001B74F0 /* FlowTrackAccent.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -342,6 +345,7 @@
 				DDA524B92FB47F36001B74F0 /* CreatorEffectDefaultsService.swift in Sources */,
 				DD88BC6D2FAAA39800BFFBBF /* CaptureInfoInspectorViews.swift in Sources */,
 				DD88BC562FA8562800BFFBBF /* EffectsEditorViews.swift in Sources */,
+				DDA524BB2FB664F2001B74F0 /* FlowTrackAccent.swift in Sources */,
 				DD88BC732FAAAFF900BFFBBF /* CaptureSetupViews.swift in Sources */,
 				DD88BC572FA8562800BFFBBF /* InputEventCaptureService.swift in Sources */,
 				DD88BC832FABA9AC00BFFBBF /* CaptureMetadataManager.swift in Sources */,
