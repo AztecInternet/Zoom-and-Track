@@ -10,29 +10,41 @@ enum EditInspectorMode: String, CaseIterable, Identifiable {
 
 struct InspectorSectionHeaderView: View {
     let title: String
+    let accentRole: FlowTrackAccentRole?
+
+    init(title: String, accentRole: FlowTrackAccentRole? = nil) {
+        self.title = title
+        self.accentRole = accentRole
+    }
 
     var body: some View {
         Text(title.uppercased())
             .font(.system(size: 11, weight: .semibold))
             .tracking(0.8)
-            .foregroundStyle(Color.accentColor)
+            .foregroundStyle(.secondary)
     }
 }
 
 struct EffectsInspectorPlaceholderView: View {
     let effectMarkerCount: Int
+    let accentRole: FlowTrackAccentRole?
+
+    init(effectMarkerCount: Int, accentRole: FlowTrackAccentRole? = nil) {
+        self.effectMarkerCount = effectMarkerCount
+        self.accentRole = accentRole
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
-                InspectorSectionHeaderView(title: "Effects")
+                InspectorSectionHeaderView(title: "Effects", accentRole: accentRole)
                 Text("Create effect markers from the timeline, then select one to tune its style, timing, and focus region.")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                InspectorSectionHeaderView(title: "Status")
+                InspectorSectionHeaderView(title: "Status", accentRole: accentRole)
                 Text(effectMarkerCount == 0 ? "No effect markers yet" : "\(effectMarkerCount) effect marker" + (effectMarkerCount == 1 ? "" : "s"))
                     .font(.system(size: 13, weight: .medium))
                 Text("Zoom & Click bars remain visible in the timeline as non-editable grey reference guides while you are in Effects mode.")
@@ -662,6 +674,7 @@ struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
     let editorMode: ReviewEditorMode
     @Binding var inspectorMode: EditInspectorMode
     let effectMarkerCount: Int
+    let accentRole: FlowTrackAccentRole?
     @ViewBuilder let primaryContent: PrimaryContent
     @ViewBuilder let effectsContent: EffectsContent
 
@@ -669,32 +682,50 @@ struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
         editorMode: ReviewEditorMode,
         inspectorMode: Binding<EditInspectorMode>,
         effectMarkerCount: Int,
+        accentRole: FlowTrackAccentRole? = nil,
         @ViewBuilder primaryContent: () -> PrimaryContent,
         @ViewBuilder effectsContent: () -> EffectsContent
     ) {
         self.editorMode = editorMode
         self._inspectorMode = inspectorMode
         self.effectMarkerCount = effectMarkerCount
+        self.accentRole = accentRole
         self.primaryContent = primaryContent()
         self.effectsContent = effectsContent()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if inspectorMode == .captureInfo {
-                Text("Capture Info")
-                    .font(.system(size: 16, weight: .semibold))
-            } else if editorMode == .effects {
-                Text("Effects Inspector")
-                    .font(.system(size: 16, weight: .semibold))
-            } else {
-                Text("Zoom & Clicks Inspector")
-                    .font(.system(size: 16, weight: .semibold))
+        let resolvedAccentRole: FlowTrackAccentRole? = inspectorMode == .captureInfo
+            ? nil
+            : (accentRole ?? (editorMode == .effects ? .effects : .zoomAndClicks))
+        let headerText: (title: String, subtitle: String?) = {
+            switch inspectorMode {
+            case .captureInfo:
+                return ("Capture Info", nil)
+            case .markers:
+                if editorMode == .effects {
+                    return ("Effects Inspector", "Editing effect timing, style, and focus region")
+                } else {
+                    return ("Zoom & Clicks Inspector", "Editing marker timing and click behavior")
+                }
             }
-                
+        }()
+
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(headerText.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                if let subtitle = headerText.subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             VStack(alignment: .leading, spacing: 8) {
-                InspectorSectionHeaderView(title: "Mode")
+                InspectorSectionHeaderView(title: "Mode", accentRole: resolvedAccentRole)
 
                 Picker("Mode", selection: $inspectorMode) {
                     ForEach(EditInspectorMode.allCases) { mode in

@@ -2,11 +2,17 @@ import AppKit
 import SwiftUI
 
 extension ContentView {
+    private var inspectorAccentRole: FlowTrackAccentRole {
+        editorMode == .effects ? .effects : .zoomAndClicks
+    }
+
     func markerInspectorCard(_ summary: RecordingInspectionSummary) -> some View {
-        ReviewInspectorCard(
+        let accentRole = inspectorMode == .captureInfo ? nil : inspectorAccentRole
+        return ReviewInspectorCard(
             editorMode: editorMode,
             inspectorMode: $inspectorMode,
-            effectMarkerCount: summary.effectMarkers.count
+            effectMarkerCount: summary.effectMarkers.count,
+            accentRole: accentRole
         ) {
             Group {
                 switch inspectorMode {
@@ -21,10 +27,27 @@ extension ContentView {
         }
         .padding(20)
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(cardBackground)
+        .background {
+            inspectorCardBackground(accentRole: accentRole)
+        }
+    }
+
+    @ViewBuilder
+    private func inspectorCardBackground(accentRole: FlowTrackAccentRole?) -> some View {
+        ZStack {
+            cardBackground
+
+            if let accentRole {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(FlowTrackAccent.panelFill(for: accentRole))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(FlowTrackAccent.panelBorder(for: accentRole), lineWidth: 1)
+            }
+        }
     }
 
     func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
+        let accentRole = inspectorAccentRole
         let displayedMarkers = displayedEffectMarkerList(summary.effectMarkers)
         let entries = displayedMarkers.enumerated().map { index, marker in
             EffectListEntry(
@@ -37,7 +60,7 @@ extension ContentView {
 
         return ResizableInspectorSplitView {
             VStack(alignment: .leading, spacing: 10) {
-                InspectorSectionHeaderView(title: "Effects")
+                InspectorSectionHeaderView(title: "Effects", accentRole: accentRole)
 
                 if entries.isEmpty {
                     Text("No effect markers")
@@ -82,6 +105,7 @@ extension ContentView {
     }
 
     func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
+        let accentRole = inspectorAccentRole
         let displayedMarkers = displayedMarkerList(summary.zoomMarkers)
         let entries = displayedMarkers.enumerated().map { index, marker in
             MarkerListEntry(
@@ -94,7 +118,7 @@ extension ContentView {
 
         return ResizableInspectorSplitView {
             VStack(alignment: .leading, spacing: 10) {
-                InspectorSectionHeaderView(title: "Markers")
+                InspectorSectionHeaderView(title: "Markers", accentRole: accentRole)
 
                 if entries.isEmpty {
                     Text("No markers")
@@ -146,17 +170,19 @@ extension ContentView {
         isGhosted: Bool,
         isLiftedPreview: Bool,
         showsDropTarget: Bool,
+        accentRole: FlowTrackAccentRole,
         dragProvider: (() -> NSItemProvider)? = nil
     ) -> AnyView {
+        let selectionColor = Color.accentColor
         let backgroundFill: Color = isPlaybackHighlighted
-            ? Color.accentColor.opacity(0.20)
+            ? selectionColor.opacity(0.16)
             : isSelected
-            ? Color.accentColor.opacity(0.12)
+            ? selectionColor.opacity(0.10)
             : Color.clear
         let strokeColor: Color = isPlaybackHighlighted
-            ? Color.accentColor.opacity(0.55)
+            ? selectionColor.opacity(0.42)
             : isSelected
-            ? Color.accentColor.opacity(0.35)
+            ? selectionColor.opacity(0.28)
             : Color.secondary.opacity(0.08)
 
         return AnyView(VStack(alignment: .leading, spacing: 6) {
@@ -182,7 +208,17 @@ extension ContentView {
                 }
                 Text("#\(markerNumber)")
                     .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 26, alignment: .leading)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.secondary.opacity(isSelected ? 0.12 : 0.08))
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(Color.secondary.opacity(isSelected ? 0.22 : 0.12), lineWidth: 1)
+                    )
                 Text(timecodeString(for: marker.sourceEventTimestamp))
                     .font(.system(size: 11, design: .monospaced))
                     .frame(width: 88, alignment: .leading)
@@ -234,7 +270,7 @@ extension ContentView {
         .overlay(alignment: .leading) {
             if isPlaybackHighlighted {
                 Capsule(style: .continuous)
-                    .fill(Color.accentColor)
+                    .fill(selectionColor)
                     .frame(width: 4)
                     .padding(.vertical, 8)
                     .padding(.leading, 2)
@@ -243,7 +279,7 @@ extension ContentView {
         .overlay(alignment: .top) {
             if showsDropTarget {
                 Capsule(style: .continuous)
-                    .fill(Color.accentColor.opacity(0.8))
+                    .fill(selectionColor.opacity(0.8))
                     .frame(width: 110, height: 4)
                     .offset(y: -2)
             }
@@ -264,7 +300,8 @@ extension ContentView {
         isSelected: Bool,
         isPlaybackHighlighted: Bool
     ) -> AnyView {
-        AnyView(markerListRow(
+        let accentRole = inspectorAccentRole
+        return AnyView(markerListRow(
             marker: marker,
             markerNumber: markerNumber,
             isSelected: isSelected,
@@ -272,6 +309,7 @@ extension ContentView {
             isGhosted: false,
             isLiftedPreview: true,
             showsDropTarget: false,
+            accentRole: accentRole,
             dragProvider: nil
         )
         .frame(width: 280))
@@ -279,6 +317,7 @@ extension ContentView {
 
     @ViewBuilder
     var markerEditorSection: some View {
+        let accentRole = inspectorAccentRole
         if let marker = viewModel.selectedZoomMarker {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -313,7 +352,7 @@ extension ContentView {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    InspectorSectionHeaderView(title: "Timing")
+                    InspectorSectionHeaderView(title: "Timing", accentRole: accentRole)
 
                     switch marker.zoomType {
                     case .inOut:
@@ -395,6 +434,7 @@ extension ContentView {
 
                 if marker.isClickFocus {
                     ClickPulseSelectorControl(
+                        accentRole: accentRole,
                         selectedPreset: marker.clickPulse?.preset,
                         onSelectOff: {
                             viewModel.setSelectedMarkerClickPulseEnabled(false)
@@ -408,7 +448,7 @@ extension ContentView {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 6) {
-                            InspectorSectionHeaderView(title: "Zoom Type")
+                            InspectorSectionHeaderView(title: "Zoom Type", accentRole: accentRole)
                             Picker("Zoom Type", selection: Binding(
                                 get: { marker.zoomType },
                                 set: { viewModel.setSelectedMarkerZoomType($0) }
@@ -473,6 +513,7 @@ extension ContentView {
 
     @ViewBuilder
     var effectEditorSection: some View {
+        let accentRole = inspectorAccentRole
         if let marker = viewModel.selectedEffectMarker {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -488,7 +529,7 @@ extension ContentView {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        InspectorSectionHeaderView(title: "Style")
+                        InspectorSectionHeaderView(title: "Style", accentRole: accentRole)
                         Spacer()
                         if supportsCreatorDefaults(marker.style) {
                             Menu {
@@ -534,7 +575,7 @@ extension ContentView {
                 effectAmountEditorSection(for: marker)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    InspectorSectionHeaderView(title: "Timing")
+                    InspectorSectionHeaderView(title: "Timing", accentRole: accentRole)
                     let maxTimelineTime = max(viewModel.recordingSummary?.duration ?? marker.endTime, marker.holdEndTime)
                     let maxFadeInDuration = max(min(3.0, marker.holdStartTime), 0)
                     let maxFadeOutDuration = max(min(3.0, maxTimelineTime - marker.holdEndTime), 0)
@@ -900,7 +941,7 @@ extension ContentView {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("GLOW EFFECTS")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Edge Palette")
                             .font(.system(size: 12, weight: .semibold))
@@ -976,6 +1017,7 @@ extension ContentView {
 }
 
 private struct ClickPulseSelectorControl: View {
+    let accentRole: FlowTrackAccentRole
     let selectedPreset: ClickPulsePreset?
     let onSelectOff: () -> Void
     let onSelectPreset: (ClickPulsePreset) -> Void
@@ -991,7 +1033,7 @@ private struct ClickPulseSelectorControl: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            InspectorSectionHeaderView(title: "Click Pulse")
+            InspectorSectionHeaderView(title: "Click Pulse", accentRole: accentRole)
 
             Button {
                 isPopoverPresented.toggle()

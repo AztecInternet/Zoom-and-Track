@@ -1,43 +1,45 @@
 # Swift Symbols
 
-Generated: 2026-05-14 22:21:51
+Generated: 2026-05-15 03:58:08
 
 ## App/ContentView.swift
 
 - Line 12:struct ContentView: View {
-- Line 72:    struct OverlayMapping {
-- Line 81:    struct ZoomPreviewState {
-- Line 86:    struct EffectPreviewState {
-- Line 97:    struct PrecisionLoupeFrame {
-- Line 102:    enum EffectRegionHandle: Hashable {
-- Line 113:    enum ActiveEffectHoldPoint {
-- Line 118:    struct ZoomStateEvent {
-- Line 124:    enum MotionDirection {
-- Line 129:    struct MotionProgressSample {
-- Line 171:    enum CaptureInfoField: Hashable {
-- Line 177:    enum MotionTuning {
-- Line 185:    struct LibraryFilterOption: Identifiable {
-- Line 451:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
-- Line 471:    func mappedOverlayPoint(
-- Line 510:    func infoRow(title: String, value: String) -> some View {
-- Line 521:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
-- Line 560:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
-- Line 576:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
-- Line 583:    func clearTimelineHover() {
-- Line 592:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
-- Line 597:    func clearEffectTimelineHover() {
-- Line 602:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
-- Line 612:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
-- Line 621:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
-- Line 636:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
-- Line 648:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
-- Line 652:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
-- Line 673:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
-- Line 745:struct SharingAnchorView: NSViewRepresentable {
-- Line 748:    func makeNSView(context: Context) -> NSView {
-- Line 756:    func updateNSView(_ nsView: NSView, context: Context) {
-- Line 767:enum AppTab: String, CaseIterable, Identifiable {
-- Line 789:struct MarkerListEntry: Identifiable {
+- Line 73:    struct OverlayMapping {
+- Line 82:    struct ZoomPreviewState {
+- Line 87:    struct EffectPreviewState {
+- Line 98:    struct PrecisionLoupeFrame {
+- Line 103:    enum EffectRegionHandle: Hashable {
+- Line 114:    enum ActiveEffectHoldPoint {
+- Line 119:    struct ZoomStateEvent {
+- Line 125:    enum MotionDirection {
+- Line 130:    struct MotionProgressSample {
+- Line 172:    enum CaptureInfoField: Hashable {
+- Line 178:    enum MotionTuning {
+- Line 186:    struct LibraryFilterOption: Identifiable {
+- Line 471:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
+- Line 491:    func mappedOverlayPoint(
+- Line 530:    func infoRow(title: String, value: String) -> some View {
+- Line 541:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
+- Line 585:    func reviewHeaderActionIcon(_ systemName: String, action: ReviewHeaderAction) -> some View {
+- Line 600:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
+- Line 613:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
+- Line 620:    func clearTimelineHover() {
+- Line 629:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
+- Line 634:    func clearEffectTimelineHover() {
+- Line 639:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
+- Line 649:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
+- Line 658:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
+- Line 673:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
+- Line 685:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
+- Line 689:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
+- Line 710:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
+- Line 782:struct SharingAnchorView: NSViewRepresentable {
+- Line 785:    func makeNSView(context: Context) -> NSView {
+- Line 793:    func updateNSView(_ nsView: NSView, context: Context) {
+- Line 804:enum ReviewHeaderAction {
+- Line 810:enum AppTab: String, CaseIterable, Identifiable {
+- Line 845:struct MarkerListEntry: Identifiable {
 
 ## App/TutorialCaptureApp.swift
 
@@ -373,18 +375,18 @@ Generated: 2026-05-14 22:21:51
 
 - Line 3:extension ContentView {
 - Line 113:    func libraryCaptureRow(_ item: CaptureLibraryItem) -> some View {
-- Line 242:    func libraryMetadataPill(text: String, systemName: String) -> some View {
-- Line 258:    func matchesLibrarySearch(_ item: CaptureLibraryItem) -> Bool {
-- Line 270:    func matchesLibraryCollectionFilter(_ item: CaptureLibraryItem) -> Bool {
-- Line 275:    func matchesLibraryProjectFilter(_ item: CaptureLibraryItem) -> Bool {
-- Line 280:    func matchesLibraryTypeFilter(_ item: CaptureLibraryItem) -> Bool {
-- Line 354:    func buildLibraryFilterOptions(
-- Line 364:    func libraryFilterSection(
-- Line 449:    func activeLibraryFilterChip(title: String, removeAction: @escaping () -> Void) -> some View {
-- Line 473:    func toggleLibraryCollectionFilter(_ collectionName: String) {
-- Line 485:    func toggleLibraryProjectFilter(_ projectName: String) {
-- Line 493:    func toggleLibraryTypeFilter(_ type: CaptureType) {
-- Line 497:    func clearLibraryFilters() {
+- Line 243:    func libraryMetadataPill(text: String, systemName: String) -> some View {
+- Line 259:    func matchesLibrarySearch(_ item: CaptureLibraryItem) -> Bool {
+- Line 271:    func matchesLibraryCollectionFilter(_ item: CaptureLibraryItem) -> Bool {
+- Line 276:    func matchesLibraryProjectFilter(_ item: CaptureLibraryItem) -> Bool {
+- Line 281:    func matchesLibraryTypeFilter(_ item: CaptureLibraryItem) -> Bool {
+- Line 355:    func buildLibraryFilterOptions(
+- Line 365:    func libraryFilterSection(
+- Line 450:    func activeLibraryFilterChip(title: String, removeAction: @escaping () -> Void) -> some View {
+- Line 474:    func toggleLibraryCollectionFilter(_ collectionName: String) {
+- Line 486:    func toggleLibraryProjectFilter(_ projectName: String) {
+- Line 494:    func toggleLibraryTypeFilter(_ type: CaptureType) {
+- Line 498:    func clearLibraryFilters() {
 
 ## Views/Review/CaptureInfoInspectorViews.swift
 
@@ -469,51 +471,51 @@ Generated: 2026-05-14 22:21:51
 
 - Line 4:enum EditInspectorMode: String, CaseIterable, Identifiable {
 - Line 11:struct InspectorSectionHeaderView: View {
-- Line 22:struct EffectsInspectorPlaceholderView: View {
-- Line 62:struct InspectorOverflowHintView: View {
-- Line 98:struct ResizableInspectorSplitView<TopContent: View, BottomContent: View>: View {
-- Line 143:    func makeCoordinator() -> Coordinator { Coordinator() }
-- Line 145:    func makeNSView(context: Context) -> NSScrollView {
-- Line 149:    func updateNSView(_ nsView: NSScrollView, context: Context) {
-- Line 163:        func makeScrollView(rootView: AnyView) -> NSScrollView {
-- Line 184:        func update(scrollView: NSScrollView, rootView: AnyView) {
-- Line 247:    func update(rootView: AnyView) {
-- Line 251:    func updateWidth(_ width: CGFloat) {
-- Line 313:    func observeDocumentView(_ documentView: NSView?) {
-- Line 359:    func updateOverflowHintVisibility(animated: Bool = true) {
-- Line 475:    func makeCoordinator() -> Coordinator {
-- Line 479:    func makeNSView(context: Context) -> InspectorSplitView {
-- Line 488:    func updateNSView(_ nsView: InspectorSplitView, context: Context) {
-- Line 512:        func makeSplitView(
-- Line 544:        func update(
-- Line 559:        func splitViewDidResizeSubviews(_ notification: Notification) {
-- Line 585:        func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
-- Line 589:        func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
-- Line 661:struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
+- Line 28:struct EffectsInspectorPlaceholderView: View {
+- Line 74:struct InspectorOverflowHintView: View {
+- Line 110:struct ResizableInspectorSplitView<TopContent: View, BottomContent: View>: View {
+- Line 155:    func makeCoordinator() -> Coordinator { Coordinator() }
+- Line 157:    func makeNSView(context: Context) -> NSScrollView {
+- Line 161:    func updateNSView(_ nsView: NSScrollView, context: Context) {
+- Line 175:        func makeScrollView(rootView: AnyView) -> NSScrollView {
+- Line 196:        func update(scrollView: NSScrollView, rootView: AnyView) {
+- Line 259:    func update(rootView: AnyView) {
+- Line 263:    func updateWidth(_ width: CGFloat) {
+- Line 325:    func observeDocumentView(_ documentView: NSView?) {
+- Line 371:    func updateOverflowHintVisibility(animated: Bool = true) {
+- Line 487:    func makeCoordinator() -> Coordinator {
+- Line 491:    func makeNSView(context: Context) -> InspectorSplitView {
+- Line 500:    func updateNSView(_ nsView: InspectorSplitView, context: Context) {
+- Line 524:        func makeSplitView(
+- Line 556:        func update(
+- Line 571:        func splitViewDidResizeSubviews(_ notification: Notification) {
+- Line 597:        func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+- Line 601:        func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+- Line 673:struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
 
 ## Views/Review/ReviewMarkerInspectorViews.swift
 
 - Line 4:extension ContentView {
-- Line 5:    func markerInspectorCard(_ summary: RecordingInspectionSummary) -> some View {
-- Line 27:    func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
-- Line 84:    func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
-- Line 141:    func markerListRow(
-- Line 261:    func markerListDragPreview(
-- Line 620:    func supportsCreatorDefaults(_ style: EffectStyle) -> Bool {
-- Line 629:    func markerDisplayNumber(for marker: ZoomPlanItem) -> Int {
-- Line 637:    func timingSliderRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
-- Line 672:    func pointTimingRow(
-- Line 743:    func beginEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
-- Line 751:    func endEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
-- Line 759:    func seekPlaybackToActiveEffectHoldPoint(_ holdPoint: ActiveEffectHoldPoint) {
-- Line 769:    func scheduleRealtimeEffectPreviewResume(for holdPoint: ActiveEffectHoldPoint) {
-- Line 779:    func nudgeActiveEffectHoldPoint(by delta: Double) {
-- Line 800:    func setSelectedEffectHoldStartTimeAndFollowPlayback(_ time: Double) {
-- Line 809:    func setSelectedEffectHoldEndTimeAndFollowPlayback(_ time: Double) {
-- Line 819:    func effectAmountEditorSection(for marker: EffectPlanItem) -> some View {
-- Line 857:    func distortionEditorSection(for marker: EffectPlanItem) -> some View {
-- Line 943:    func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
-- Line 964:    func markerTypeSymbol(for zoomType: ZoomType) -> String {
+- Line 9:    func markerInspectorCard(_ summary: RecordingInspectionSummary) -> some View {
+- Line 49:    func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 107:    func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 165:    func markerListRow(
+- Line 297:    func markerListDragPreview(
+- Line 661:    func supportsCreatorDefaults(_ style: EffectStyle) -> Bool {
+- Line 670:    func markerDisplayNumber(for marker: ZoomPlanItem) -> Int {
+- Line 678:    func timingSliderRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
+- Line 713:    func pointTimingRow(
+- Line 784:    func beginEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
+- Line 792:    func endEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
+- Line 800:    func seekPlaybackToActiveEffectHoldPoint(_ holdPoint: ActiveEffectHoldPoint) {
+- Line 810:    func scheduleRealtimeEffectPreviewResume(for holdPoint: ActiveEffectHoldPoint) {
+- Line 820:    func nudgeActiveEffectHoldPoint(by delta: Double) {
+- Line 841:    func setSelectedEffectHoldStartTimeAndFollowPlayback(_ time: Double) {
+- Line 850:    func setSelectedEffectHoldEndTimeAndFollowPlayback(_ time: Double) {
+- Line 860:    func effectAmountEditorSection(for marker: EffectPlanItem) -> some View {
+- Line 898:    func distortionEditorSection(for marker: EffectPlanItem) -> some View {
+- Line 984:    func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
+- Line 1005:    func markerTypeSymbol(for zoomType: ZoomType) -> String {
 
 ## Views/Review/ReviewPlaybackMainViews.swift
 

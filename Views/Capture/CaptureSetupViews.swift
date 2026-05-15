@@ -411,6 +411,7 @@ extension ContentView {
 
     func targetRow(_ target: ShareableCaptureTarget) -> some View {
         let isSelected = viewModel.selectedTargetID == target.id
+        let accentColor = FlowTrackAccent.color(for: .capture)
 
         return Button {
             viewModel.selectedTargetID = target.id
@@ -434,18 +435,18 @@ extension ContentView {
                 }
                 Spacer()
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    .foregroundStyle(isSelected ? accentColor : .secondary)
             }
             .padding(14)
             .frame(minHeight: 72)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor))
+                    .fill(isSelected ? accentColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.45) : Color.secondary.opacity(0.12), lineWidth: 1)
+                    .strokeBorder(isSelected ? accentColor.opacity(0.45) : Color.secondary.opacity(0.12), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

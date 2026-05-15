@@ -112,6 +112,7 @@ extension ContentView {
 
     func libraryCaptureRow(_ item: CaptureLibraryItem) -> some View {
         let isSelected = selectedLibraryCaptureID == item.id
+        let accentColor = FlowTrackAccent.color(for: .library)
 
         return HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
@@ -132,7 +133,7 @@ extension ContentView {
                             Text("Reveal in Finder")
                                 .font(.system(size: 11, weight: .semibold))
                         }
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(accentColor)
                     }
                     .buttonStyle(.plain)
                     .help("Reveal in Finder")
@@ -150,7 +151,7 @@ extension ContentView {
                             Text("Edit Info")
                                 .font(.system(size: 11, weight: .semibold))
                         }
-                        .foregroundStyle(item.canOpenInEditor ? Color.accentColor : Color.secondary)
+                        .foregroundStyle(item.canOpenInEditor ? accentColor : Color.secondary)
                     }
                     .buttonStyle(.plain)
                     .disabled(!item.canOpenInEditor)
@@ -185,11 +186,11 @@ extension ContentView {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor).opacity(0.58))
+                .fill(isSelected ? accentColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor).opacity(0.58))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(isSelected ? Color.accentColor.opacity(0.45) : Color.secondary.opacity(0.10), lineWidth: 1)
+                .stroke(isSelected ? accentColor.opacity(0.45) : Color.secondary.opacity(0.10), lineWidth: 1)
         )
         .contentShape(Rectangle())
         .onTapGesture {

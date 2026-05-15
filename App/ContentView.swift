@@ -18,6 +18,7 @@ struct ContentView: View {
     @State var isPlaybackInspectorVisible = true
     @State private var isPlaybackInfoPresented = false
     @State private var playbackScrubTime = 0.0
+    @State private var hoveredReviewHeaderAction: ReviewHeaderAction?
     @State private var isScrubbingPlayback = false
     @State var suppressMarkerListAutoScrollUntil: Date?
     @State private var draggedMarkerListID: String?
@@ -253,7 +254,7 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isSelected ? Color.accentColor : Color.clear)
+                    .fill(isSelected ? FlowTrackAccent.color(for: tab.accentRole) : Color.clear)
             )
         }
         .buttonStyle(.plain)
@@ -276,6 +277,7 @@ struct ContentView: View {
         .padding(.horizontal, 28)
         .padding(.vertical, 24)
         .background(detailBackground)
+        .tint(detailAccentColor)
     }
 
     private var reviewView: some View {
@@ -292,34 +294,52 @@ struct ContentView: View {
 
                 Spacer()
 
-                if viewModel.recordingSummary != nil {
-                    Button {
-                        isPlaybackInfoPresented = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                    }
-                    .popover(isPresented: $isPlaybackInfoPresented, arrowEdge: .top) {
-                        if let summary = viewModel.recordingSummary {
-                            playbackInfoPopover(summary)
-                                .frame(width: 360)
-                                .padding(16)
+                HStack(spacing: 2) {
+                    if viewModel.recordingSummary != nil {
+                        Button {
+                            isPlaybackInfoPresented = true
+                        } label: {
+                            reviewHeaderActionIcon("info.circle", action: .info)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $isPlaybackInfoPresented, arrowEdge: .top) {
+                            if let summary = viewModel.recordingSummary {
+                                playbackInfoPopover(summary)
+                                    .frame(width: 360)
+                                    .padding(16)
+                            }
                         }
                     }
-                }
 
-                Button {
-                    isPlaybackInspectorVisible.toggle()
-                } label: {
-                    Image(systemName: isPlaybackInspectorVisible ? "sidebar.right" : "sidebar.right")
-                }
-                .help(isPlaybackInspectorVisible ? "Hide Inspector" : "Show Inspector")
-
-                if viewModel.recordingSummary != nil {
-                    Button("Export…") {
-                        viewModel.exportRecording()
+                    Button {
+                        isPlaybackInspectorVisible.toggle()
+                    } label: {
+                        reviewHeaderActionIcon("sidebar.right", action: .inspector)
                     }
-                    .disabled(!viewModel.canExportRecording)
+                    .buttonStyle(.plain)
+                    .help(isPlaybackInspectorVisible ? "Hide Inspector" : "Show Inspector")
+
+                    if viewModel.recordingSummary != nil {
+                        Button {
+                            viewModel.exportRecording()
+                        } label: {
+                            reviewHeaderActionIcon("square.and.arrow.up", action: .export)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!viewModel.canExportRecording)
+                        .help("Export Movie File")
+                    }
                 }
+                .padding(3)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.84))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.08), radius: 3, x: 0, y: 1)
             }
             .zIndex(2)
 
@@ -553,8 +573,28 @@ struct ContentView: View {
     }
 
     private var accentTint: Color {
-        let accent = NSColor.controlAccentColor.usingColorSpace(.deviceRGB) ?? .systemBlue
-        return Color(nsColor: accent)
+        detailAccentColor
+    }
+
+    private var detailAccentColor: Color {
+        let activeTab = selectedTab ?? .capture
+        let accentRole = activeTab == .review ? editorMode.accentRole : activeTab.accentRole
+        return FlowTrackAccent.color(for: accentRole)
+    }
+
+    func reviewHeaderActionIcon(_ systemName: String, action: ReviewHeaderAction) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(Color.primary)
+            .frame(width: 34, height: 34)
+            .background(
+                Circle()
+                    .fill(hoveredReviewHeaderAction == action ? Color.primary.opacity(0.10) : Color.clear)
+            )
+            .contentShape(Circle())
+            .onHover { isHovered in
+                hoveredReviewHeaderAction = isHovered ? action : nil
+            }
     }
 
     func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
@@ -566,10 +606,7 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
                 .padding(.top, 4)
-            Capsule()
-                .fill(Color.accentColor)
-                .frame(width: accentWidth, height: 2)
-                .padding(.top, 12)
+
         }
     }
 
@@ -764,6 +801,12 @@ struct SharingAnchorView: NSViewRepresentable {
     ContentView()
 }
 
+enum ReviewHeaderAction {
+    case info
+    case inspector
+    case export
+}
+
 enum AppTab: String, CaseIterable, Identifiable {
     case capture = "Capture"
     case library = "Library"
@@ -782,6 +825,19 @@ enum AppTab: String, CaseIterable, Identifiable {
             return "play.rectangle"
         case .settings:
             return "gearshape"
+        }
+    }
+
+    var accentRole: FlowTrackAccentRole {
+        switch self {
+        case .capture:
+            return .capture
+        case .library:
+            return .library
+        case .review:
+            return .zoomAndClicks
+        case .settings:
+            return .settings
         }
     }
 }
