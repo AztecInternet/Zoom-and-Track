@@ -1,8 +1,11 @@
 import AppKit
 import SwiftUI
 
-func effectTimelineSegmentLayouts(for markers: [EffectPlanItem], duration: Double) -> [EffectTimelineSegmentLayout] {
-    let safeDuration = max(duration, 0.001)
+func effectTimelineSegmentLayouts(
+    for markers: [EffectPlanItem],
+    duration: Double,
+    visibleRange: TimelineVisibleRange
+) -> [EffectTimelineSegmentLayout] {
     let maxLaneCount = 3
     var laneEndRatios = Array(repeating: -Double.infinity, count: maxLaneCount)
 
@@ -16,12 +19,16 @@ func effectTimelineSegmentLayouts(for markers: [EffectPlanItem], duration: Doubl
             }
             return $0.id < $1.id
         }
-        .map { marker in
-            let eventRatio = min(max(marker.snapTime / safeDuration, 0), 1)
-            let startRatio = min(max(marker.startTime / safeDuration, 0), eventRatio)
-            let holdStartRatio = min(max(marker.holdStartTime / safeDuration, startRatio), 1)
-            let holdEndRatio = min(max(marker.holdEndTime / safeDuration, holdStartRatio), 1)
-            let endRatio = min(max(marker.endTime / safeDuration, eventRatio), 1)
+        .compactMap { marker in
+            guard let clippedWindow = visibleRange.clippedRange(start: marker.startTime, end: marker.endTime) else {
+                return nil
+            }
+
+            let eventRatio = visibleRange.clampedRatio(for: marker.snapTime)
+            let startRatio = visibleRange.clampedRatio(for: clippedWindow.start)
+            let holdStartRatio = max(visibleRange.clampedRatio(for: marker.holdStartTime), startRatio)
+            let holdEndRatio = max(visibleRange.clampedRatio(for: marker.holdEndTime), holdStartRatio)
+            let endRatio = max(visibleRange.clampedRatio(for: clippedWindow.end), startRatio)
             let lane = effectTimelineLane(
                 for: startRatio,
                 endRatio: endRatio,

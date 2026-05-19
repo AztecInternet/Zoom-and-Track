@@ -32,6 +32,7 @@ extension ContentView {
     func timelineCanvasView(
         width: CGFloat,
         duration: Double,
+        visibleRange: TimelineVisibleRange,
         trackCenterY: CGFloat,
         segmentOriginY: CGFloat,
         editorMode: ReviewEditorMode,
@@ -97,6 +98,7 @@ extension ContentView {
                         isSelected: selectedZoomMarkerID == layout.marker.id,
                         isEnabled: layout.marker.enabled,
                         activePhase: displayedPhase,
+                        visibleRange: visibleRange,
                         interactionSuppressed: timelineInteractionSuppressed,
                         isHovered: !timelineInteractionSuppressed && hoveredTimelineMarkerID == layout.marker.id,
                         hoveredTimelineMarkerID: hoveredTimelineMarkerID,
@@ -198,18 +200,18 @@ extension ContentView {
     }
 
     func timelineFooterView(
-        duration: Double,
+        visibleRange: TimelineVisibleRange,
         editorMode: ReviewEditorMode,
         isDrawingEffectFocusRegion: Bool,
         isDrawingNoZoomOverflowRegion: Bool
     ) -> some View {
         ZStack {
             HStack {
-                Text("0")
+                Text(timecodeString(for: visibleRange.startTime))
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(timecodeString(for: duration))
+                Text(timecodeString(for: visibleRange.endTime))
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.secondary)
             }

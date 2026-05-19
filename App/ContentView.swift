@@ -56,6 +56,8 @@ struct ContentView: View {
     @State var activeEffectRegionLoupeOffset: CGSize = .zero
     @State var activeTimelineMarkerDragID: String?
     @State var activeTimelineMarkerDragStartTime: Double?
+    @State var timelineZoomScale = 1.0
+    @State var visibleTimelineStartTime = 0.0
     @State var librarySearchText = ""
     @State var editorMode: ReviewEditorMode = .zoomAndClicks
     @State var inspectorMode: EditInspectorMode = .markers

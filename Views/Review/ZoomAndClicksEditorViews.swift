@@ -19,8 +19,11 @@ struct TimelineSegmentLayout: Identifiable {
     var id: String { marker.id }
 }
 
-func timelineSegmentLayouts(for markers: [ZoomPlanItem], duration: Double) -> [TimelineSegmentLayout] {
-    let safeDuration = max(duration, 0.001)
+func timelineSegmentLayouts(
+    for markers: [ZoomPlanItem],
+    duration: Double,
+    visibleRange: TimelineVisibleRange
+) -> [TimelineSegmentLayout] {
     let maxLaneCount = 3
     var laneEndRatios = Array(repeating: -Double.infinity, count: maxLaneCount)
     let sortedMarkers = markers.enumerated().sorted { lhs, rhs in
@@ -34,12 +37,16 @@ func timelineSegmentLayouts(for markers: [ZoomPlanItem], duration: Double) -> [T
         return lhs.element.sourceEventTimestamp < rhs.element.sourceEventTimestamp
     }
 
-    return sortedMarkers.map { entry in
+    return sortedMarkers.compactMap { entry in
         let marker = entry.element
         let window = timelineSegmentWindow(for: marker)
-        let startRatio = min(max(window.start / safeDuration, 0), 1)
-        let eventRatio = min(max(marker.sourceEventTimestamp / safeDuration, 0), 1)
-        let endRatio = min(max(window.end / safeDuration, eventRatio), 1)
+        guard let clippedWindow = visibleRange.clippedRange(start: window.start, end: window.end) else {
+            return nil
+        }
+
+        let startRatio = visibleRange.clampedRatio(for: clippedWindow.start)
+        let eventRatio = visibleRange.clampedRatio(for: marker.sourceEventTimestamp)
+        let endRatio = max(visibleRange.clampedRatio(for: clippedWindow.end), startRatio)
         let lane = timelineLane(for: startRatio, endRatio: endRatio, laneEndRatios: &laneEndRatios)
 
         return TimelineSegmentLayout(
@@ -69,6 +76,7 @@ func timelineSegment(
     isSelected: Bool,
     isEnabled: Bool,
     activePhase: MarkerTimingPhase?,
+    visibleRange: TimelineVisibleRange,
     interactionSuppressed: Bool,
     isHovered: Bool,
     hoveredTimelineMarkerID: String?,
@@ -146,7 +154,7 @@ func timelineSegment(
         }
 
         if let activePhase {
-            let labelX = timelinePhaseCenterX(for: marker, phase: activePhase, duration: duration, width: width) - localMinX
+            let labelX = timelinePhaseCenterX(for: marker, phase: activePhase, visibleRange: visibleRange, width: width) - localMinX
 
             Text(activePhase.rawValue)
                 .font(.system(size: 10, weight: .semibold))
@@ -497,11 +505,10 @@ private func phaseStartOffset(
     }
 }
 
-private func timelinePhaseCenterX(for marker: ZoomPlanItem, phase: MarkerTimingPhase, duration: Double, width: CGFloat) -> CGFloat {
+private func timelinePhaseCenterX(for marker: ZoomPlanItem, phase: MarkerTimingPhase, visibleRange: TimelineVisibleRange, width: CGFloat) -> CGFloat {
     let bounds = timelinePhaseBounds(for: marker, phase: phase)
-    let safeDuration = max(duration, 0.001)
-    let startX = CGFloat(min(max(bounds.start, 0), safeDuration) / safeDuration) * width
-    let endX = CGFloat(min(max(bounds.end, 0), safeDuration) / safeDuration) * width
+    let startX = CGFloat(visibleRange.clampedRatio(for: bounds.start)) * width
+    let endX = CGFloat(visibleRange.clampedRatio(for: bounds.end)) * width
     return startX + max((endX - startX) / 2, 0)
 }
 

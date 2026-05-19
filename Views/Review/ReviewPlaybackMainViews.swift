@@ -684,8 +684,9 @@ extension ContentView {
 
     func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
         let duration = max(summary.duration ?? 0, 0.001)
-        let segmentLayouts = timelineSegmentLayouts(for: summary.zoomMarkers, duration: duration)
-        let effectLayouts = effectTimelineSegmentLayouts(for: summary.effectMarkers, duration: duration)
+        let visibleRange = timelineVisibleRange(for: duration)
+        let segmentLayouts = timelineSegmentLayouts(for: summary.zoomMarkers, duration: duration, visibleRange: visibleRange)
+        let effectLayouts = effectTimelineSegmentLayouts(for: summary.effectMarkers, duration: duration, visibleRange: visibleRange)
         let trackCenterY: CGFloat = 34
         let segmentOriginY: CGFloat = 16
         let hoveredTooltipEntry = hoveredTimelineTooltipEntry(in: summary)
@@ -811,11 +812,12 @@ extension ContentView {
 
             GeometryReader { geometry in
                 let width = max(geometry.size.width, 1)
-                let playheadX = timelineX(for: viewModel.currentPlaybackTime, duration: duration, width: width)
+                let playheadX = timelineX(for: viewModel.currentPlaybackTime, visibleRange: visibleRange, width: width)
 
                 timelineCanvasView(
                     width: width,
                     duration: duration,
+                    visibleRange: visibleRange,
                     trackCenterY: trackCenterY,
                     segmentOriginY: segmentOriginY,
                     editorMode: editorMode,
@@ -889,13 +891,13 @@ extension ContentView {
 
                             if isDraggingTimeline {
                                 let zoomSnap = editorMode == .zoomAndClicks
-                                    ? timelineSnapTarget(at: currentX, width: width, duration: duration, markers: summary.zoomMarkers)
+                                    ? timelineSnapTarget(at: currentX, width: width, visibleRange: visibleRange, markers: summary.zoomMarkers)
                                     : nil
                                 let effectSnap = editorMode == .effects
-                                    ? effectTimelineSnapTarget(at: currentX, width: width, duration: duration, markers: summary.effectMarkers)
+                                    ? effectTimelineSnapTarget(at: currentX, width: width, visibleRange: visibleRange, markers: summary.effectMarkers)
                                     : nil
                                 viewModel.updateTimelineScrub(
-                                    to: zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: currentX, width: width, duration: duration),
+                                    to: zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: currentX, width: width, visibleRange: visibleRange),
                                     snappedMarkerID: zoomSnap?.marker.id,
                                     snappedEffectMarkerID: effectSnap?.marker.id
                                 )
@@ -904,10 +906,10 @@ extension ContentView {
                         .onEnded { value in
                             let endX = min(max(value.location.x, 0), width)
                             let zoomSnap = editorMode == .zoomAndClicks
-                                ? timelineSnapTarget(at: endX, width: width, duration: duration, markers: summary.zoomMarkers)
+                                ? timelineSnapTarget(at: endX, width: width, visibleRange: visibleRange, markers: summary.zoomMarkers)
                                 : nil
                             let effectSnap = editorMode == .effects
-                                ? effectTimelineSnapTarget(at: endX, width: width, duration: duration, markers: summary.effectMarkers)
+                                ? effectTimelineSnapTarget(at: endX, width: width, visibleRange: visibleRange, markers: summary.effectMarkers)
                                 : nil
                             let effectHit = editorMode == .effects
                                 ? effectTimelineHitTarget(
@@ -917,7 +919,7 @@ extension ContentView {
                                     layouts: effectLayouts
                                 )
                                 : nil
-                            let targetTime = zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: endX, width: width, duration: duration)
+                            let targetTime = zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: endX, width: width, visibleRange: visibleRange)
 
                             if isDraggingTimeline {
                                 viewModel.endTimelineScrub(
@@ -961,11 +963,34 @@ extension ContentView {
                         clearTimelineHover()
                     }
                 }
+                .overlay {
+                    TimelineTrackpadGestureCaptureView(
+                        onMagnify: { magnification, locationX, gestureWidth in
+                            guard !isDraggingTimeline else { return false }
+                            return zoomTimelineVisibleRange(
+                                magnification: magnification,
+                                anchorX: locationX,
+                                width: gestureWidth,
+                                duration: duration
+                            )
+                        },
+                        onHorizontalScroll: { deltaX, _, gestureWidth in
+                            guard !isDraggingTimeline else { return false }
+                            return panTimelineVisibleRange(
+                                deltaX: deltaX,
+                                width: gestureWidth,
+                                duration: duration
+                            )
+                        }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+                }
             }
             .frame(height: 60)
 
             timelineFooterView(
-                duration: duration,
+                visibleRange: visibleRange,
                 editorMode: editorMode,
                 isDrawingEffectFocusRegion: isDrawingEffectFocusRegion,
                 isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion
