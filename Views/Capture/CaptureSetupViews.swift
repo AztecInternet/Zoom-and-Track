@@ -67,6 +67,17 @@ extension ContentView {
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(cardBackground)
+        .overlay {
+            if isHelpModeEnabled {
+                HelpModeRegionHighlight()
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            HelpModeHintView(topic: .captureTarget, isPresented: isHelpModeEnabled, staggerIndex: 0)
+                .frame(width: 280, alignment: .leading)
+                .padding(12)
+                .allowsHitTesting(false)
+        }
     }
 
     var compositionCard: some View {
@@ -74,6 +85,17 @@ extension ContentView {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(cardBackground)
+            .overlay {
+                if isHelpModeEnabled {
+                    HelpModeRegionHighlight()
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                HelpModeHintView(topic: .captureComposition, isPresented: isHelpModeEnabled, staggerIndex: 1)
+                    .frame(width: 280, alignment: .leading)
+                    .padding(12)
+                    .allowsHitTesting(false)
+            }
     }
 
     var captureSetupInspectorCard: some View {
@@ -83,6 +105,17 @@ extension ContentView {
             recordingSetup: { recordingSetupContent },
             controls: { recordingControlButton }
         )
+        .overlay {
+            if isHelpModeEnabled {
+                HelpModeRegionHighlight()
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            HelpModeHintView(topic: .captureSetup, isPresented: isHelpModeEnabled, staggerIndex: 2)
+                .frame(width: 280, alignment: .leading)
+                .padding(12)
+                .allowsHitTesting(false)
+        }
     }
 
     var compositionContent: some View {
@@ -238,6 +271,17 @@ extension ContentView {
         .padding(20)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(cardBackground)
+        .overlay {
+            if isHelpModeEnabled {
+                HelpModeRegionHighlight()
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            HelpModeHintView(topic: .captureSetup, isPresented: isHelpModeEnabled, staggerIndex: 2)
+                .frame(width: 280, alignment: .leading)
+                .padding(12)
+                .allowsHitTesting(false)
+        }
     }
 
     var recordingSetupContent: some View {

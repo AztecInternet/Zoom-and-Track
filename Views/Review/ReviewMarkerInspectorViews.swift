@@ -30,6 +30,21 @@ extension ContentView {
         .background {
             inspectorCardBackground(accentRole: accentRole)
         }
+        .overlay {
+            if isHelpModeEnabled, inspectorMode == .markers {
+                HelpModeRegionHighlight()
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            HelpModeHintView(
+                topic: editorMode == .effects ? .effectsInspector : .zoomInspector,
+                isPresented: isHelpModeEnabled && inspectorMode == .markers,
+                staggerIndex: 2
+            )
+            .frame(width: 270, alignment: .leading)
+            .padding(12)
+            .allowsHitTesting(false)
+        }
     }
 
     @ViewBuilder

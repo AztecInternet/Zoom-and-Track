@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var playbackVideoHeightOverride: CGFloat?
     @State var playbackVideoHeightDragOrigin: CGFloat?
     @State var isPlaybackInspectorVisible = true
+    @State var isHelpModeEnabled = false
     @State private var isPlaybackInfoPresented = false
     @State private var playbackScrubTime = 0.0
     @State private var hoveredReviewHeaderAction: ReviewHeaderAction?
@@ -56,6 +57,15 @@ struct ContentView: View {
     @State var activeEffectRegionLoupeOffset: CGSize = .zero
     @State var activeTimelineMarkerDragID: String?
     @State var activeTimelineMarkerDragStartTime: Double?
+    @State private var activeTimelineMarkerDragTimeOffset = 0.0
+    @State private var activeTimelineMarkerDragCursorX: CGFloat?
+    @State private var activeTimelineMarkerDragWidth: CGFloat = 1
+    @State private var activeTimelineMarkerDragDuration = 0.0
+    @State private var timelineMarkerAutoScrollTask: Task<Void, Never>?
+    @State private var activeTimelineScrubCursorX: CGFloat?
+    @State private var activeTimelineScrubWidth: CGFloat = 1
+    @State private var activeTimelineScrubDuration = 0.0
+    @State private var timelineScrubAutoScrollTask: Task<Void, Never>?
     @State var timelineZoomScale = 1.0
     @State var visibleTimelineStartTime = 0.0
     @State var librarySearchText = ""
@@ -207,6 +217,7 @@ struct ContentView: View {
                 selectedTab = .review
             }
         }
+        .focusedValue(\.flowTrackCommandContext, flowTrackCommandContext)
     }
 
     private var sidebar: some View {
@@ -224,6 +235,9 @@ struct ContentView: View {
             .padding(.horizontal, 12)
 
             Spacer(minLength: 0)
+
+            helpModeToggle
+                .padding(.horizontal, 12)
         }
         .padding(.bottom, 24)
         .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
@@ -260,6 +274,35 @@ struct ContentView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var helpModeToggle: some View {
+        Button {
+            isHelpModeEnabled.toggle()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: isHelpModeEnabled ? "questionmark.circle.fill" : "questionmark.circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 18)
+                Text("Help")
+                    .font(.system(size: 14, weight: isHelpModeEnabled ? .semibold : .regular))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isHelpModeEnabled ? Color.primary : Color.secondary)
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isHelpModeEnabled ? Color(nsColor: .controlBackgroundColor).opacity(0.82) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(isHelpModeEnabled ? Color.secondary.opacity(0.16) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .help(isHelpModeEnabled ? "Turn Help Mode Off" : "Turn Help Mode On")
     }
 
     @ViewBuilder
@@ -422,6 +465,8 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .zIndex(0)
                     .onChange(of: summary.recordingURL) {
+                        cancelTimelineMarkerAutoScroll()
+                        cancelTimelineScrubAutoScroll()
                         playbackVideoHeightOverride = nil
                         playbackVideoHeightDragOrigin = nil
                         playbackScrubTime = 0
@@ -435,6 +480,8 @@ struct ContentView: View {
                         playbackScrubTime = viewModel.currentPlaybackTime
                     }
                     .onChange(of: editorMode) {
+                        cancelTimelineMarkerAutoScroll()
+                        cancelTimelineScrubAutoScroll()
                         finishEffectFocusRegionDrawing()
                         isPlacingClickFocus = false
                         pendingMarkerDragSourcePoint = nil
@@ -443,6 +490,8 @@ struct ContentView: View {
                         pendingNoZoomOverflowRegion = nil
                         activeTimelineMarkerDragID = nil
                         activeTimelineMarkerDragStartTime = nil
+                        activeTimelineMarkerDragCursorX = nil
+                        activeTimelineScrubCursorX = nil
                         renamingEffectMarkerID = nil
                     }
                 }
@@ -582,6 +631,490 @@ struct ContentView: View {
         let activeTab = selectedTab ?? .capture
         let accentRole = activeTab == .review ? editorMode.accentRole : activeTab.accentRole
         return FlowTrackAccent.color(for: accentRole)
+    }
+
+    private var flowTrackCommandContext: FlowTrackCommandContext {
+        FlowTrackCommandContext(
+            isHelpModeEnabled: isHelpModeEnabled,
+            canZoomTimelineIn: canZoomTimelineInFromMenu,
+            canZoomTimelineOut: canZoomTimelineOutFromMenu,
+            canResetTimelineZoom: canResetTimelineZoomFromMenu,
+            canUsePlayback: canUsePlaybackFromMenu,
+            canJumpToStart: canUsePlaybackFromMenu,
+            canGoToPreviousMarker: previousMarkerNavigationTarget() != nil,
+            canGoToNextMarker: nextMarkerNavigationTarget() != nil,
+            canDeleteSelectedMarker: canDeleteSelectedMarkerFromMenu,
+            canDuplicateSelectedMarker: canDuplicateSelectedMarkerFromMenu,
+            toggleHelpMode: {
+                isHelpModeEnabled.toggle()
+            },
+            zoomTimelineIn: {
+                zoomTimelineFromMenu(by: 1.25)
+            },
+            zoomTimelineOut: {
+                zoomTimelineFromMenu(by: 0.8)
+            },
+            resetTimelineZoom: {
+                resetTimelineZoomFromMenu()
+            },
+            togglePlayback: {
+                viewModel.togglePlayback()
+            },
+            jumpToStart: {
+                viewModel.jumpPlaybackToStart()
+            },
+            goToPreviousMarker: {
+                navigateToPreviousMarkerFromMenu()
+            },
+            goToNextMarker: {
+                navigateToNextMarkerFromMenu()
+            },
+            deleteSelectedMarker: {
+                deleteSelectedMarkerFromMenu()
+            },
+            duplicateSelectedMarker: {
+                duplicateSelectedMarkerFromMenu()
+            }
+        )
+    }
+
+    private var timelineCommandDuration: Double? {
+        guard (selectedTab ?? .capture) == .review,
+              let duration = viewModel.recordingSummary?.duration,
+              duration > 0.001 else {
+            return nil
+        }
+
+        return duration
+    }
+
+    private var canZoomTimelineInFromMenu: Bool {
+        guard let duration = timelineCommandDuration else { return false }
+        return timelineZoomScale < timelineMaximumZoomScale(for: duration) - 0.0001
+    }
+
+    private var canZoomTimelineOutFromMenu: Bool {
+        timelineCommandDuration != nil && timelineZoomScale > 1.0001
+    }
+
+    private var canResetTimelineZoomFromMenu: Bool {
+        timelineCommandDuration != nil && (timelineZoomScale > 1.0001 || visibleTimelineStartTime > 0.0001)
+    }
+
+    private var canUsePlaybackFromMenu: Bool {
+        (selectedTab ?? .capture) == .review && (viewModel.canUsePlaybackTransport || viewModel.isRenderedPreviewActive)
+    }
+
+    private var canDeleteSelectedMarkerFromMenu: Bool {
+        guard (selectedTab ?? .capture) == .review else { return false }
+
+        switch editorMode {
+        case .zoomAndClicks:
+            return viewModel.selectedZoomMarkerID != nil
+        case .effects:
+            return viewModel.selectedEffectMarkerID != nil
+        }
+    }
+
+    private var canDuplicateSelectedMarkerFromMenu: Bool {
+        (selectedTab ?? .capture) == .review &&
+        editorMode == .zoomAndClicks &&
+        viewModel.selectedZoomMarkerID != nil
+    }
+
+    private enum MarkerNavigationDirection {
+        case previous
+        case next
+    }
+
+    private enum MarkerNavigationTarget {
+        case zoom(ZoomPlanItem)
+        case effect(EffectPlanItem)
+
+        var time: Double {
+            switch self {
+            case .zoom(let marker):
+                return marker.sourceEventTimestamp
+            case .effect(let marker):
+                return marker.snapTime
+            }
+        }
+    }
+
+    private func zoomTimelineFromMenu(by factor: Double) {
+        guard let duration = timelineCommandDuration else { return }
+
+        let safeDuration = max(duration, 0.001)
+        let currentRange = timelineVisibleRange(for: safeDuration)
+        let centreTime = currentRange.startTime + (currentRange.duration / 2)
+        let newZoomScale = clampedTimelineZoomScale(timelineZoomScale * factor, duration: safeDuration)
+        let newVisibleDuration = safeDuration / newZoomScale
+
+        timelineZoomScale = newZoomScale
+        visibleTimelineStartTime = clampedTimelineStartTime(
+            centreTime - (newVisibleDuration / 2),
+            visibleDuration: newVisibleDuration,
+            fullDuration: safeDuration
+        )
+    }
+
+    private func resetTimelineZoomFromMenu() {
+        timelineZoomScale = 1
+        visibleTimelineStartTime = 0
+    }
+
+    func updateTimelineScrubAutoScroll(cursorX: CGFloat, width: CGFloat, duration: Double) {
+        guard isDraggingTimeline, activeTimelineMarkerDragID == nil else {
+            cancelTimelineScrubAutoScroll()
+            return
+        }
+
+        let safeWidth = max(width, 1)
+        let safeDuration = max(duration, 0.001)
+        let clampedCursorX = min(max(cursorX, 0), safeWidth)
+        activeTimelineScrubCursorX = clampedCursorX
+        activeTimelineScrubWidth = safeWidth
+        activeTimelineScrubDuration = safeDuration
+
+        guard timelineMarkerAutoScrollIntensity(cursorX: clampedCursorX, width: safeWidth) != nil,
+              timelineVisibleRange(for: safeDuration).duration < safeDuration else {
+            cancelTimelineScrubAutoScroll()
+            return
+        }
+
+        guard timelineScrubAutoScrollTask == nil else { return }
+
+        timelineScrubAutoScrollTask = Task { @MainActor in
+            while !Task.isCancelled {
+                guard tickTimelineScrubAutoScroll() else { break }
+                try? await Task.sleep(nanoseconds: 16_000_000)
+            }
+            timelineScrubAutoScrollTask = nil
+        }
+    }
+
+    func cancelTimelineScrubAutoScroll() {
+        timelineScrubAutoScrollTask?.cancel()
+        timelineScrubAutoScrollTask = nil
+    }
+
+    private func tickTimelineScrubAutoScroll() -> Bool {
+        guard isDraggingTimeline,
+              activeTimelineMarkerDragID == nil,
+              let cursorX = activeTimelineScrubCursorX,
+              let edgeState = timelineMarkerAutoScrollIntensity(cursorX: cursorX, width: activeTimelineScrubWidth) else {
+            return false
+        }
+
+        let safeDuration = max(activeTimelineScrubDuration, 0.001)
+        let visibleRange = timelineVisibleRange(for: safeDuration)
+        guard visibleRange.duration < visibleRange.fullDuration else { return false }
+
+        let speed = visibleRange.duration * 0.75 * edgeState.intensity * edgeState.intensity
+        let proposedStartTime = visibleTimelineStartTime + (edgeState.direction * speed / 60)
+        let newStartTime = clampedTimelineStartTime(
+            proposedStartTime,
+            visibleDuration: visibleRange.duration,
+            fullDuration: visibleRange.fullDuration
+        )
+
+        guard abs(newStartTime - visibleTimelineStartTime) > 0.0001 else { return false }
+
+        visibleTimelineStartTime = newStartTime
+        let updatedRange = timelineVisibleRange(for: safeDuration)
+        viewModel.updateTimelineScrub(
+            to: timelineTime(for: cursorX, width: activeTimelineScrubWidth, visibleRange: updatedRange),
+            snappedMarkerID: nil,
+            snappedEffectMarkerID: nil
+        )
+        return true
+    }
+
+    func beginTimelineMarkerDrag(
+        marker: ZoomPlanItem,
+        startX: CGFloat,
+        width: CGFloat,
+        duration: Double,
+        visibleRange: TimelineVisibleRange
+    ) {
+        finishEffectFocusRegionDrawing()
+        clearTimelineHover()
+        isTimelineKeyboardFocused = true
+        suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
+        viewModel.selectZoomMarker(marker.id, seekPlaybackHead: false)
+        activeTimelineMarkerDragID = marker.id
+        activeTimelineMarkerDragStartTime = marker.sourceEventTimestamp
+        activeTimelineMarkerDragTimeOffset = marker.sourceEventTimestamp - timelineTime(for: startX, width: width, visibleRange: visibleRange)
+        activeTimelineMarkerDragCursorX = startX
+        activeTimelineMarkerDragWidth = max(width, 1)
+        activeTimelineMarkerDragDuration = max(duration, 0.001)
+    }
+
+    func updateTimelineMarkerDrag(
+        cursorX: CGFloat,
+        width: CGFloat,
+        duration: Double
+    ) {
+        guard activeTimelineMarkerDragID != nil else { return }
+
+        let safeWidth = max(width, 1)
+        let safeDuration = max(duration, 0.001)
+        let clampedCursorX = min(max(cursorX, 0), safeWidth)
+        activeTimelineMarkerDragCursorX = clampedCursorX
+        activeTimelineMarkerDragWidth = safeWidth
+        activeTimelineMarkerDragDuration = safeDuration
+
+        let visibleRange = timelineVisibleRange(for: safeDuration)
+        let targetTime = timelineMarkerDragTime(
+            cursorX: clampedCursorX,
+            width: safeWidth,
+            visibleRange: visibleRange
+        )
+        viewModel.updateSelectedTimelineMarkerDrag(to: targetTime)
+        updateTimelineMarkerAutoScroll(cursorX: clampedCursorX, width: safeWidth, duration: safeDuration)
+    }
+
+    func finishTimelineMarkerDrag(
+        cursorX: CGFloat,
+        width: CGFloat,
+        duration: Double
+    ) {
+        guard activeTimelineMarkerDragID != nil else { return }
+
+        cancelTimelineMarkerAutoScroll()
+        let safeWidth = max(width, 1)
+        let safeDuration = max(duration, 0.001)
+        let clampedCursorX = min(max(cursorX, 0), safeWidth)
+        let visibleRange = timelineVisibleRange(for: safeDuration)
+        let targetTime = timelineMarkerDragTime(
+            cursorX: clampedCursorX,
+            width: safeWidth,
+            visibleRange: visibleRange
+        )
+        viewModel.commitSelectedTimelineMarkerDrag(to: targetTime)
+        activeTimelineMarkerDragID = nil
+        activeTimelineMarkerDragStartTime = nil
+        activeTimelineMarkerDragCursorX = nil
+    }
+
+    private func timelineMarkerDragTime(
+        cursorX: CGFloat,
+        width: CGFloat,
+        visibleRange: TimelineVisibleRange
+    ) -> Double {
+        min(
+            max(timelineTime(for: cursorX, width: width, visibleRange: visibleRange) + activeTimelineMarkerDragTimeOffset, 0),
+            visibleRange.fullDuration
+        )
+    }
+
+    private func updateTimelineMarkerAutoScroll(cursorX: CGFloat, width: CGFloat, duration: Double) {
+        guard activeTimelineMarkerDragID != nil,
+              timelineMarkerAutoScrollIntensity(cursorX: cursorX, width: width) != nil,
+              timelineVisibleRange(for: duration).duration < max(duration, 0.001) else {
+            cancelTimelineMarkerAutoScroll()
+            return
+        }
+
+        guard timelineMarkerAutoScrollTask == nil else { return }
+
+        timelineMarkerAutoScrollTask = Task { @MainActor in
+            while !Task.isCancelled {
+                guard tickTimelineMarkerAutoScroll() else { break }
+                try? await Task.sleep(nanoseconds: 16_000_000)
+            }
+            timelineMarkerAutoScrollTask = nil
+        }
+    }
+
+    private func cancelTimelineMarkerAutoScroll() {
+        timelineMarkerAutoScrollTask?.cancel()
+        timelineMarkerAutoScrollTask = nil
+    }
+
+    private func tickTimelineMarkerAutoScroll() -> Bool {
+        guard activeTimelineMarkerDragID != nil,
+              let cursorX = activeTimelineMarkerDragCursorX,
+              let edgeState = timelineMarkerAutoScrollIntensity(cursorX: cursorX, width: activeTimelineMarkerDragWidth) else {
+            return false
+        }
+
+        let safeDuration = max(activeTimelineMarkerDragDuration, 0.001)
+        let visibleRange = timelineVisibleRange(for: safeDuration)
+        guard visibleRange.duration < visibleRange.fullDuration else { return false }
+
+        let speed = visibleRange.duration * 0.75 * edgeState.intensity * edgeState.intensity
+        let proposedStartTime = visibleTimelineStartTime + (edgeState.direction * speed / 60)
+        let newStartTime = clampedTimelineStartTime(
+            proposedStartTime,
+            visibleDuration: visibleRange.duration,
+            fullDuration: visibleRange.fullDuration
+        )
+
+        guard abs(newStartTime - visibleTimelineStartTime) > 0.0001 else { return false }
+
+        visibleTimelineStartTime = newStartTime
+        let updatedRange = timelineVisibleRange(for: safeDuration)
+        let targetTime = timelineMarkerDragTime(
+            cursorX: cursorX,
+            width: activeTimelineMarkerDragWidth,
+            visibleRange: updatedRange
+        )
+        viewModel.updateSelectedTimelineMarkerDrag(to: targetTime)
+        return true
+    }
+
+    private func timelineMarkerAutoScrollIntensity(cursorX: CGFloat, width: CGFloat) -> (direction: Double, intensity: Double)? {
+        let safeWidth = max(width, 1)
+        let edgeWidth = min(CGFloat(80), safeWidth / 3)
+        guard edgeWidth > 0 else { return nil }
+
+        if cursorX < edgeWidth {
+            return (-1, Double((edgeWidth - max(cursorX, 0)) / edgeWidth))
+        }
+
+        if cursorX > safeWidth - edgeWidth {
+            return (1, Double((min(cursorX, safeWidth) - (safeWidth - edgeWidth)) / edgeWidth))
+        }
+
+        return nil
+    }
+
+    private func previousMarkerNavigationTarget() -> MarkerNavigationTarget? {
+        markerNavigationTarget(direction: .previous)
+    }
+
+    private func nextMarkerNavigationTarget() -> MarkerNavigationTarget? {
+        markerNavigationTarget(direction: .next)
+    }
+
+    private func markerNavigationTarget(direction: MarkerNavigationDirection) -> MarkerNavigationTarget? {
+        guard (selectedTab ?? .capture) == .review,
+              let summary = viewModel.recordingSummary else {
+            return nil
+        }
+
+        switch editorMode {
+        case .zoomAndClicks:
+            let markers = summary.zoomMarkers.sorted {
+                if $0.sourceEventTimestamp == $1.sourceEventTimestamp {
+                    return $0.id < $1.id
+                }
+                return $0.sourceEventTimestamp < $1.sourceEventTimestamp
+            }
+            guard !markers.isEmpty else { return nil }
+
+            if let selectedMarkerID = viewModel.selectedZoomMarkerID,
+               let selectedIndex = markers.firstIndex(where: { $0.id == selectedMarkerID }) {
+                switch direction {
+                case .previous:
+                    guard selectedIndex > 0 else { return nil }
+                    return .zoom(markers[selectedIndex - 1])
+                case .next:
+                    guard selectedIndex < markers.count - 1 else { return nil }
+                    return .zoom(markers[selectedIndex + 1])
+                }
+            }
+
+            switch direction {
+            case .previous:
+                return markers.last(where: { $0.sourceEventTimestamp < viewModel.currentPlaybackTime }).map(MarkerNavigationTarget.zoom)
+            case .next:
+                return markers.first(where: { $0.sourceEventTimestamp > viewModel.currentPlaybackTime }).map(MarkerNavigationTarget.zoom)
+            }
+
+        case .effects:
+            let markers = summary.effectMarkers.sorted {
+                if $0.snapTime == $1.snapTime {
+                    return $0.id < $1.id
+                }
+                return $0.snapTime < $1.snapTime
+            }
+            guard !markers.isEmpty else { return nil }
+
+            if let selectedMarkerID = viewModel.selectedEffectMarkerID,
+               let selectedIndex = markers.firstIndex(where: { $0.id == selectedMarkerID }) {
+                switch direction {
+                case .previous:
+                    guard selectedIndex > 0 else { return nil }
+                    return .effect(markers[selectedIndex - 1])
+                case .next:
+                    guard selectedIndex < markers.count - 1 else { return nil }
+                    return .effect(markers[selectedIndex + 1])
+                }
+            }
+
+            switch direction {
+            case .previous:
+                return markers.last(where: { $0.snapTime < viewModel.currentPlaybackTime }).map(MarkerNavigationTarget.effect)
+            case .next:
+                return markers.first(where: { $0.snapTime > viewModel.currentPlaybackTime }).map(MarkerNavigationTarget.effect)
+            }
+        }
+    }
+
+    func navigateToPreviousMarkerFromMenu() {
+        navigateToMarkerFromMenu(previousMarkerNavigationTarget())
+    }
+
+    func navigateToNextMarkerFromMenu() {
+        navigateToMarkerFromMenu(nextMarkerNavigationTarget())
+    }
+
+    private func navigateToMarkerFromMenu(_ target: MarkerNavigationTarget?) {
+        guard let target else { return }
+
+        finishEffectFocusRegionDrawing()
+        isTimelineKeyboardFocused = true
+        revealTimelineTimeFromMenu(target.time)
+
+        switch target {
+        case .zoom(let marker):
+            suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
+            viewModel.selectZoomMarker(marker.id, seekPlaybackHead: true)
+        case .effect(let marker):
+            viewModel.selectEffectMarker(marker.id, seekPlaybackHead: true)
+        }
+    }
+
+    private func revealTimelineTimeFromMenu(_ time: Double) {
+        guard let duration = timelineCommandDuration else { return }
+
+        let visibleRange = timelineVisibleRange(for: duration)
+        guard visibleRange.duration < visibleRange.fullDuration else { return }
+
+        let padding = min(visibleRange.duration * 0.15, max(visibleRange.duration / 2, 0))
+        let leadingEdge = visibleRange.startTime + padding
+        let trailingEdge = visibleRange.endTime - padding
+
+        let proposedStartTime: Double
+        if time < leadingEdge {
+            proposedStartTime = time - padding
+        } else if time > trailingEdge {
+            proposedStartTime = time + padding - visibleRange.duration
+        } else {
+            return
+        }
+
+        visibleTimelineStartTime = clampedTimelineStartTime(
+            proposedStartTime,
+            visibleDuration: visibleRange.duration,
+            fullDuration: visibleRange.fullDuration
+        )
+    }
+
+    private func deleteSelectedMarkerFromMenu() {
+        switch editorMode {
+        case .zoomAndClicks:
+            viewModel.deleteSelectedMarker()
+        case .effects:
+            viewModel.deleteSelectedEffectMarker()
+        }
+    }
+
+    private func duplicateSelectedMarkerFromMenu() {
+        guard editorMode == .zoomAndClicks else { return }
+        viewModel.duplicateSelectedMarker()
     }
 
     func reviewHeaderActionIcon(_ systemName: String, action: ReviewHeaderAction) -> some View {

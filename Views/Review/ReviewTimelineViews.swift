@@ -221,6 +221,34 @@ extension ContentView {
         CGFloat(visibleRange.clampedRatio(for: time)) * width
     }
 
+    func zoomTimelineMarkerHitTarget(
+        at point: CGPoint,
+        width: CGFloat,
+        verticalOrigin: CGFloat,
+        layouts: [TimelineSegmentLayout]
+    ) -> TimelineSegmentLayout? {
+        let laneHeight: CGFloat = 9
+        let laneSpacing: CGFloat = 4
+        let hoverTargetPadding: CGFloat = 7
+        let hoverTargetWidthMinimum: CGFloat = 18
+        let localHeight: CGFloat = 34
+
+        return layouts.reversed().first { layout in
+            let laneY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
+            let startX = CGFloat(layout.startRatio) * width
+            let endX = CGFloat(layout.endRatio) * width
+            let eventX = CGFloat(layout.eventRatio) * width
+            let barWidth = max(endX - startX, 10)
+            let hoverTargetWidth = max(barWidth + (hoverTargetPadding * 2), hoverTargetWidthMinimum)
+            let localMinX = max(min(startX, eventX - 8) - hoverTargetPadding, 0)
+            let localMaxX = min(max(endX, eventX + 8) + hoverTargetPadding, width)
+            let localWidth = max(localMaxX - localMinX, hoverTargetWidth)
+            let hitRect = CGRect(x: localMinX, y: laneY, width: localWidth, height: localHeight)
+
+            return hitRect.contains(point)
+        }
+    }
+
     func timelineSnapTarget(
         at x: CGFloat,
         width: CGFloat,

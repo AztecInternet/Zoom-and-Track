@@ -51,7 +51,7 @@ extension ContentView {
         hoveredEffectTooltipMarker: EffectPlanItem?,
         hoveredEffectTooltipMarkerNumber: Int?,
         hoveredEffectTooltipAnchor: CGPoint?,
-        playheadX: CGFloat,
+        playheadX: CGFloat?,
         isDraggingTimeline: Bool,
         displayedPhaseProvider: @escaping (ZoomPlanItem) -> MarkerTimingPhase?,
         zoomPlaybackHighlightProvider: @escaping (ZoomPlanItem) -> Bool,
@@ -157,12 +157,14 @@ extension ContentView {
                 )
             }
 
-            timelinePlayheadView(
-                playheadX: playheadX,
-                width: width,
-                trackCenterY: trackCenterY,
-                isDraggingTimeline: isDraggingTimeline
-            )
+            if let playheadX {
+                timelinePlayheadView(
+                    playheadX: playheadX,
+                    width: width,
+                    trackCenterY: trackCenterY,
+                    isDraggingTimeline: isDraggingTimeline
+                )
+            }
         }
     }
 
@@ -194,7 +196,7 @@ extension ContentView {
         .frame(width: 22, height: 52)
         .shadow(color: Color.accentColor.opacity(isDraggingTimeline ? 0.42 : 0.22), radius: isDraggingTimeline ? 6 : 3, x: 0, y: 0)
         .position(
-            x: min(max(playheadX, 11), max(width - 11, 11)),
+            x: playheadX,
             y: trackCenterY - 2
         )
     }

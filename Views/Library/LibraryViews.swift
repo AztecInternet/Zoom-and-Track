@@ -91,6 +91,17 @@ extension ContentView {
                     .padding(20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .background(cardBackground)
+                    .overlay {
+                        if isHelpModeEnabled {
+                            HelpModeRegionHighlight()
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        HelpModeHintView(topic: .libraryBrowser, isPresented: isHelpModeEnabled, staggerIndex: 0)
+                            .frame(width: 300, alignment: .leading)
+                            .padding(12)
+                            .allowsHitTesting(false)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
@@ -319,6 +330,17 @@ extension ContentView {
         }
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(cardBackground)
+        .overlay {
+            if isHelpModeEnabled {
+                HelpModeRegionHighlight()
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            HelpModeHintView(topic: .libraryFilters, isPresented: isHelpModeEnabled, staggerIndex: 1)
+                .frame(width: 240, alignment: .leading)
+                .padding(12)
+                .allowsHitTesting(false)
+        }
     }
 
     var libraryCollectionOptions: [LibraryFilterOption] {

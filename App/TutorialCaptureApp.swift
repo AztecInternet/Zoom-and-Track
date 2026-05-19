@@ -11,5 +11,8 @@ struct TutorialCaptureApp: App {
         WindowGroup("FlowTrack Capture") {
             ContentView()
         }
+        .commands {
+            FlowTrackCommands()
+        }
     }
 }

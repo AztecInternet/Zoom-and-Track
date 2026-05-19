@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DD367DF52FBCD8A000F44877 /* HelpModeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */; };
+		DD367DF72FBCE4AC00F44877 /* FlowTrackCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF62FBCE4AC00F44877 /* FlowTrackCommands.swift */; };
 		DD88BC532FA8562800BFFBBF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD88BC422FA8562800BFFBBF /* Assets.xcassets */; };
 		DD88BC542FA8562800BFFBBF /* CaptureSetupViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD88BC432FA8562800BFFBBF /* CaptureSetupViewModel.swift */; };
 		DD88BC552FA8562800BFFBBF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD88BC442FA8562800BFFBBF /* ContentView.swift */; };
@@ -50,6 +52,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpModeViews.swift; sourceTree = "<group>"; };
+		DD367DF62FBCE4AC00F44877 /* FlowTrackCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackCommands.swift; sourceTree = "<group>"; };
 		DD88BC422FA8562800BFFBBF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DD88BC432FA8562800BFFBBF /* CaptureSetupViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSetupViewModel.swift; sourceTree = "<group>"; };
 		DD88BC442FA8562800BFFBBF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -117,6 +121,7 @@
 			children = (
 				DD88BC522FA8562800BFFBBF /* TutorialCaptureApp.swift */,
 				DD88BC442FA8562800BFFBBF /* ContentView.swift */,
+				DD367DF62FBCE4AC00F44877 /* FlowTrackCommands.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -237,6 +242,7 @@
 				DD88BC902FABCCC800BFFBBF /* TimecodeFormatting.swift */,
 				DD88BC922FABD3E600BFFBBF /* ExportProgressSheetViews.swift */,
 				DDA524BA2FB664F2001B74F0 /* FlowTrackAccent.swift */,
+				DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -355,8 +361,10 @@
 				DD88BC582FA8562800BFFBBF /* MarkerPreviewCacheService.swift in Sources */,
 				DD88BC7D2FAB916100BFFBBF /* LibraryManager.swift in Sources */,
 				DD88BC672FAA924100BFFBBF /* ReviewPlaybackPreviewViews.swift in Sources */,
+				DD367DF72FBCE4AC00F44877 /* FlowTrackCommands.swift in Sources */,
 				DD88BC6F2FAAA92500BFFBBF /* ReviewTimelineInteractionViews.swift in Sources */,
 				DD88BC592FA8562800BFFBBF /* MarkerPreviewRenderService.swift in Sources */,
+				DD367DF52FBCD8A000F44877 /* HelpModeViews.swift in Sources */,
 				DD88BC782FAB026400BFFBBF /* MarkerListTableViews.swift in Sources */,
 				DD88BC9B2FAEF0BC00BFFBBF /* RealtimeEffectPreviewSurface.swift in Sources */,
 				DD88BC792FAB026400BFFBBF /* ReviewSupportViews.swift in Sources */,

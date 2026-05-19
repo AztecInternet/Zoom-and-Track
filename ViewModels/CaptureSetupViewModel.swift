@@ -973,6 +973,16 @@ final class CaptureSetupViewModel: ObservableObject {
         )
     }
 
+    func updateSelectedTimelineMarkerDrag(to seconds: Double) {
+        guard canEditClickFocusMarkers, let markerID = selectedZoomMarkerID else { return }
+        moveMarker(markerID, to: seconds, persist: false, seekPlaybackHead: false)
+    }
+
+    func commitSelectedTimelineMarkerDrag(to seconds: Double) {
+        guard canEditClickFocusMarkers, let markerID = selectedZoomMarkerID else { return }
+        moveMarker(markerID, to: seconds, persist: true, seekPlaybackHead: true)
+    }
+
     func nudgeSelectedEffectTimelineMarker(by delta: Double) {
         guard let summary = recordingSummary,
               let markerID = selectedEffectMarkerID,
