@@ -5,6 +5,7 @@ struct FlowTrackCommandContext {
     var canZoomTimelineIn: Bool
     var canZoomTimelineOut: Bool
     var canResetTimelineZoom: Bool
+    var isTimelineScrubSnappingEnabled: Bool
     var canUsePlayback: Bool
     var canJumpToStart: Bool
     var canGoToPreviousMarker: Bool
@@ -15,6 +16,7 @@ struct FlowTrackCommandContext {
     var zoomTimelineIn: () -> Void
     var zoomTimelineOut: () -> Void
     var resetTimelineZoom: () -> Void
+    var toggleTimelineScrubSnapping: () -> Void
     var togglePlayback: () -> Void
     var jumpToStart: () -> Void
     var goToPreviousMarker: () -> Void
@@ -56,6 +58,11 @@ struct FlowTrackCommands: Commands {
             }
             .keyboardShortcut("0", modifiers: [.command, .shift])
             .disabled(commandContext?.canResetTimelineZoom != true)
+
+            Button(commandContext?.isTimelineScrubSnappingEnabled == true ? "Snap Playhead to Markers" : "Snap Playhead to Markers") {
+                commandContext?.toggleTimelineScrubSnapping()
+            }
+            .disabled(commandContext == nil)
 
             Divider()
 

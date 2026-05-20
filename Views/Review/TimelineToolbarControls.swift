@@ -7,10 +7,12 @@ struct TimelineToolbarView: View {
     let selectedMarker: ZoomPlanItem?
     let showsNoZoomFallbackControls: Bool
     let isDrawingNoZoomOverflowRegion: Bool
+    let isTimelineScrubSnappingEnabled: Bool
     let onToggleAddClickFocus: () -> Void
     let onDeleteSelectedMarker: () -> Void
     let onSelectNoZoomFallbackMode: (NoZoomFallbackMode) -> Void
     let onToggleOverflowRegion: () -> Void
+    let onToggleTimelineScrubSnapping: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -92,6 +94,21 @@ struct TimelineToolbarView: View {
                     )
                 }
             }
+
+            Divider()
+                .frame(height: 14)
+
+            Text(isTimelineScrubSnappingEnabled ? "snapping on" : "snapping off")
+                .font(.system(size: 10, weight: .light))
+                .foregroundStyle(Color.accentColor)
+
+            TimelineGadgetButton(
+                systemName: "arrow.down.to.line.compact",
+                isActive: isTimelineScrubSnappingEnabled,
+                isEnabled: true,
+                help: "Turn marker snapping on or off while moving the playhead",
+                action: onToggleTimelineScrubSnapping
+            )
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -112,10 +129,12 @@ struct EffectsTimelineToolbarView: View {
     let isDrawingFocusRegion: Bool
     let showsOverlayToggle: Bool
     let isShowingOverlay: Bool
+    let isTimelineScrubSnappingEnabled: Bool
     let onAddMarker: () -> Void
     let onDeleteSelectedMarker: () -> Void
     let onToggleFocusRegion: () -> Void
     let onToggleOverlay: () -> Void
+    let onToggleTimelineScrubSnapping: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -182,6 +201,21 @@ struct EffectsTimelineToolbarView: View {
                     .help("Show the imported distortion color map over the video")
                 }
             }
+
+            Divider()
+                .frame(height: 14)
+
+            Text(isTimelineScrubSnappingEnabled ? "snapping on" : "snapping off")
+                .font(.system(size: 10, weight: .light))
+                .foregroundStyle(Color.accentColor)
+
+            TimelineGadgetButton(
+                systemName: "arrow.down.to.line.compact",
+                isActive: isTimelineScrubSnappingEnabled,
+                isEnabled: true,
+                help: "Turn marker snapping on or off while moving the playhead",
+                action: onToggleTimelineScrubSnapping
+            )
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

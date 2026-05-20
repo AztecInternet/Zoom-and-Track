@@ -698,15 +698,15 @@ extension ContentView {
         let visibleRange = timelineVisibleRange(for: duration)
         let segmentLayouts = timelineSegmentLayouts(for: summary.zoomMarkers, duration: duration, visibleRange: visibleRange)
         let effectLayouts = effectTimelineSegmentLayouts(for: summary.effectMarkers, duration: duration, visibleRange: visibleRange)
-        let trackCenterY: CGFloat = 34
-        let segmentOriginY: CGFloat = 16
+        let trackCenterY: CGFloat = 46
+        let segmentOriginY: CGFloat = 28
         let hoveredTooltipEntry = hoveredTimelineTooltipEntry(in: summary)
         let hoveredEffectTooltipEntry = hoveredEffectTimelineTooltipEntry(in: summary)
         let timelineInteractionSuppressed = activeTimelineMarkerDragID != nil
         let selectedMarker = editorMode == .zoomAndClicks ? viewModel.selectedZoomMarker : nil
         let showsNoZoomFallbackControls = selectedMarker?.zoomType == .noZoom
 
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 ReviewEditorModeControlStrip(editorMode: editorMode) { mode in
                     editorMode = mode
@@ -721,6 +721,7 @@ extension ContentView {
                         canEditClickFocusMarkers: viewModel.canEditClickFocusMarkers,
                         isPlacingClickFocus: isPlacingClickFocus,
                         isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion,
+                        isTimelineScrubSnappingEnabled: isTimelineScrubSnappingEnabled,
                         onToggleAddClickFocus: {
                             if isPlacingClickFocus {
                                 isPlacingClickFocus = false
@@ -762,6 +763,9 @@ extension ContentView {
                                 isDrawingNoZoomOverflowRegion = true
                                 isTimelineKeyboardFocused = true
                             }
+                        },
+                        onToggleTimelineScrubSnapping: {
+                            isTimelineScrubSnappingEnabled.toggle()
                         }
                     )
                         .padding(.trailing, 18)
@@ -772,6 +776,7 @@ extension ContentView {
                         isDrawingFocusRegion: isDrawingEffectFocusRegion,
                         showsOverlayToggle: viewModel.canShowSelectedDistortionMapOverlay,
                         isShowingOverlay: viewModel.isShowingDistortionMapOverlay,
+                        isTimelineScrubSnappingEnabled: isTimelineScrubSnappingEnabled,
                         onAddMarker: {
                             guard viewModel.selectedEffectMarkerID == nil else { return }
                             viewModel.cancelPlaybackPreview()
@@ -811,6 +816,9 @@ extension ContentView {
                         },
                         onToggleOverlay: {
                             viewModel.toggleDistortionMapOverlay()
+                        },
+                        onToggleTimelineScrubSnapping: {
+                            isTimelineScrubSnappingEnabled.toggle()
                         }
                     )
                         .padding(.trailing, 18)
@@ -819,7 +827,9 @@ extension ContentView {
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
-            .frame(minHeight: 28)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             GeometryReader { geometry in
                 let width = max(geometry.size.width, 1)
@@ -937,10 +947,10 @@ extension ContentView {
                             }
 
                             if isDraggingTimeline {
-                                let zoomSnap = editorMode == .zoomAndClicks
+                                let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
                                     ? timelineSnapTarget(at: currentX, width: width, visibleRange: visibleRange, markers: summary.zoomMarkers)
                                     : nil
-                                let effectSnap = editorMode == .effects
+                                let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
                                     ? effectTimelineSnapTarget(at: currentX, width: width, visibleRange: visibleRange, markers: summary.effectMarkers)
                                     : nil
                                 viewModel.updateTimelineScrub(
@@ -967,10 +977,10 @@ extension ContentView {
                                 return
                             }
 
-                            let zoomSnap = editorMode == .zoomAndClicks
+                            let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
                                 ? timelineSnapTarget(at: endX, width: width, visibleRange: visibleRange, markers: summary.zoomMarkers)
                                 : nil
-                            let effectSnap = editorMode == .effects
+                            let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
                                 ? effectTimelineSnapTarget(at: endX, width: width, visibleRange: visibleRange, markers: summary.effectMarkers)
                                 : nil
                             let effectHit = editorMode == .effects
@@ -1050,7 +1060,7 @@ extension ContentView {
                     .allowsHitTesting(false)
                 }
             }
-            .frame(height: 60)
+            .frame(height: 76)
 
             timelineFooterView(
                 visibleRange: visibleRange,
@@ -1058,6 +1068,9 @@ extension ContentView {
                 isDrawingEffectFocusRegion: isDrawingEffectFocusRegion,
                 isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion
             )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .overlay {
             if isHelpModeEnabled {

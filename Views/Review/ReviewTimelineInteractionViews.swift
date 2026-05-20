@@ -1,5 +1,22 @@
 import SwiftUI
 
+private struct TimelinePlayheadHandleShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+
+        let sideY = rect.height * 0.34
+        let neckY = rect.maxY
+
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + sideY))
+        path.addLine(to: CGPoint(x: rect.midX, y: neckY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + sideY))
+        path.closeSubpath()
+        return path
+    }
+}
+
 extension ContentView {
     @ViewBuilder
     func timelineToolbar(
@@ -10,10 +27,12 @@ extension ContentView {
         canEditClickFocusMarkers: Bool,
         isPlacingClickFocus: Bool,
         isDrawingNoZoomOverflowRegion: Bool,
+        isTimelineScrubSnappingEnabled: Bool,
         onToggleAddClickFocus: @escaping () -> Void,
         onDeleteSelectedMarker: @escaping () -> Void,
         onSelectNoZoomFallbackMode: @escaping (NoZoomFallbackMode) -> Void,
-        onToggleOverflowRegion: @escaping () -> Void
+        onToggleOverflowRegion: @escaping () -> Void,
+        onToggleTimelineScrubSnapping: @escaping () -> Void
     ) -> some View {
         TimelineToolbarView(
             hasSelectedMarker: hasSelectedMarker,
@@ -22,10 +41,12 @@ extension ContentView {
             selectedMarker: selectedMarker,
             showsNoZoomFallbackControls: showsNoZoomFallbackControls,
             isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion,
+            isTimelineScrubSnappingEnabled: isTimelineScrubSnappingEnabled,
             onToggleAddClickFocus: onToggleAddClickFocus,
             onDeleteSelectedMarker: onDeleteSelectedMarker,
             onSelectNoZoomFallbackMode: onSelectNoZoomFallbackMode,
-            onToggleOverflowRegion: onToggleOverflowRegion
+            onToggleOverflowRegion: onToggleOverflowRegion,
+            onToggleTimelineScrubSnapping: onToggleTimelineScrubSnapping
         )
     }
 
@@ -174,27 +195,35 @@ extension ContentView {
         trackCenterY: CGFloat,
         isDraggingTimeline: Bool
     ) -> some View {
-        ZStack {
+        let playheadColor = Color.accentColor
+        let separationColor = Color(nsColor: .controlBackgroundColor)
+
+        return ZStack {
             Rectangle()
-                .fill(Color.accentColor)
-                .frame(width: 3, height: 40)
+                .fill(separationColor)
+                .frame(width: 4, height: 54)
 
-            Circle()
-                .fill(Color.accentColor)
-                .frame(width: 11, height: 11)
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(0.6), lineWidth: 1)
-                )
-                .offset(y: -19)
+            TimelinePlayheadHandleShape()
+                .fill(separationColor)
+                .frame(width: 28, height: 24)
+                .offset(y: -29)
 
-            Circle()
-                .fill(Color.accentColor.opacity(0.001))
-                .frame(width: 22, height: 22)
-                .offset(y: -19)
+            Rectangle()
+                .fill(playheadColor)
+                .frame(width: 2, height: 54)
+
+            TimelinePlayheadHandleShape()
+                .fill(playheadColor)
+                .frame(width: 26, height: 22)
+                .offset(y: -29)
+
+            Rectangle()
+                .fill(playheadColor.opacity(0.001))
+                .frame(width: 34, height: 34)
+                .offset(y: -28)
         }
-        .frame(width: 22, height: 52)
-        .shadow(color: Color.accentColor.opacity(isDraggingTimeline ? 0.42 : 0.22), radius: isDraggingTimeline ? 6 : 3, x: 0, y: 0)
+        .frame(width: 34, height: 70)
+        .shadow(color: Color.black.opacity(isDraggingTimeline ? 0.10 : 0.05), radius: isDraggingTimeline ? 1 : 0.5, x: 0, y: 0.5)
         .position(
             x: playheadX,
             y: trackCenterY - 2

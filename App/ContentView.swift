@@ -68,6 +68,7 @@ struct ContentView: View {
     @State private var timelineScrubAutoScrollTask: Task<Void, Never>?
     @State var timelineZoomScale = 1.0
     @State var visibleTimelineStartTime = 0.0
+    @State var isTimelineScrubSnappingEnabled = true
     @State var librarySearchText = ""
     @State var editorMode: ReviewEditorMode = .zoomAndClicks
     @State var inspectorMode: EditInspectorMode = .markers
@@ -639,6 +640,7 @@ struct ContentView: View {
             canZoomTimelineIn: canZoomTimelineInFromMenu,
             canZoomTimelineOut: canZoomTimelineOutFromMenu,
             canResetTimelineZoom: canResetTimelineZoomFromMenu,
+            isTimelineScrubSnappingEnabled: isTimelineScrubSnappingEnabled,
             canUsePlayback: canUsePlaybackFromMenu,
             canJumpToStart: canUsePlaybackFromMenu,
             canGoToPreviousMarker: previousMarkerNavigationTarget() != nil,
@@ -656,6 +658,9 @@ struct ContentView: View {
             },
             resetTimelineZoom: {
                 resetTimelineZoomFromMenu()
+            },
+            toggleTimelineScrubSnapping: {
+                isTimelineScrubSnappingEnabled.toggle()
             },
             togglePlayback: {
                 viewModel.togglePlayback()
