@@ -951,8 +951,9 @@ final class CaptureSetupViewModel: ObservableObject {
         seekPlayback(to: plan.targetTime)
     }
 
-    func nudgeSelectedTimelineMarker(by delta: Double) {
+    func nudgeSelectedTimelineMarker(by delta: Double, stepDuration: Double? = nil) {
         guard canEditClickFocusMarkers, let markerID = selectedZoomMarkerID else { return }
+        let nudgeInterval = stepDuration ?? timelineMarkerNudgeInterval
         cancelPendingMarkerPreviewRender()
         if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
             playbackTransitionPlateState = .hidden
@@ -967,7 +968,7 @@ final class CaptureSetupViewModel: ObservableObject {
         manualSelectionSuppressionUntil = Date().addingTimeInterval(0.2)
         moveMarker(
             markerID,
-            to: selectedMarkerTimestamp(for: markerID) + (delta * timelineMarkerNudgeInterval),
+            to: selectedMarkerTimestamp(for: markerID) + (delta * nudgeInterval),
             persist: true,
             seekPlaybackHead: true
         )
@@ -983,10 +984,11 @@ final class CaptureSetupViewModel: ObservableObject {
         moveMarker(markerID, to: seconds, persist: true, seekPlaybackHead: true)
     }
 
-    func nudgeSelectedEffectTimelineMarker(by delta: Double) {
+    func nudgeSelectedEffectTimelineMarker(by delta: Double, stepDuration: Double? = nil) {
         guard let summary = recordingSummary,
               let markerID = selectedEffectMarkerID,
               let index = summary.effectMarkers.firstIndex(where: { $0.id == markerID }) else { return }
+        let nudgeInterval = stepDuration ?? timelineMarkerNudgeInterval
 
         cancelPendingMarkerPreviewRender()
         if playbackPresentationMode == .previewCompletedSlate || playbackPresentationMode == .renderingPreview {
@@ -1005,7 +1007,7 @@ final class CaptureSetupViewModel: ObservableObject {
         let timelineOffsetToStart = currentMarker.startTime - currentMarker.sourceEventTimestamp
         let timelineOffsetToEnd = currentMarker.endTime - currentMarker.sourceEventTimestamp
         let targetTimestamp = min(
-            max(currentMarker.sourceEventTimestamp + (delta * timelineMarkerNudgeInterval), 0),
+            max(currentMarker.sourceEventTimestamp + (delta * nudgeInterval), 0),
             maxDuration
         )
 

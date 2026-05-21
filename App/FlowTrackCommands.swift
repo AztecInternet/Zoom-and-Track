@@ -8,6 +8,7 @@ struct FlowTrackCommandContext {
     var isTimelineScrubSnappingEnabled: Bool
     var canUsePlayback: Bool
     var canJumpToStart: Bool
+    var canNudgePlayheadByFrame: Bool
     var canGoToPreviousMarker: Bool
     var canGoToNextMarker: Bool
     var canDeleteSelectedMarker: Bool
@@ -19,6 +20,8 @@ struct FlowTrackCommandContext {
     var toggleTimelineScrubSnapping: () -> Void
     var togglePlayback: () -> Void
     var jumpToStart: () -> Void
+    var nudgePlayheadBackwardOneFrame: () -> Void
+    var nudgePlayheadForwardOneFrame: () -> Void
     var goToPreviousMarker: () -> Void
     var goToNextMarker: () -> Void
     var deleteSelectedMarker: () -> Void
@@ -85,6 +88,18 @@ struct FlowTrackCommands: Commands {
             }
             .keyboardShortcut(.leftArrow, modifiers: .command)
             .disabled(commandContext?.canJumpToStart != true)
+
+            Button("Nudge Playhead Left One Frame") {
+                commandContext?.nudgePlayheadBackwardOneFrame()
+            }
+            .keyboardShortcut(",", modifiers: [])
+            .disabled(commandContext?.canNudgePlayheadByFrame != true)
+
+            Button("Nudge Playhead Right One Frame") {
+                commandContext?.nudgePlayheadForwardOneFrame()
+            }
+            .keyboardShortcut(".", modifiers: [])
+            .disabled(commandContext?.canNudgePlayheadByFrame != true)
         }
 
         CommandMenu("Marker") {

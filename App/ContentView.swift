@@ -69,6 +69,8 @@ struct ContentView: View {
     @State var timelineZoomScale = 1.0
     @State var visibleTimelineStartTime = 0.0
     @State var isTimelineScrubSnappingEnabled = true
+    @State var isPlayheadTimeNudgeFlashActive = false
+    @State private var playheadTimeNudgeFlashTask: Task<Void, Never>?
     @State var librarySearchText = ""
     @State var editorMode: ReviewEditorMode = .zoomAndClicks
     @State var inspectorMode: EditInspectorMode = .markers
@@ -395,7 +397,7 @@ struct ContentView: View {
                     let inspectorWidth: CGFloat = 320
                     let activeInspectorWidth = isPlaybackInspectorVisible ? inspectorWidth : 0
                     let contentWidth = max(geometry.size.width - activeInspectorWidth - (isPlaybackInspectorVisible ? 22 : 0), 320)
-                    let reservedBottomHeight: CGFloat = 156
+                    let reservedBottomHeight: CGFloat = 132
                     let totalVerticalSpacing: CGFloat = 16
                     let maxVideoHeight = max(180, min(geometry.size.height - reservedBottomHeight - totalVerticalSpacing, geometry.size.height * 0.7))
                     let minVideoHeight = min(280, maxVideoHeight)
@@ -454,7 +456,13 @@ struct ContentView: View {
 
                             playbackTimelineStrip(summary)
 
-                            playbackTransportBar(summary)
+                            timelineInstructionView(
+                                editorMode: editorMode,
+                                isDrawingEffectFocusRegion: isDrawingEffectFocusRegion,
+                                isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion
+                            )
+                            .padding(.horizontal, 14)
+                            .padding(.top, -8)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
@@ -643,6 +651,7 @@ struct ContentView: View {
             isTimelineScrubSnappingEnabled: isTimelineScrubSnappingEnabled,
             canUsePlayback: canUsePlaybackFromMenu,
             canJumpToStart: canUsePlaybackFromMenu,
+            canNudgePlayheadByFrame: canNudgePlayheadByFrameFromMenu,
             canGoToPreviousMarker: previousMarkerNavigationTarget() != nil,
             canGoToNextMarker: nextMarkerNavigationTarget() != nil,
             canDeleteSelectedMarker: canDeleteSelectedMarkerFromMenu,
@@ -667,6 +676,12 @@ struct ContentView: View {
             },
             jumpToStart: {
                 viewModel.jumpPlaybackToStart()
+            },
+            nudgePlayheadBackwardOneFrame: {
+                nudgePlayheadByFrame(-1)
+            },
+            nudgePlayheadForwardOneFrame: {
+                nudgePlayheadByFrame(1)
             },
             goToPreviousMarker: {
                 navigateToPreviousMarkerFromMenu()
@@ -708,6 +723,14 @@ struct ContentView: View {
 
     private var canUsePlaybackFromMenu: Bool {
         (selectedTab ?? .capture) == .review && (viewModel.canUsePlaybackTransport || viewModel.isRenderedPreviewActive)
+    }
+
+    private var canNudgePlayheadByFrameFromMenu: Bool {
+        canUsePlaybackFromMenu && timelineCommandDuration != nil
+    }
+
+    var timelineFrameDuration: Double {
+        1.0 / 60.0
     }
 
     private var canDeleteSelectedMarkerFromMenu: Bool {
@@ -766,6 +789,36 @@ struct ContentView: View {
     private func resetTimelineZoomFromMenu() {
         timelineZoomScale = 1
         visibleTimelineStartTime = 0
+    }
+
+    private func nudgePlayheadByFrame(_ direction: Int) {
+        guard let duration = timelineCommandDuration else { return }
+
+        let targetTime = min(
+            max(viewModel.currentPlaybackTime + (Double(direction) * timelineFrameDuration), 0),
+            duration
+        )
+        viewModel.seekTimelineDirectly(
+            to: targetTime,
+            snappedMarkerID: nil,
+            snappedEffectMarkerID: nil,
+            suppressAutoSelectionWhenUnsnapped: true
+        )
+        revealTimelineTimeFromMenu(targetTime)
+        flashPlayheadTimeDisplay()
+    }
+
+    private func flashPlayheadTimeDisplay() {
+        playheadTimeNudgeFlashTask?.cancel()
+        isPlayheadTimeNudgeFlashActive = true
+        playheadTimeNudgeFlashTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.22)) {
+                isPlayheadTimeNudgeFlashActive = false
+            }
+            playheadTimeNudgeFlashTask = nil
+        }
     }
 
     func updateTimelineScrubAutoScroll(cursorX: CGFloat, width: CGFloat, duration: Double) {

@@ -109,13 +109,14 @@ extension ContentView {
                             renamingEffectMarkerID = nil
                         }
                     )
-                    .frame(minHeight: 220, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .layoutPriority(1)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } bottomContent: {
             effectEditorSection
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 
@@ -167,13 +168,14 @@ extension ContentView {
                             renamingMarkerID = nil
                         }
                     )
-                    .frame(minHeight: 220, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .layoutPriority(1)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } bottomContent: {
             markerEditorSection
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 

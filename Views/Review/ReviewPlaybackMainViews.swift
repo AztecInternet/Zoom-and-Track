@@ -698,13 +698,14 @@ extension ContentView {
         let visibleRange = timelineVisibleRange(for: duration)
         let segmentLayouts = timelineSegmentLayouts(for: summary.zoomMarkers, duration: duration, visibleRange: visibleRange)
         let effectLayouts = effectTimelineSegmentLayouts(for: summary.effectMarkers, duration: duration, visibleRange: visibleRange)
-        let trackCenterY: CGFloat = 46
-        let segmentOriginY: CGFloat = 28
+        let trackCenterY: CGFloat = 38
+        let segmentOriginY = trackCenterY
         let hoveredTooltipEntry = hoveredTimelineTooltipEntry(in: summary)
         let hoveredEffectTooltipEntry = hoveredEffectTimelineTooltipEntry(in: summary)
         let timelineInteractionSuppressed = activeTimelineMarkerDragID != nil
         let selectedMarker = editorMode == .zoomAndClicks ? viewModel.selectedZoomMarker : nil
         let showsNoZoomFallbackControls = selectedMarker?.zoomType == .noZoom
+        let timelineHorizontalInset: CGFloat = 14
 
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -832,84 +833,106 @@ extension ContentView {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             GeometryReader { geometry in
-                let width = max(geometry.size.width, 1)
+                let fullWidth = max(geometry.size.width, 1)
+                let timelineWidth = max(fullWidth - (timelineHorizontalInset * 2), 1)
+
+                timelineRulerView(
+                    visibleRange: visibleRange,
+                    width: timelineWidth,
+                    topY: 0
+                )
+                .frame(width: timelineWidth, alignment: .leading)
+                .offset(x: timelineHorizontalInset)
+            }
+            .frame(height: 24)
+
+            GeometryReader { geometry in
+                let fullWidth = max(geometry.size.width, 1)
+                let timelineWidth = max(fullWidth - (timelineHorizontalInset * 2), 1)
                 let playheadX = visibleRange.contains(viewModel.currentPlaybackTime)
-                    ? timelineX(for: viewModel.currentPlaybackTime, visibleRange: visibleRange, width: width)
+                    ? timelineX(for: viewModel.currentPlaybackTime, visibleRange: visibleRange, width: timelineWidth)
                     : nil
 
-                timelineCanvasView(
-                    width: width,
-                    duration: duration,
-                    visibleRange: visibleRange,
-                    trackCenterY: trackCenterY,
-                    segmentOriginY: segmentOriginY,
-                    editorMode: editorMode,
-                    segmentLayouts: segmentLayouts,
-                    effectLayouts: effectLayouts,
-                    timelineInteractionSuppressed: timelineInteractionSuppressed,
-                    selectedZoomMarkerID: viewModel.selectedZoomMarkerID,
-                    hoveredTimelineMarkerID: hoveredTimelineMarkerID,
-                    hoveredTimelinePhase: hoveredTimelinePhase,
-                    hoveredTooltipMarker: hoveredTooltipEntry?.marker,
-                    hoveredTooltipMarkerNumber: hoveredTooltipEntry?.markerNumber,
-                    hoveredTooltipAnchor: hoveredTimelineTooltipAnchor,
-                    hoveredEffectTimelineMarkerID: hoveredEffectTimelineMarkerID,
-                    selectedEffectMarkerID: viewModel.selectedEffectMarkerID,
-                    activeEffectHoldPoint: activeEffectHoldPoint,
-                    hoveredEffectTooltipMarker: hoveredEffectTooltipEntry?.marker,
-                    hoveredEffectTooltipMarkerNumber: hoveredEffectTooltipEntry?.markerNumber,
-                    hoveredEffectTooltipAnchor: hoveredEffectTimelineTooltipAnchor,
-                    playheadX: playheadX,
-                    isDraggingTimeline: isDraggingTimeline,
-                    displayedPhaseProvider: { marker in
-                        displayedTimelinePhase(for: marker)
-                    },
-                    zoomPlaybackHighlightProvider: { marker in
-                        isMarkerPlaybackHighlighted(marker)
-                    },
-                    effectPlaybackHighlightProvider: { marker in
-                        isEffectPlaybackHighlighted(marker)
-                    },
-                    onTimelineHoverChanged: { markerID, isHovering, phase, anchor in
-                        if isHovering {
-                            setTimelineHover(markerID: markerID, phase: phase, anchor: anchor)
-                        } else if hoveredTimelineMarkerID == markerID {
-                            clearTimelineHover()
+                ZStack(alignment: .leading) {
+                    timelineCanvasView(
+                        width: timelineWidth,
+                        duration: duration,
+                        visibleRange: visibleRange,
+                        trackCenterY: trackCenterY,
+                        segmentOriginY: segmentOriginY,
+                        editorMode: editorMode,
+                        segmentLayouts: segmentLayouts,
+                        effectLayouts: effectLayouts,
+                        timelineInteractionSuppressed: timelineInteractionSuppressed,
+                        selectedZoomMarkerID: viewModel.selectedZoomMarkerID,
+                        hoveredTimelineMarkerID: hoveredTimelineMarkerID,
+                        hoveredTimelinePhase: hoveredTimelinePhase,
+                        hoveredTooltipMarker: hoveredTooltipEntry?.marker,
+                        hoveredTooltipMarkerNumber: hoveredTooltipEntry?.markerNumber,
+                        hoveredTooltipAnchor: hoveredTimelineTooltipAnchor,
+                        hoveredEffectTimelineMarkerID: hoveredEffectTimelineMarkerID,
+                        selectedEffectMarkerID: viewModel.selectedEffectMarkerID,
+                        activeEffectHoldPoint: activeEffectHoldPoint,
+                        hoveredEffectTooltipMarker: hoveredEffectTooltipEntry?.marker,
+                        hoveredEffectTooltipMarkerNumber: hoveredEffectTooltipEntry?.markerNumber,
+                        hoveredEffectTooltipAnchor: hoveredEffectTimelineTooltipAnchor,
+                        playheadX: playheadX,
+                        isDraggingTimeline: isDraggingTimeline,
+                        displayedPhaseProvider: { marker in
+                            displayedTimelinePhase(for: marker)
+                        },
+                        zoomPlaybackHighlightProvider: { marker in
+                            isMarkerPlaybackHighlighted(marker)
+                        },
+                        effectPlaybackHighlightProvider: { marker in
+                            isEffectPlaybackHighlighted(marker)
+                        },
+                        onTimelineHoverChanged: { markerID, isHovering, phase, anchor in
+                            let adjustedAnchor = CGPoint(x: anchor.x + timelineHorizontalInset, y: anchor.y)
+                            if isHovering {
+                                setTimelineHover(markerID: markerID, phase: phase, anchor: adjustedAnchor)
+                            } else if hoveredTimelineMarkerID == markerID {
+                                clearTimelineHover()
+                            }
+                        },
+                        onTimelineTap: { markerID in
+                            isTimelineKeyboardFocused = true
+                            suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
+                            viewModel.selectZoomMarker(markerID, seekPlaybackHead: true)
+                        },
+                        onEffectHoverChanged: { markerID, isHovering, anchor in
+                            guard editorMode == .effects else { return }
+                            guard !timelineInteractionSuppressed else {
+                                clearEffectTimelineHover()
+                                return
+                            }
+                            if isHovering, let anchor {
+                                setEffectTimelineHover(markerID: markerID, anchor: CGPoint(x: anchor.x + timelineHorizontalInset, y: anchor.y))
+                            } else if hoveredEffectTimelineMarkerID == markerID {
+                                clearEffectTimelineHover()
+                            }
+                        },
+                        onEffectSelect: { markerID in
+                            finishEffectFocusRegionDrawing()
+                            viewModel.selectEffectMarker(markerID, seekPlaybackHead: true)
                         }
-                    },
-                    onTimelineTap: { markerID in
-                        isTimelineKeyboardFocused = true
-                        suppressMarkerListAutoScrollUntil = Date().addingTimeInterval(0.4)
-                        viewModel.selectZoomMarker(markerID, seekPlaybackHead: true)
-                    },
-                    onEffectHoverChanged: { markerID, isHovering, anchor in
-                        guard editorMode == .effects else { return }
-                        guard !timelineInteractionSuppressed else {
-                            clearEffectTimelineHover()
-                            return
-                        }
-                        if isHovering, let anchor {
-                            setEffectTimelineHover(markerID: markerID, anchor: anchor)
-                        } else if hoveredEffectTimelineMarkerID == markerID {
-                            clearEffectTimelineHover()
-                        }
-                    },
-                    onEffectSelect: { markerID in
-                        finishEffectFocusRegionDrawing()
-                        viewModel.selectEffectMarker(markerID, seekPlaybackHead: true)
-                    }
-                )
+                    )
+                    .frame(width: timelineWidth, alignment: .leading)
+                    .offset(x: timelineHorizontalInset)
+                }
                 .contentShape(Rectangle())
                 .highPriorityGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
-                            let currentX = min(max(value.location.x, 0), width)
+                            let currentX = min(max(value.location.x - timelineHorizontalInset, 0), timelineWidth)
+                            let startX = min(max(value.startLocation.x - timelineHorizontalInset, 0), timelineWidth)
+                            let startPoint = CGPoint(x: startX, y: value.startLocation.y)
                             let hasMovedEnough = abs(value.translation.width) > 3
 
                             if activeTimelineMarkerDragID != nil {
                                 updateTimelineMarkerDrag(
                                     cursorX: currentX,
-                                    width: width,
+                                    width: timelineWidth,
                                     duration: duration
                                 )
                                 return
@@ -917,8 +940,8 @@ extension ContentView {
 
                             let zoomMarkerDragTarget = editorMode == .zoomAndClicks
                                 ? zoomTimelineMarkerHitTarget(
-                                    at: value.startLocation,
-                                    width: width,
+                                    at: startPoint,
+                                    width: timelineWidth,
                                     verticalOrigin: segmentOriginY,
                                     layouts: segmentLayouts
                                 )
@@ -928,14 +951,14 @@ extension ContentView {
                                 if let zoomMarkerDragTarget {
                                     beginTimelineMarkerDrag(
                                         marker: zoomMarkerDragTarget.marker,
-                                        startX: min(max(value.startLocation.x, 0), width),
-                                        width: width,
+                                        startX: startX,
+                                        width: timelineWidth,
                                         duration: duration,
                                         visibleRange: visibleRange
                                     )
                                     updateTimelineMarkerDrag(
                                         cursorX: currentX,
-                                        width: width,
+                                        width: timelineWidth,
                                         duration: duration
                                     )
                                     return
@@ -948,50 +971,51 @@ extension ContentView {
 
                             if isDraggingTimeline {
                                 let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
-                                    ? timelineSnapTarget(at: currentX, width: width, visibleRange: visibleRange, markers: summary.zoomMarkers)
+                                    ? timelineSnapTarget(at: currentX, width: timelineWidth, visibleRange: visibleRange, markers: summary.zoomMarkers)
                                     : nil
                                 let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
-                                    ? effectTimelineSnapTarget(at: currentX, width: width, visibleRange: visibleRange, markers: summary.effectMarkers)
+                                    ? effectTimelineSnapTarget(at: currentX, width: timelineWidth, visibleRange: visibleRange, markers: summary.effectMarkers)
                                     : nil
                                 viewModel.updateTimelineScrub(
-                                    to: zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: currentX, width: width, visibleRange: visibleRange),
+                                    to: zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: currentX, width: timelineWidth, visibleRange: visibleRange),
                                     snappedMarkerID: zoomSnap?.marker.id,
                                     snappedEffectMarkerID: effectSnap?.marker.id
                                 )
                                 updateTimelineScrubAutoScroll(
                                     cursorX: currentX,
-                                    width: width,
+                                    width: timelineWidth,
                                     duration: duration
                                 )
                             }
                         }
                         .onEnded { value in
-                            let endX = min(max(value.location.x, 0), width)
+                            let endX = min(max(value.location.x - timelineHorizontalInset, 0), timelineWidth)
+                            let endPoint = CGPoint(x: endX, y: value.location.y)
 
                             if activeTimelineMarkerDragID != nil {
                                 finishTimelineMarkerDrag(
                                     cursorX: endX,
-                                    width: width,
+                                    width: timelineWidth,
                                     duration: duration
                                 )
                                 return
                             }
 
                             let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
-                                ? timelineSnapTarget(at: endX, width: width, visibleRange: visibleRange, markers: summary.zoomMarkers)
+                                ? timelineSnapTarget(at: endX, width: timelineWidth, visibleRange: visibleRange, markers: summary.zoomMarkers)
                                 : nil
                             let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
-                                ? effectTimelineSnapTarget(at: endX, width: width, visibleRange: visibleRange, markers: summary.effectMarkers)
+                                ? effectTimelineSnapTarget(at: endX, width: timelineWidth, visibleRange: visibleRange, markers: summary.effectMarkers)
                                 : nil
                             let effectHit = editorMode == .effects
                                 ? effectTimelineHitTarget(
-                                    at: value.location,
-                                    width: width,
+                                    at: endPoint,
+                                    width: timelineWidth,
                                     verticalOrigin: segmentOriginY,
                                     layouts: effectLayouts
                                 )
                                 : nil
-                            let targetTime = zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: endX, width: width, visibleRange: visibleRange)
+                            let targetTime = zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: endX, width: timelineWidth, visibleRange: visibleRange)
 
                             if isDraggingTimeline {
                                 cancelTimelineScrubAutoScroll()
@@ -1056,11 +1080,12 @@ extension ContentView {
                             )
                         }
                     )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: timelineWidth)
+                    .offset(x: timelineHorizontalInset)
                     .allowsHitTesting(false)
                 }
             }
-            .frame(height: 76)
+            .frame(height: 78)
 
             timelineFooterView(
                 visibleRange: visibleRange,
@@ -1151,10 +1176,10 @@ extension ContentView {
                 }
                 switch keyPress.key {
                 case .leftArrow:
-                    viewModel.nudgeSelectedEffectTimelineMarker(by: -1)
+                    viewModel.nudgeSelectedEffectTimelineMarker(by: -1, stepDuration: timelineFrameDuration)
                     return .handled
                 case .rightArrow:
-                    viewModel.nudgeSelectedEffectTimelineMarker(by: 1)
+                    viewModel.nudgeSelectedEffectTimelineMarker(by: 1, stepDuration: timelineFrameDuration)
                     return .handled
                 default:
                     return .ignored
@@ -1188,10 +1213,10 @@ extension ContentView {
             }
             switch keyPress.key {
             case .leftArrow:
-                viewModel.nudgeSelectedTimelineMarker(by: -1)
+                viewModel.nudgeSelectedTimelineMarker(by: -1, stepDuration: timelineFrameDuration)
                 return .handled
             case .rightArrow:
-                viewModel.nudgeSelectedTimelineMarker(by: 1)
+                viewModel.nudgeSelectedTimelineMarker(by: 1, stepDuration: timelineFrameDuration)
                 return .handled
             default:
                 return .ignored

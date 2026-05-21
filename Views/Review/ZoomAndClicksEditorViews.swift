@@ -212,7 +212,7 @@ func timelineSegment(
             }
     }
     .frame(width: localWidth, height: localHeight)
-    .position(x: localCenterX, y: laneY + (localHeight / 2))
+    .position(x: localCenterX, y: laneY)
     .brightness(isHovered ? 0.06 : 0)
 }
 

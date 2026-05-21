@@ -107,8 +107,17 @@ private struct InspectorPaneContainer<Content: View>: View {
     }
 }
 
+private struct InspectorBottomContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct ResizableInspectorSplitView<TopContent: View, BottomContent: View>: View {
     @State private var topSectionFraction: CGFloat = 0.42
+    @State private var bottomContentHeight: CGFloat = 0
 
     let minTopHeight: CGFloat
     let minBottomHeight: CGFloat
@@ -132,20 +141,37 @@ struct ResizableInspectorSplitView<TopContent: View, BottomContent: View>: View 
             topSectionFraction: $topSectionFraction,
             minTopHeight: minTopHeight,
             minBottomHeight: minBottomHeight,
+            maxBottomHeight: measuredBottomMaximumHeight,
             topContent: {
                 InspectorPaneContainer {
                     topContent
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 0)
                 }
             },
             bottomContent: {
                 NativeOverflowScrollPane {
                     bottomContent
                         .padding(.top, 12)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear
+                                    .preference(key: InspectorBottomContentHeightKey.self, value: proxy.size.height)
+                            }
+                        )
                 }
             }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onPreferenceChange(InspectorBottomContentHeightKey.self) { height in
+            guard height > 0, abs(height - bottomContentHeight) > 0.5 else { return }
+            bottomContentHeight = height
+        }
+    }
+
+    private var measuredBottomMaximumHeight: CGFloat? {
+        guard bottomContentHeight > 0 else { return nil }
+        return max(minBottomHeight, bottomContentHeight + 10)
     }
 }
 
@@ -467,6 +493,7 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
     @Binding var topSectionFraction: CGFloat
     let minTopHeight: CGFloat
     let minBottomHeight: CGFloat
+    let maxBottomHeight: CGFloat?
     let topContent: TopPane
     let bottomContent: BottomPane
 
@@ -474,12 +501,14 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
         topSectionFraction: Binding<CGFloat>,
         minTopHeight: CGFloat,
         minBottomHeight: CGFloat,
+        maxBottomHeight: CGFloat?,
         @ViewBuilder topContent: () -> TopPane,
         @ViewBuilder bottomContent: () -> BottomPane
     ) {
         self._topSectionFraction = topSectionFraction
         self.minTopHeight = minTopHeight
         self.minBottomHeight = minBottomHeight
+        self.maxBottomHeight = maxBottomHeight
         self.topContent = topContent()
         self.bottomContent = bottomContent()
     }
@@ -492,6 +521,7 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
         context.coordinator.makeSplitView(
             minTopHeight: minTopHeight,
             minBottomHeight: minBottomHeight,
+            maxBottomHeight: maxBottomHeight,
             topContent: AnyView(topContent),
             bottomContent: AnyView(bottomContent)
         )
@@ -502,6 +532,7 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
             splitView: nsView,
             minTopHeight: minTopHeight,
             minBottomHeight: minBottomHeight,
+            maxBottomHeight: maxBottomHeight,
             topContent: AnyView(topContent),
             bottomContent: AnyView(bottomContent),
             desiredFraction: topSectionFraction
@@ -516,6 +547,7 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
         private var pendingTopSectionFraction: CGFloat?
         private var minTopHeight: CGFloat = 180
         private var minBottomHeight: CGFloat = 220
+        private var maxBottomHeight: CGFloat?
 
         init(topSectionFraction: Binding<CGFloat>) {
             self._topSectionFraction = topSectionFraction
@@ -524,11 +556,13 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
         func makeSplitView(
             minTopHeight: CGFloat,
             minBottomHeight: CGFloat,
+            maxBottomHeight: CGFloat?,
             topContent: AnyView,
             bottomContent: AnyView
         ) -> InspectorSplitView {
             self.minTopHeight = minTopHeight
             self.minBottomHeight = minBottomHeight
+            self.maxBottomHeight = maxBottomHeight
 
             let splitView = InspectorSplitView()
             splitView.delegate = self
@@ -557,12 +591,14 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
             splitView: InspectorSplitView,
             minTopHeight: CGFloat,
             minBottomHeight: CGFloat,
+            maxBottomHeight: CGFloat?,
             topContent: AnyView,
             bottomContent: AnyView,
             desiredFraction: CGFloat
         ) {
             self.minTopHeight = minTopHeight
             self.minBottomHeight = minBottomHeight
+            self.maxBottomHeight = maxBottomHeight
             topHostingView.rootView = topContent
             bottomHostingView.rootView = bottomContent
             applyLayout(to: splitView, desiredFraction: desiredFraction)
@@ -595,7 +631,8 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
         }
 
         func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
-            minTopHeight
+            let availableHeight = max(splitView.bounds.height - splitView.dividerThickness, 1)
+            return max(minTopHeight, availableHeight - resolvedMaxBottomHeight(for: availableHeight))
         }
 
         func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
@@ -607,7 +644,8 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
             let availableHeight = splitView.bounds.height - splitView.dividerThickness
             guard availableHeight > 0 else { return }
 
-            let minFraction = min(max(minTopHeight / availableHeight, 0.15), 0.85)
+            let minTopCoordinate = max(minTopHeight, availableHeight - resolvedMaxBottomHeight(for: availableHeight))
+            let minFraction = min(max(minTopCoordinate / availableHeight, 0.15), 0.95)
             let maxFraction = max(min(1 - (minBottomHeight / availableHeight), 0.85), minFraction)
             let clampedFraction = min(max(desiredFraction, minFraction), maxFraction)
             let topHeight = availableHeight * clampedFraction
@@ -632,12 +670,20 @@ private struct NativeInspectorSplitView<TopPane: View, BottomPane: View>: NSView
                 hostingView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
             ])
         }
+
+        private func resolvedMaxBottomHeight(for availableHeight: CGFloat) -> CGFloat {
+            guard let maxBottomHeight else {
+                return availableHeight
+            }
+
+            return min(max(maxBottomHeight, minBottomHeight), availableHeight)
+        }
     }
 }
 
 private final class InspectorSplitView: NSSplitView {
     override var isFlipped: Bool { true }
-    override var dividerThickness: CGFloat { 12 }
+    override var dividerThickness: CGFloat { 8 }
 
     override func drawDivider(in rect: NSRect) {
         let separatorRect = NSRect(

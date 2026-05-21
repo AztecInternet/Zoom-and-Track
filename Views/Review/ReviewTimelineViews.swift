@@ -1,6 +1,16 @@
 import AppKit
 import SwiftUI
 
+struct TimelineRulerTick: Identifiable {
+    let time: Double
+    let isMajor: Bool
+    let label: String?
+
+    var id: String {
+        "\(time)-\(isMajor)"
+    }
+}
+
 struct TimelineVisibleRange: Equatable {
     let fullDuration: Double
     let startTime: Double
@@ -46,34 +56,37 @@ struct TimelineVisibleRange: Equatable {
 }
 
 extension ContentView {
-    func playbackTransportBar(_ summary: RecordingInspectionSummary) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 14) {
-                Button {
-                    viewModel.jumpPlaybackToStart()
-                } label: {
-                    Image(systemName: "backward.end.fill")
-                }
-                .buttonStyle(.plain)
-                .disabled(!viewModel.canUsePlaybackTransport && !viewModel.isRenderedPreviewActive)
-
-                Button {
-                    viewModel.togglePlayback()
-                } label: {
-                    Image(systemName: viewModel.isPlaybackActive ? "pause.fill" : "play.fill")
-                }
-                .buttonStyle(.plain)
-                .disabled(!viewModel.canUsePlaybackTransport && !viewModel.isRenderedPreviewActive && viewModel.playbackPresentationMode != .previewCompletedSlate)
-
-                Text(timecodeString(for: viewModel.currentPlaybackTime))
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.secondary)
+    func playbackTransportControls() -> some View {
+        HStack(spacing: 14) {
+            Button {
+                viewModel.jumpPlaybackToStart()
+            } label: {
+                Image(systemName: "backward.end.fill")
             }
-            .frame(maxWidth: .infinity, alignment: .center)
+            .buttonStyle(.plain)
+            .disabled(!viewModel.canUsePlaybackTransport && !viewModel.isRenderedPreviewActive)
+
+            Button {
+                viewModel.togglePlayback()
+            } label: {
+                Image(systemName: viewModel.isPlaybackActive ? "pause.fill" : "play.fill")
+            }
+            .buttonStyle(.plain)
+            .disabled(!viewModel.canUsePlaybackTransport && !viewModel.isRenderedPreviewActive && viewModel.playbackPresentationMode != .previewCompletedSlate)
+
+            Text(timecodeString(for: viewModel.currentPlaybackTime))
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(isPlayheadTimeNudgeFlashActive ? Color.primary : Color.secondary)
+                .animation(.easeOut(duration: 0.22), value: isPlayheadTimeNudgeFlashActive)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(cardBackground)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    func playbackTransportBar(_ summary: RecordingInspectionSummary) -> some View {
+        playbackTransportControls()
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(cardBackground)
     }
 
     @ViewBuilder
@@ -89,7 +102,7 @@ extension ContentView {
     ) -> some View {
         let laneHeight: CGFloat = 9
         let laneSpacing: CGFloat = 4
-        let laneY = verticalOrigin + (CGFloat(lane) * (laneHeight + laneSpacing))
+        let laneCenterY = verticalOrigin + (CGFloat(lane) * (laneHeight + laneSpacing))
         let startX = CGFloat(startRatio) * width
         let endX = CGFloat(endRatio) * width
         let eventX = CGFloat(eventRatio) * width
@@ -99,12 +112,12 @@ extension ContentView {
             Capsule(style: .continuous)
                 .fill(tint.opacity(opacity))
                 .frame(width: barWidth, height: laneHeight)
-                .position(x: startX + (barWidth / 2), y: laneY + (laneHeight / 2))
+                .position(x: startX + (barWidth / 2), y: laneCenterY)
 
             Capsule(style: .continuous)
                 .fill(tint.opacity(min(opacity + 0.12, 1)))
                 .frame(width: 5, height: 14)
-                .position(x: eventX, y: laneY + (laneHeight / 2))
+                .position(x: eventX, y: laneCenterY)
         }
         .allowsHitTesting(false)
     }
@@ -221,6 +234,67 @@ extension ContentView {
         CGFloat(visibleRange.clampedRatio(for: time)) * width
     }
 
+    func timelineRulerTicks(visibleRange: TimelineVisibleRange, width: CGFloat) -> [TimelineRulerTick] {
+        let majorInterval = timelineRulerMajorInterval(visibleDuration: visibleRange.duration, width: width)
+        let minorInterval = timelineRulerMinorInterval(for: majorInterval, visibleDuration: visibleRange.duration, width: width)
+        let firstTick = floor(visibleRange.startTime / minorInterval) * minorInterval
+        let lastTick = visibleRange.endTime
+        var ticks: [TimelineRulerTick] = []
+        var time = firstTick
+        var tickCount = 0
+
+        while time <= lastTick + (minorInterval * 0.5), tickCount < 600 {
+            if time >= visibleRange.startTime - 0.0001 {
+                let majorRatio = time / majorInterval
+                let isMajor = abs(majorRatio.rounded() - majorRatio) < 0.001
+                ticks.append(
+                    TimelineRulerTick(
+                        time: min(max(time, 0), visibleRange.fullDuration),
+                        isMajor: isMajor,
+                        label: isMajor ? timelineRulerLabel(for: time, fullDuration: visibleRange.fullDuration) : nil
+                    )
+                )
+            }
+
+            time += minorInterval
+            tickCount += 1
+        }
+
+        return ticks
+    }
+
+    private func timelineRulerMajorInterval(visibleDuration: Double, width: CGFloat) -> Double {
+        let minimumMajorSpacing: CGFloat = 82
+        let intervals: [Double] = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600]
+        let safeWidth = max(width, 1)
+
+        return intervals.first { interval in
+            CGFloat(interval / max(visibleDuration, 0.001)) * safeWidth >= minimumMajorSpacing
+        } ?? intervals[intervals.count - 1]
+    }
+
+    private func timelineRulerMinorInterval(for majorInterval: Double, visibleDuration: Double, width: CGFloat) -> Double {
+        let safeWidth = max(width, 1)
+        let candidates = [majorInterval / 10, majorInterval / 8, majorInterval / 5, majorInterval / 4, majorInterval / 2]
+
+        return candidates.first { interval in
+            CGFloat(interval / max(visibleDuration, 0.001)) * safeWidth >= 8
+        } ?? majorInterval
+    }
+
+    private func timelineRulerLabel(for time: Double, fullDuration: Double) -> String {
+        let roundedTime = max(Int(time.rounded()), 0)
+        let hours = roundedTime / 3600
+        let minutes = (roundedTime % 3600) / 60
+        let seconds = roundedTime % 60
+
+        if fullDuration >= 3600 || hours > 0 {
+            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        }
+
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
     func zoomTimelineMarkerHitTarget(
         at point: CGPoint,
         width: CGFloat,
@@ -234,7 +308,7 @@ extension ContentView {
         let localHeight: CGFloat = 34
 
         return layouts.reversed().first { layout in
-            let laneY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
+            let laneCenterY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
             let startX = CGFloat(layout.startRatio) * width
             let endX = CGFloat(layout.endRatio) * width
             let eventX = CGFloat(layout.eventRatio) * width
@@ -243,7 +317,7 @@ extension ContentView {
             let localMinX = max(min(startX, eventX - 8) - hoverTargetPadding, 0)
             let localMaxX = min(max(endX, eventX + 8) + hoverTargetPadding, width)
             let localWidth = max(localMaxX - localMinX, hoverTargetWidth)
-            let hitRect = CGRect(x: localMinX, y: laneY, width: localWidth, height: localHeight)
+            let hitRect = CGRect(x: localMinX, y: laneCenterY - (localHeight / 2), width: localWidth, height: localHeight)
 
             return hitRect.contains(point)
         }
@@ -310,9 +384,9 @@ extension ContentView {
             let hitPadding = max((hitWidth - actualBarWidth) / 2, 0)
             let minX = startX - hitPadding
             let maxX = endX + hitPadding
-            let laneY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
-            let minY = laneY - verticalHitSlop
-            let maxY = laneY + laneHeight + verticalHitSlop
+            let laneCenterY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
+            let minY = laneCenterY - (laneHeight / 2) - verticalHitSlop
+            let maxY = laneCenterY + (laneHeight / 2) + verticalHitSlop
 
             return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
         }?.marker

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 private struct TimelinePlayheadHandleShape: Shape {
@@ -85,13 +86,13 @@ extension ContentView {
         ZStack(alignment: .leading) {
             Capsule()
                 .fill(Color.secondary.opacity(0.16))
-                .frame(height: 8)
+                .frame(height: 24)
                 .position(x: width / 2, y: trackCenterY)
 
             if isDraggingTimeline {
                 Capsule()
                     .fill(Color.accentColor.opacity(0.14))
-                    .frame(height: 8)
+                    .frame(height: 24)
                     .position(x: width / 2, y: trackCenterY)
             }
 
@@ -189,6 +190,38 @@ extension ContentView {
         }
     }
 
+    func timelineRulerView(
+        visibleRange: TimelineVisibleRange,
+        width: CGFloat,
+        topY: CGFloat
+    ) -> some View {
+        let ticks = timelineRulerTicks(visibleRange: visibleRange, width: width)
+
+        return ZStack(alignment: .topLeading) {
+            ForEach(ticks) { tick in
+                let x = timelineX(for: tick.time, visibleRange: visibleRange, width: width)
+
+                Rectangle()
+                    .fill(tick.isMajor ? Color.primary : Color.secondary.opacity(0.58))
+                    .frame(width: 1, height: tick.isMajor ? 10 : 5)
+                    .position(x: x, y: topY + (tick.isMajor ? 17 : 19.5))
+
+                if let label = tick.label {
+                    let labelInset: CGFloat = 22
+                    let labelX = min(max(x, labelInset), max(width - labelInset, labelInset))
+
+                    Text(label)
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .foregroundStyle(Color.primary)
+                        .fixedSize()
+                        .position(x: labelX, y: topY + 6)
+                }
+            }
+        }
+        .frame(width: width, height: 24, alignment: .topLeading)
+        .allowsHitTesting(false)
+    }
+
     func timelinePlayheadView(
         playheadX: CGFloat,
         width: CGFloat,
@@ -201,33 +234,72 @@ extension ContentView {
         return ZStack {
             Rectangle()
                 .fill(separationColor)
-                .frame(width: 4, height: 54)
+                .frame(width: 4, height: 82)
+                .offset(y: -5)
 
             TimelinePlayheadHandleShape()
                 .fill(separationColor)
                 .frame(width: 28, height: 24)
                 .offset(y: -29)
 
-            Rectangle()
-                .fill(playheadColor)
-                .frame(width: 2, height: 54)
-
             TimelinePlayheadHandleShape()
-                .fill(playheadColor)
+                .fill(playheadColor.opacity(0.86))
                 .frame(width: 26, height: 22)
                 .offset(y: -29)
+
+            Rectangle()
+                .fill(playheadColor)
+                .frame(width: 2, height: 82)
+                .offset(y: -5)
 
             Rectangle()
                 .fill(playheadColor.opacity(0.001))
                 .frame(width: 34, height: 34)
                 .offset(y: -28)
+                .onHover { isHovering in
+                    if isHovering {
+                        NSCursor.openHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
         }
-        .frame(width: 34, height: 70)
+        .frame(width: 34, height: 98)
         .shadow(color: Color.black.opacity(isDraggingTimeline ? 0.10 : 0.05), radius: isDraggingTimeline ? 1 : 0.5, x: 0, y: 0.5)
         .position(
             x: playheadX,
             y: trackCenterY - 2
         )
+    }
+
+    func timelineInstructionText(
+        editorMode: ReviewEditorMode,
+        isDrawingEffectFocusRegion: Bool,
+        isDrawingNoZoomOverflowRegion: Bool
+    ) -> String {
+        isDrawingEffectFocusRegion
+        ? "←/→/↑/↓ to nudge the focus region, ⌥ + Arrow for 10x speed"
+        : editorMode == .effects
+        ? "Zoom & Click bars are shown as grey reference guides while editing effects."
+        : isDrawingNoZoomOverflowRegion
+        ? "←/→/↑/↓ to nudge the overflow region, ⌥ + Arrow for 10x speed"
+        : "Click a marker to preview it, click empty timeline to clear selection, ←/→ to nudge one frame"
+    }
+
+    func timelineInstructionView(
+        editorMode: ReviewEditorMode,
+        isDrawingEffectFocusRegion: Bool,
+        isDrawingNoZoomOverflowRegion: Bool
+    ) -> some View {
+        Text(
+            timelineInstructionText(
+                editorMode: editorMode,
+                isDrawingEffectFocusRegion: isDrawingEffectFocusRegion,
+                isDrawingNoZoomOverflowRegion: isDrawingNoZoomOverflowRegion
+            )
+        )
+        .font(.system(size: 10, weight: .light))
+        .foregroundStyle(.secondary)
     }
 
     func timelineFooterView(
@@ -247,17 +319,7 @@ extension ContentView {
                     .foregroundStyle(.secondary)
             }
 
-            Text(
-                isDrawingEffectFocusRegion
-                ? "←/→/↑/↓ to nudge the focus region, ⌥ + Arrow for 10x speed"
-                : editorMode == .effects
-                ? "Zoom & Click bars are shown as grey reference guides while editing effects."
-                : isDrawingNoZoomOverflowRegion
-                ? "←/→/↑/↓ to nudge the overflow region, ⌥ + Arrow for 10x speed"
-                : "Click a marker to preview it, click empty timeline to clear selection, ←/→ to nudge 0.1s"
-            )
-                .font(.system(size: 10, weight: .light))
-                .foregroundStyle(.secondary)
+            playbackTransportControls()
         }
     }
 }
