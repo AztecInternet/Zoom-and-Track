@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct TimelineToolbarView: View {
+    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
     let hasSelectedMarker: Bool
     let canEditClickFocusMarkers: Bool
     let isPlacingClickFocus: Bool
@@ -18,7 +20,7 @@ struct TimelineToolbarView: View {
         HStack(spacing: 10) {
             Text("markers")
                 .font(.system(size: 10, weight: .light))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(flowTrackTheme.controlStripText)
 
             if !hasSelectedMarker || isPlacingClickFocus {
                 TimelineGadgetButton(
@@ -46,7 +48,7 @@ struct TimelineToolbarView: View {
 
                 Text("overflow")
                     .font(.system(size: 10, weight: .light))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(flowTrackTheme.controlStripText)
 
                 HStack(spacing: 2) {
                     ForEach(NoZoomFallbackMode.allCases) { mode in
@@ -55,12 +57,12 @@ struct TimelineToolbarView: View {
                         } label: {
                             Text(mode.displayName)
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(segmentedPillTextColor(isSelected: selectedMarker.noZoomFallbackMode == mode))
+                                .foregroundStyle(segmentedPillTextColor(isSelected: selectedMarker.noZoomFallbackMode == mode, theme: flowTrackTheme))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
                                 .background(
                                     Capsule(style: .continuous)
-                                        .fill(segmentedPillBackgroundColor(isSelected: selectedMarker.noZoomFallbackMode == mode))
+                                        .fill(segmentedPillBackgroundColor(isSelected: selectedMarker.noZoomFallbackMode == mode, theme: flowTrackTheme))
                                 )
                         }
                         .buttonStyle(.plain)
@@ -70,11 +72,11 @@ struct TimelineToolbarView: View {
                 .padding(2)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(Color.secondary.opacity(0.1))
+                        .fill(flowTrackTheme.controlStripBackground)
                 )
                 .overlay(
                     Capsule(style: .continuous)
-                        .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                        .stroke(flowTrackTheme.controlStripBorder, lineWidth: 1)
                 )
 
                 if selectedMarker.noZoomFallbackMode == .scale {
@@ -83,7 +85,7 @@ struct TimelineToolbarView: View {
 
                     Text("region")
                         .font(.system(size: 10, weight: .light))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(flowTrackTheme.controlStripText)
 
                     TimelineGadgetButton(
                         systemName: isDrawingNoZoomOverflowRegion ? "checkmark" : "viewfinder.rectangular",
@@ -100,7 +102,7 @@ struct TimelineToolbarView: View {
 
             Text(isTimelineScrubSnappingEnabled ? "snapping on" : "snapping off")
                 .font(.system(size: 10, weight: .light))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(flowTrackTheme.controlStripText)
 
             TimelineGadgetButton(
                 systemName: "arrow.down.to.line.compact",
@@ -114,16 +116,18 @@ struct TimelineToolbarView: View {
         .padding(.vertical, 6)
         .background(
             Capsule(style: .continuous)
-                .fill(Color.secondary.opacity(0.08))
+                .fill(flowTrackTheme.controlStripBackground)
         )
         .overlay(
             Capsule(style: .continuous)
-                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                .stroke(flowTrackTheme.controlStripBorder, lineWidth: 1)
         )
     }
 }
 
 struct EffectsTimelineToolbarView: View {
+    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
     let hasSelectedMarker: Bool
     let selectedMarker: EffectPlanItem?
     let isDrawingFocusRegion: Bool
@@ -140,7 +144,7 @@ struct EffectsTimelineToolbarView: View {
         HStack(spacing: 10) {
             Text("effects")
                 .font(.system(size: 10, weight: .light))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(flowTrackTheme.controlStripText)
 
             if !hasSelectedMarker {
                 TimelineGadgetButton(
@@ -168,7 +172,7 @@ struct EffectsTimelineToolbarView: View {
 
                 Text("region")
                     .font(.system(size: 10, weight: .light))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(flowTrackTheme.controlStripText)
 
                 TimelineGadgetButton(
                     systemName: isDrawingFocusRegion ? "checkmark" : "viewfinder.rectangular",
@@ -184,17 +188,17 @@ struct EffectsTimelineToolbarView: View {
 
                     Text("overlay")
                         .font(.system(size: 10, weight: .light))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(flowTrackTheme.controlStripText)
 
                     Button(action: onToggleOverlay) {
                         Text("Show Overlay")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(segmentedPillTextColor(isSelected: isShowingOverlay))
+                            .foregroundStyle(segmentedPillTextColor(isSelected: isShowingOverlay, theme: flowTrackTheme))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(segmentedPillBackgroundColor(isSelected: isShowingOverlay))
+                                    .fill(segmentedPillBackgroundColor(isSelected: isShowingOverlay, theme: flowTrackTheme))
                             )
                     }
                     .buttonStyle(.plain)
@@ -207,7 +211,7 @@ struct EffectsTimelineToolbarView: View {
 
             Text(isTimelineScrubSnappingEnabled ? "snapping on" : "snapping off")
                 .font(.system(size: 10, weight: .light))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(flowTrackTheme.controlStripText)
 
             TimelineGadgetButton(
                 systemName: "arrow.down.to.line.compact",
@@ -221,16 +225,18 @@ struct EffectsTimelineToolbarView: View {
         .padding(.vertical, 6)
         .background(
             Capsule(style: .continuous)
-                .fill(Color.secondary.opacity(0.08))
+                .fill(flowTrackTheme.controlStripBackground)
         )
         .overlay(
             Capsule(style: .continuous)
-                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                .stroke(flowTrackTheme.controlStripBorder, lineWidth: 1)
         )
     }
 }
 
 struct TimelineGadgetButton: View {
+    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
     let systemName: String
     let isActive: Bool
     let isEnabled: Bool
@@ -270,7 +276,8 @@ struct TimelineGadgetButton: View {
                         isEnabled: isEnabled,
                         role: role,
                         activeColor: activeColor,
-                        inactiveColor: inactiveColor
+                        inactiveColor: inactiveColor,
+                        theme: flowTrackTheme
                     )
                 )
                 .frame(width: 18, height: 18)
@@ -288,7 +295,8 @@ private func gadgetForegroundColor(
     isEnabled: Bool,
     role: ButtonRole?,
     activeColor: Color?,
-    inactiveColor: Color?
+    inactiveColor: Color?,
+    theme: FlowTrackTheme
 ) -> Color {
     if isEnabled {
         if let activeColor {
@@ -297,11 +305,11 @@ private func gadgetForegroundColor(
         if role == .destructive {
             return .red
         }
-        return isActive ? .accentColor : .secondary
+        return isActive ? theme.controlStripText : theme.controlStripMutedText
     }
 
     if let inactiveColor {
         return inactiveColor
     }
-    return .secondary
+    return theme.controlStripMutedText
 }

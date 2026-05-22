@@ -416,7 +416,7 @@ extension ContentView {
             }
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(viewModel.canStopRecording || viewModel.sessionState == .stopping ? .white : accentContrastingTextColor())
+            .foregroundStyle(viewModel.canStopRecording || viewModel.sessionState == .stopping ? .white : accentContrastingTextColor(theme: flowTrackTheme))
             .frame(width: 190, height: 44)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -455,7 +455,7 @@ extension ContentView {
 
     func targetRow(_ target: ShareableCaptureTarget) -> some View {
         let isSelected = viewModel.selectedTargetID == target.id
-        let accentColor = FlowTrackAccent.color(for: .capture)
+        let accentColor = FlowTrackAccent.color(for: .capture, theme: flowTrackTheme)
 
         return Button {
             viewModel.selectedTargetID = target.id

@@ -8,6 +8,7 @@ struct MarkerListTableView: NSViewRepresentable {
     let onSelectMarker: (String) -> Void
     let onToggleMarkerEnabled: (String) -> Void
     let onReorderMarkers: ([String]) -> Void
+    let accentColor: Color
     @Binding var renamingMarkerID: String?
     @Binding var markerNameDraft: String
     let onBeginRename: (ZoomPlanItem) -> Void
@@ -60,6 +61,7 @@ struct MarkerListTableView: NSViewRepresentable {
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.refreshTableIfNeeded()
+        context.coordinator.refreshVisibleRows()
         context.coordinator.syncSelection()
         (nsView as? InspectorOverflowHintingScrollView)?.updateOverflowHintVisibility()
     }
@@ -100,26 +102,7 @@ struct MarkerListTableView: NSViewRepresentable {
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
             let identifier = NSUserInterfaceItemIdentifier("MarkerListHostingCellView")
             let cell = (tableView.makeView(withIdentifier: identifier, owner: nil) as? MarkerListHostingCellView) ?? MarkerListHostingCellView(identifier: identifier)
-            let entry = parent.entries[row]
-            cell.update(
-                rootView: MarkerListCellContent(
-                    entry: entry,
-                    onToggleEnabled: { [weak self] in
-                        self?.parent.onToggleMarkerEnabled(entry.id)
-                    },
-                    renamingMarkerID: parent.$renamingMarkerID,
-                    markerNameDraft: parent.$markerNameDraft,
-                    onBeginRename: { [weak self] in
-                        self?.parent.onBeginRename(entry.marker)
-                    },
-                    onCommitRename: { [weak self] name in
-                        self?.parent.onCommitRename(entry.id, name)
-                    },
-                    onCancelRename: { [weak self] in
-                        self?.parent.onCancelRename()
-                    }
-                )
-            )
+            cell.update(rootView: cellContent(for: row))
             return cell
         }
 
@@ -220,11 +203,44 @@ struct MarkerListTableView: NSViewRepresentable {
                 lastRenderedRenamingMarkerID = renamingMarkerID
             }
         }
+
+        func refreshVisibleRows() {
+            guard let tableView else { return }
+            for row in 0..<parent.entries.count {
+                guard let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? MarkerListHostingCellView else {
+                    continue
+                }
+                cell.update(rootView: cellContent(for: row))
+            }
+        }
+
+        private func cellContent(for row: Int) -> MarkerListCellContent {
+            let entry = parent.entries[row]
+            return MarkerListCellContent(
+                entry: entry,
+                accentColor: parent.accentColor,
+                onToggleEnabled: { [weak self] in
+                    self?.parent.onToggleMarkerEnabled(entry.id)
+                },
+                renamingMarkerID: parent.$renamingMarkerID,
+                markerNameDraft: parent.$markerNameDraft,
+                onBeginRename: { [weak self] in
+                    self?.parent.onBeginRename(entry.marker)
+                },
+                onCommitRename: { [weak self] name in
+                    self?.parent.onCommitRename(entry.id, name)
+                },
+                onCancelRename: { [weak self] in
+                    self?.parent.onCancelRename()
+                }
+            )
+        }
     }
 }
 
 private struct MarkerListCellContent: View {
     let entry: MarkerListEntry
+    let accentColor: Color
     let onToggleEnabled: () -> Void
     @Binding var renamingMarkerID: String?
     @Binding var markerNameDraft: String
@@ -241,14 +257,14 @@ private struct MarkerListCellContent: View {
             : "Unnamed Marker"
         let isRenaming = renamingMarkerID == entry.id
         let backgroundFill: Color = entry.isPlaybackHighlighted
-            ? Color.accentColor.opacity(0.20)
+            ? accentColor.opacity(0.20)
             : entry.isSelected
-            ? Color.accentColor.opacity(0.12)
+            ? accentColor.opacity(0.12)
             : Color.clear
         let strokeColor: Color = entry.isPlaybackHighlighted
-            ? Color.accentColor.opacity(0.55)
+            ? accentColor.opacity(0.55)
             : entry.isSelected
-            ? Color.accentColor.opacity(0.35)
+            ? accentColor.opacity(0.35)
             : Color.secondary.opacity(0.08)
 
         HStack(alignment: .top, spacing: 10) {
@@ -266,7 +282,7 @@ private struct MarkerListCellContent: View {
                             Text(marker.enabled ? "On" : "Off")
                         }
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(marker.enabled ? Color.accentColor : Color.secondary)
+                        .foregroundStyle(marker.enabled ? accentColor : Color.secondary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -280,11 +296,11 @@ private struct MarkerListCellContent: View {
                             .padding(.vertical, 2)
                             .background(
                                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Color.accentColor.opacity(0.08))
+                                    .fill(accentColor.opacity(0.08))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .strokeBorder(Color.accentColor.opacity(0.22), lineWidth: 1)
+                                    .strokeBorder(accentColor.opacity(0.22), lineWidth: 1)
                             )
                             .focused($isNameFieldFocused)
                             .onSubmit {
@@ -308,7 +324,7 @@ private struct MarkerListCellContent: View {
                     } label: {
                         Image(systemName: "rectangle.and.pencil.and.ellipsis")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(isRenameButtonHovered ? Color.accentColor : Color.secondary)
+                            .foregroundStyle(isRenameButtonHovered ? accentColor : Color.secondary)
                     }
                     .buttonStyle(.plain)
                     .onHover { isHovered in
@@ -351,7 +367,7 @@ private struct MarkerListCellContent: View {
         .overlay(alignment: .leading) {
             if entry.isPlaybackHighlighted {
                 Capsule(style: .continuous)
-                    .fill(Color.accentColor)
+                    .fill(accentColor)
                     .frame(width: 4)
                     .padding(.vertical, 8)
                     .padding(.leading, 2)

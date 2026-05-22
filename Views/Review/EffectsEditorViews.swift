@@ -1,6 +1,12 @@
 import AppKit
 import SwiftUI
 
+func compactTimelineLaneCenterY(for lane: Int, verticalOrigin: CGFloat) -> CGFloat {
+    let laneStep: CGFloat = 7
+    let centeredLaneOffset = CGFloat(lane) - 1
+    return verticalOrigin + (centeredLaneOffset * laneStep)
+}
+
 func effectTimelineSegmentLayouts(
     for markers: [EffectPlanItem],
     duration: Double,
@@ -99,6 +105,8 @@ struct EffectTimelineSegmentLayout: Identifiable {
 }
 
 struct EffectTimelineSegmentView: View {
+    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
     let layout: EffectTimelineSegmentLayout
     let width: CGFloat
     let verticalOrigin: CGFloat
@@ -112,15 +120,14 @@ struct EffectTimelineSegmentView: View {
 
     var body: some View {
         let laneHeight: CGFloat = 9
-        let laneSpacing: CGFloat = 4
-        let laneY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
+        let laneY = compactTimelineLaneCenterY(for: layout.lane, verticalOrigin: verticalOrigin)
         let startX = CGFloat(layout.startRatio) * width
         let holdStartX = CGFloat(layout.holdStartRatio) * width
         let holdEndX = CGFloat(layout.holdEndRatio) * width
         let endX = CGFloat(layout.endRatio) * width
         let actualBarWidth = max(endX - startX, 1)
         let hitTargetWidth = max(actualBarWidth, 18)
-        let effectsAccent = FlowTrackAccent.color(for: .effects)
+        let effectsAccent = FlowTrackAccent.color(for: .effects, theme: flowTrackTheme)
         let baseColor: Color = isSelected
             ? effectsAccent
             : (isEnabled ? effectsAccent.opacity(0.82) : Color.secondary.opacity(0.35))
@@ -573,6 +580,8 @@ struct EffectListTableView: NSViewRepresentable {
 }
 
 private struct EffectListCellContent: View {
+    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
     let entry: EffectListEntry
     let onToggleEnabled: () -> Void
     @Binding var renamingMarkerID: String?
@@ -590,14 +599,14 @@ private struct EffectListCellContent: View {
             : "Unnamed Effect"
         let isRenaming = renamingMarkerID == entry.id
         let backgroundFill: Color = entry.isPlaybackHighlighted
-            ? FlowTrackAccent.subtleFill(for: .effects, opacity: 0.20)
+            ? FlowTrackAccent.subtleFill(for: .effects, opacity: 0.20, theme: flowTrackTheme)
             : entry.isSelected
-            ? FlowTrackAccent.subtleFill(for: .effects, opacity: 0.12)
+            ? FlowTrackAccent.subtleFill(for: .effects, opacity: 0.12, theme: flowTrackTheme)
             : Color.clear
         let strokeColor: Color = entry.isPlaybackHighlighted
-            ? FlowTrackAccent.selectedStroke(for: .effects, opacity: 0.55)
+            ? FlowTrackAccent.selectedStroke(for: .effects, opacity: 0.55, theme: flowTrackTheme)
             : entry.isSelected
-            ? FlowTrackAccent.selectedStroke(for: .effects)
+            ? FlowTrackAccent.selectedStroke(for: .effects, theme: flowTrackTheme)
             : Color.secondary.opacity(0.08)
 
         HStack(alignment: .top, spacing: 10) {
@@ -673,7 +682,7 @@ private struct EffectListCellContent: View {
                 HStack(spacing: 8) {
                     Image(systemName: "timeline.selection")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(FlowTrackAccent.color(for: .effects))
+                        .foregroundStyle(FlowTrackAccent.color(for: .effects, theme: flowTrackTheme))
                     Text(timecodeString(marker.holdStartTime))
                         .font(.system(size: 11, weight: .regular, design: .monospaced))
                         .fixedSize(horizontal: true, vertical: false)
@@ -702,7 +711,7 @@ private struct EffectListCellContent: View {
         .overlay(alignment: .leading) {
             if entry.isPlaybackHighlighted {
                 Capsule(style: .continuous)
-                    .fill(FlowTrackAccent.color(for: .effects))
+                    .fill(FlowTrackAccent.color(for: .effects, theme: flowTrackTheme))
                     .frame(width: 4)
                     .padding(.vertical, 8)
                     .padding(.leading, 2)

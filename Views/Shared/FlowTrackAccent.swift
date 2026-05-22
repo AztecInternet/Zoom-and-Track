@@ -9,37 +9,26 @@ enum FlowTrackAccentRole {
 }
 
 enum FlowTrackAccent {
-    static func color(for role: FlowTrackAccentRole) -> Color {
+    static func color(for role: FlowTrackAccentRole, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
         guard usesRoleSpecificAccent else { return .accentColor }
 
-        switch role {
-        case .zoomAndClicks:
-            return .blue
-        case .effects:
-            return .pink
-        case .capture:
-            return .green
-        case .library:
-            return .orange
-        case .settings:
-            return .indigo
-        }
+        return theme.accentColor(for: role)
     }
 
-    static func panelFill(for role: FlowTrackAccentRole, opacity: Double = 0.045) -> Color {
-        color(for: role).opacity(opacity)
+    static func panelFill(for role: FlowTrackAccentRole, opacity: Double = 0.045, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+        color(for: role, theme: theme).opacity(opacity)
     }
 
-    static func panelBorder(for role: FlowTrackAccentRole, opacity: Double = 0.10) -> Color {
-        color(for: role).opacity(opacity)
+    static func panelBorder(for role: FlowTrackAccentRole, opacity: Double = 0.10, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+        color(for: role, theme: theme).opacity(opacity)
     }
 
-    static func subtleFill(for role: FlowTrackAccentRole, opacity: Double) -> Color {
-        color(for: role).opacity(opacity)
+    static func subtleFill(for role: FlowTrackAccentRole, opacity: Double, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+        color(for: role, theme: theme).opacity(opacity)
     }
 
-    static func selectedStroke(for role: FlowTrackAccentRole, opacity: Double = 0.35) -> Color {
-        color(for: role).opacity(opacity)
+    static func selectedStroke(for role: FlowTrackAccentRole, opacity: Double = 0.35, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+        color(for: role, theme: theme).opacity(opacity)
     }
 
     private static var usesRoleSpecificAccent: Bool {

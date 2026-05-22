@@ -123,7 +123,7 @@ extension ContentView {
 
     func libraryCaptureRow(_ item: CaptureLibraryItem) -> some View {
         let isSelected = selectedLibraryCaptureID == item.id
-        let accentColor = FlowTrackAccent.color(for: .library)
+        let accentColor = FlowTrackAccent.color(for: .library, theme: flowTrackTheme)
 
         return HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {

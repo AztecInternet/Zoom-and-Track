@@ -10,6 +10,11 @@ extension ContentView {
             )
 
             settingsCard(
+                title: "Appearance",
+                body: AnyView(appearanceSettingsCardBody)
+            )
+
+            settingsCard(
                 title: "Library Root",
                 body: AnyView(
                     VStack(alignment: .leading, spacing: 8) {
@@ -87,6 +92,33 @@ extension ContentView {
         .padding(20)
         .frame(maxWidth: 720, alignment: .leading)
         .background(cardBackground)
+    }
+
+    var appearanceSettingsCardBody: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Choose a saved colour theme for the app interface.")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+
+            Picker("Colour Theme", selection: Binding(
+                get: {
+                    flowTrackSelectedThemeID?.uuidString ?? flowTrackBuiltInThemeID
+                },
+                set: { selection in
+                    if selection == flowTrackBuiltInThemeID {
+                        flowTrackThemeActions.selectTheme(nil)
+                    } else if let themeID = UUID(uuidString: selection) {
+                        flowTrackThemeActions.selectTheme(themeID)
+                    }
+                }
+            )) {
+                Text("Built-in Default").tag(flowTrackBuiltInThemeID)
+                ForEach(flowTrackSavedThemes) { savedTheme in
+                    Text(savedTheme.name).tag(savedTheme.id.uuidString)
+                }
+            }
+            .frame(width: 260)
+        }
     }
 
     var distortionPresetsSettingsCardBody: some View {

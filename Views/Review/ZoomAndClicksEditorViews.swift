@@ -77,6 +77,7 @@ func timelineSegment(
     isEnabled: Bool,
     activePhase: MarkerTimingPhase?,
     visibleRange: TimelineVisibleRange,
+    theme: FlowTrackTheme,
     interactionSuppressed: Bool,
     isHovered: Bool,
     hoveredTimelineMarkerID: String?,
@@ -85,7 +86,7 @@ func timelineSegment(
     onTap: @escaping () -> Void
 ) -> some View {
     let marker = layout.marker
-    let zoomAccent = FlowTrackAccent.color(for: .zoomAndClicks)
+    let zoomAccent = FlowTrackAccent.color(for: .zoomAndClicks, theme: theme)
     let baseColor: Color = isSelected ? zoomAccent : (isEnabled ? zoomAccent.opacity(0.72) : Color.secondary.opacity(0.35))
     let laneHeight: CGFloat = 9
     let laneSpacing: CGFloat = 4
@@ -130,6 +131,7 @@ func timelineSegment(
             duration: duration,
             hoveredTimelineMarkerID: hoveredTimelineMarkerID,
             hoveredTimelinePhase: hoveredTimelinePhase,
+            theme: theme,
             onHoverChanged: onHoverChanged
         )
         .frame(width: barWidth, height: laneHeight)
@@ -145,7 +147,7 @@ func timelineSegment(
 
         if isSelected {
             Capsule()
-                .stroke(FlowTrackAccent.selectedStroke(for: .zoomAndClicks), lineWidth: 4)
+                .stroke(FlowTrackAccent.selectedStroke(for: .zoomAndClicks, theme: theme), lineWidth: 4)
                 .frame(width: 12, height: 22)
                 .position(
                     x: min(max(localEventX, 6), max(localWidth - 6, 6)),
@@ -166,7 +168,7 @@ func timelineSegment(
                         .fill(Color(nsColor: .windowBackgroundColor).opacity(0.92))
                         .overlay(
                             Capsule(style: .continuous)
-                                .stroke(FlowTrackAccent.selectedStroke(for: .zoomAndClicks, opacity: 0.18), lineWidth: 1)
+                                .stroke(FlowTrackAccent.selectedStroke(for: .zoomAndClicks, opacity: 0.18, theme: theme), lineWidth: 1)
                         )
                 )
                 .position(
@@ -307,6 +309,7 @@ private func timelineSegmentBar(
     duration: Double,
     hoveredTimelineMarkerID: String?,
     hoveredTimelinePhase: MarkerTimingPhase?,
+    theme: FlowTrackTheme,
     onHoverChanged: @escaping (Bool, MarkerTimingPhase?, CGPoint) -> Void
 ) -> some View {
     let timeline = zoomTimeline(for: marker)
@@ -347,7 +350,7 @@ private func timelineSegmentBar(
         }
         .overlay(
             Capsule()
-                .stroke(isSelected ? FlowTrackAccent.selectedStroke(for: .zoomAndClicks, opacity: 0.45) : Color.clear, lineWidth: 1)
+                .stroke(isSelected ? FlowTrackAccent.selectedStroke(for: .zoomAndClicks, opacity: 0.45, theme: theme) : Color.clear, lineWidth: 1)
         )
         .overlay {
             if isSelected {

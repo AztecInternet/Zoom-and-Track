@@ -7,7 +7,7 @@ extension ContentView {
     }
 
     func markerInspectorCard(_ summary: RecordingInspectionSummary) -> some View {
-        let accentRole = inspectorMode == .captureInfo ? nil : inspectorAccentRole
+        let accentRole = inspectorAccentRole
         return ReviewInspectorCard(
             editorMode: editorMode,
             inspectorMode: $inspectorMode,
@@ -50,13 +50,16 @@ extension ContentView {
     @ViewBuilder
     private func inspectorCardBackground(accentRole: FlowTrackAccentRole?) -> some View {
         ZStack {
-            cardBackground
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(flowTrackTheme.inspectorBackground)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(flowTrackTheme.inspectorBorder, lineWidth: 1)
 
             if let accentRole {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(FlowTrackAccent.panelFill(for: accentRole))
+                    .fill(FlowTrackAccent.panelFill(for: accentRole, theme: flowTrackTheme))
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(FlowTrackAccent.panelBorder(for: accentRole), lineWidth: 1)
+                    .stroke(FlowTrackAccent.panelBorder(for: accentRole, theme: flowTrackTheme), lineWidth: 1)
             }
         }
     }
@@ -152,6 +155,7 @@ extension ContentView {
                         },
                         onToggleMarkerEnabled: viewModel.toggleMarkerEnabled(_:),
                         onReorderMarkers: viewModel.reorderMarkerList(to:),
+                        accentColor: FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme),
                         renamingMarkerID: $renamingMarkerID,
                         markerNameDraft: $markerNameDraft,
                         onBeginRename: { marker in
@@ -190,7 +194,7 @@ extension ContentView {
         accentRole: FlowTrackAccentRole,
         dragProvider: (() -> NSItemProvider)? = nil
     ) -> AnyView {
-        let selectionColor = Color.accentColor
+        let selectionColor = FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
         let backgroundFill: Color = isPlaybackHighlighted
             ? selectionColor.opacity(0.16)
             : isSelected
@@ -251,7 +255,7 @@ extension ContentView {
                         Text(marker.enabled ? "On" : "Off")
                     }
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(marker.enabled ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(marker.enabled ? selectionColor : Color.secondary)
                 }
                 .buttonStyle(.plain)
             }
@@ -559,7 +563,7 @@ extension ContentView {
                             } label: {
                                 Image(systemName: "gearshape.fill")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color.accentColor)
+                                    .foregroundStyle(FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme))
                                     .frame(width: 28, height: 24)
                                     .contentShape(Rectangle())
                             }
@@ -775,7 +779,7 @@ extension ContentView {
                         .frame(maxHeight: .infinity, alignment: .center)
 
                     Capsule(style: .continuous)
-                        .fill(Color.accentColor)
+                        .fill(FlowTrackAccent.color(for: inspectorAccentRole, theme: flowTrackTheme))
                         .frame(width: 4, height: 18)
                         .position(x: handleX, y: geometry.size.height / 2)
                 }
@@ -1034,6 +1038,8 @@ extension ContentView {
 }
 
 private struct ClickPulseSelectorControl: View {
+    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
     let accentRole: FlowTrackAccentRole
     let selectedPreset: ClickPulsePreset?
     let onSelectOff: () -> Void
@@ -1046,6 +1052,10 @@ private struct ClickPulseSelectorControl: View {
             return selectedPreset.displayName
         }
         return "Off"
+    }
+
+    private var selectionColor: Color {
+        FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
     }
 
     var body: some View {
@@ -1101,7 +1111,7 @@ private struct ClickPulseSelectorControl: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(isSelected ? selectionColor : Color.secondary)
                 Text(title)
                     .foregroundStyle(.primary)
                 Spacer(minLength: 0)
@@ -1114,7 +1124,7 @@ private struct ClickPulseSelectorControl: View {
         .buttonStyle(.plain)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+                .fill(isSelected ? selectionColor.opacity(0.12) : Color.clear)
         )
     }
 }

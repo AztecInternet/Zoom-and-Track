@@ -76,7 +76,7 @@ extension ContentView {
 
             Text(timecodeString(for: viewModel.currentPlaybackTime))
                 .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(isPlayheadTimeNudgeFlashActive ? Color.primary : Color.secondary)
+                .foregroundStyle(isPlayheadTimeNudgeFlashActive ? Color.primary : flowTrackTheme.timelinePlayheadText)
                 .animation(.easeOut(duration: 0.22), value: isPlayheadTimeNudgeFlashActive)
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -100,25 +100,15 @@ extension ContentView {
         tint: Color,
         opacity: Double
     ) -> some View {
-        let laneHeight: CGFloat = 9
-        let laneSpacing: CGFloat = 4
-        let laneCenterY = verticalOrigin + (CGFloat(lane) * (laneHeight + laneSpacing))
+        let referenceLineY = verticalOrigin + 20
         let startX = CGFloat(startRatio) * width
         let endX = CGFloat(endRatio) * width
-        let eventX = CGFloat(eventRatio) * width
-        let barWidth = max(endX - startX, 10)
+        let lineWidth = max(endX - startX, 1)
 
-        ZStack {
-            Capsule(style: .continuous)
-                .fill(tint.opacity(opacity))
-                .frame(width: barWidth, height: laneHeight)
-                .position(x: startX + (barWidth / 2), y: laneCenterY)
-
-            Capsule(style: .continuous)
-                .fill(tint.opacity(min(opacity + 0.12, 1)))
-                .frame(width: 5, height: 14)
-                .position(x: eventX, y: laneCenterY)
-        }
+        Rectangle()
+            .fill(tint.opacity(opacity))
+            .frame(width: lineWidth, height: 1.5)
+            .position(x: startX + (lineWidth / 2), y: referenceLineY)
         .allowsHitTesting(false)
     }
 
@@ -372,7 +362,6 @@ extension ContentView {
         layouts: [EffectTimelineSegmentLayout]
     ) -> EffectPlanItem? {
         let laneHeight: CGFloat = 9
-        let laneSpacing: CGFloat = 4
         let minimumHitWidth: CGFloat = 18
         let verticalHitSlop: CGFloat = 8
 
@@ -384,7 +373,7 @@ extension ContentView {
             let hitPadding = max((hitWidth - actualBarWidth) / 2, 0)
             let minX = startX - hitPadding
             let maxX = endX + hitPadding
-            let laneCenterY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
+            let laneCenterY = compactTimelineLaneCenterY(for: layout.lane, verticalOrigin: verticalOrigin)
             let minY = laneCenterY - (laneHeight / 2) - verticalHitSlop
             let maxY = laneCenterY + (laneHeight / 2) + verticalHitSlop
 

@@ -8,6 +8,8 @@ enum ReviewEditorMode: String, CaseIterable, Identifiable {
 }
 
 struct ReviewEditorModeControlStrip: View {
+    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
     let editorMode: ReviewEditorMode
     let onSelectMode: (ReviewEditorMode) -> Void
 
@@ -15,7 +17,7 @@ struct ReviewEditorModeControlStrip: View {
         HStack(spacing: 10) {
             Text("editor")
                 .font(.system(size: 10, weight: .light))
-                .foregroundStyle(FlowTrackAccent.color(for: editorMode.accentRole))
+                .foregroundStyle(flowTrackTheme.controlStripText)
 
             HStack(spacing: 2) {
                 ForEach(ReviewEditorMode.allCases) { mode in
@@ -24,12 +26,12 @@ struct ReviewEditorModeControlStrip: View {
                     } label: {
                         Text(mode.rawValue)
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(segmentedPillTextColor(isSelected: editorMode == mode))
+                            .foregroundStyle(segmentedPillTextColor(isSelected: editorMode == mode, theme: flowTrackTheme))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(segmentedPillBackgroundColor(isSelected: editorMode == mode))
+                                    .fill(segmentedPillBackgroundColor(isSelected: editorMode == mode, theme: flowTrackTheme))
                             )
                     }
                     .buttonStyle(.plain)
@@ -39,11 +41,11 @@ struct ReviewEditorModeControlStrip: View {
             .padding(2)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.secondary.opacity(0.1))
+                    .fill(flowTrackTheme.controlStripBackground)
             )
             .overlay(
                 Capsule(style: .continuous)
-                    .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                    .stroke(flowTrackTheme.controlStripBorder, lineWidth: 1)
             )
         }
         .padding(.horizontal, 10)
@@ -51,51 +53,53 @@ struct ReviewEditorModeControlStrip: View {
         .frame(height: 32)
         .background(
             Capsule(style: .continuous)
-                .fill(Color.secondary.opacity(0.1))
+                .fill(flowTrackTheme.controlStripBackground)
         )
         .overlay(
             Capsule(style: .continuous)
-                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                .stroke(flowTrackTheme.controlStripBorder, lineWidth: 1)
         )
     }
 }
 
 struct EffectsPlaceholderControlStrip: View {
+    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
     var body: some View {
         HStack(spacing: 10) {
             Text("effects")
                 .font(.system(size: 10, weight: .light))
-                .foregroundStyle(FlowTrackAccent.color(for: .effects))
+                .foregroundStyle(flowTrackTheme.controlStripText)
 
             HStack(spacing: 2) {
                 Text("mode")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(flowTrackTheme.controlStripMutedText)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(segmentedPillBackgroundColor(isSelected: false))
+                            .fill(segmentedPillBackgroundColor(isSelected: false, theme: flowTrackTheme))
                     )
 
                 Text("style")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(flowTrackTheme.controlStripMutedText)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(segmentedPillBackgroundColor(isSelected: false))
+                            .fill(segmentedPillBackgroundColor(isSelected: false, theme: flowTrackTheme))
                     )
             }
             .padding(2)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.secondary.opacity(0.1))
+                    .fill(flowTrackTheme.controlStripBackground)
             )
             .overlay(
                 Capsule(style: .continuous)
-                    .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                    .stroke(flowTrackTheme.controlStripBorder, lineWidth: 1)
             )
         }
         .padding(.horizontal, 10)
@@ -103,27 +107,25 @@ struct EffectsPlaceholderControlStrip: View {
         .frame(height: 32)
         .background(
             Capsule(style: .continuous)
-                .fill(Color.secondary.opacity(0.1))
+                .fill(flowTrackTheme.controlStripBackground)
         )
         .overlay(
             Capsule(style: .continuous)
-                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                .stroke(flowTrackTheme.controlStripBorder, lineWidth: 1)
         )
     }
 }
 
-func segmentedPillTextColor(isSelected: Bool) -> Color {
-    isSelected ? accentContrastingTextColor() : .secondary
+func segmentedPillTextColor(isSelected: Bool, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+    isSelected ? theme.accentButtonText : theme.controlStripMutedText
 }
 
-func segmentedPillBackgroundColor(isSelected: Bool) -> Color {
-    isSelected ? .accentColor : Color.secondary.opacity(0.08)
+func segmentedPillBackgroundColor(isSelected: Bool, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+    isSelected ? theme.controlStripText : theme.controlStripBackground
 }
 
-func accentContrastingTextColor() -> Color {
-    let accent = NSColor.controlAccentColor.usingColorSpace(.deviceRGB) ?? .systemBlue
-    let brightness = (0.299 * accent.redComponent) + (0.587 * accent.greenComponent) + (0.114 * accent.blueComponent)
-    return brightness > 0.7 ? Color.black.opacity(0.8) : .white
+func accentContrastingTextColor(theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+    theme.accentButtonText
 }
 
 extension ReviewEditorMode {

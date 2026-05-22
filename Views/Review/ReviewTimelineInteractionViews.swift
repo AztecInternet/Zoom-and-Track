@@ -85,7 +85,7 @@ extension ContentView {
     ) -> some View {
         ZStack(alignment: .leading) {
             Capsule()
-                .fill(Color.secondary.opacity(0.16))
+                .fill(flowTrackTheme.timelineRailColor(for: colorScheme))
                 .frame(height: 24)
                 .position(x: width / 2, y: trackCenterY)
 
@@ -105,8 +105,8 @@ extension ContentView {
                         lane: layout.lane,
                         width: width,
                         verticalOrigin: segmentOriginY,
-                        tint: Color.secondary,
-                        opacity: 0.24
+                        tint: FlowTrackAccent.color(for: .effects, theme: flowTrackTheme),
+                        opacity: 0.34
                     )
                 }
 
@@ -121,6 +121,7 @@ extension ContentView {
                         isEnabled: layout.marker.enabled,
                         activePhase: displayedPhase,
                         visibleRange: visibleRange,
+                        theme: flowTrackTheme,
                         interactionSuppressed: timelineInteractionSuppressed,
                         isHovered: !timelineInteractionSuppressed && hoveredTimelineMarkerID == layout.marker.id,
                         hoveredTimelineMarkerID: hoveredTimelineMarkerID,
@@ -142,8 +143,8 @@ extension ContentView {
                         lane: layout.lane,
                         width: width,
                         verticalOrigin: segmentOriginY,
-                        tint: Color.secondary,
-                        opacity: 0.34
+                        tint: FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme),
+                        opacity: 0.32
                     )
                 }
 
@@ -202,7 +203,7 @@ extension ContentView {
                 let x = timelineX(for: tick.time, visibleRange: visibleRange, width: width)
 
                 Rectangle()
-                    .fill(tick.isMajor ? Color.primary : Color.secondary.opacity(0.58))
+                    .fill(tick.isMajor ? flowTrackTheme.timelineRuler : flowTrackTheme.timelineRuler.opacity(0.58))
                     .frame(width: 1, height: tick.isMajor ? 10 : 5)
                     .position(x: x, y: topY + (tick.isMajor ? 17 : 19.5))
 
@@ -212,7 +213,7 @@ extension ContentView {
 
                     Text(label)
                         .font(.system(size: 9, weight: .regular, design: .monospaced))
-                        .foregroundStyle(Color.primary)
+                        .foregroundStyle(flowTrackTheme.timelineRuler)
                         .fixedSize()
                         .position(x: labelX, y: topY + 6)
                 }
@@ -228,7 +229,7 @@ extension ContentView {
         trackCenterY: CGFloat,
         isDraggingTimeline: Bool
     ) -> some View {
-        let playheadColor = Color.accentColor
+        let playheadColor = flowTrackTheme.timelinePlayhead
         let separationColor = Color(nsColor: .controlBackgroundColor)
 
         return ZStack {

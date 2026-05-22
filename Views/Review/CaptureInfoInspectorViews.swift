@@ -276,7 +276,7 @@ extension ContentView {
                 } label: {
                     Text(type.displayName)
                         .font(.system(size: 12, weight: selectedType == type ? .semibold : .medium))
-                        .foregroundStyle(selectedType == type ? accentContrastingTextColor() : Color.primary)
+                        .foregroundStyle(selectedType == type ? accentContrastingTextColor(theme: flowTrackTheme) : Color.primary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)

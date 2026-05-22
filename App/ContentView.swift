@@ -11,6 +11,10 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.flowTrackTheme) var flowTrackTheme
+    @Environment(\.flowTrackSavedThemes) var flowTrackSavedThemes
+    @Environment(\.flowTrackSelectedThemeID) var flowTrackSelectedThemeID
+    @Environment(\.flowTrackThemeActions) var flowTrackThemeActions
     @StateObject var viewModel = CaptureSetupViewModel()
     @State var selectedTab: AppTab? = .capture
     @State private var playbackVideoHeightOverride: CGFloat?
@@ -267,13 +271,13 @@ struct ContentView: View {
                     .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isSelected ? accentContrastingTextColor() : Color.primary)
+            .foregroundStyle(isSelected ? flowTrackTheme.sidebarButtonSelectedText : flowTrackTheme.sidebarButtonText)
             .padding(.horizontal, 12)
             .frame(height: 40)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isSelected ? FlowTrackAccent.color(for: tab.accentRole) : Color.clear)
+                    .fill(isSelected ? flowTrackTheme.sidebarButtonSelectedBackground : flowTrackTheme.sidebarButtonBackground)
             )
         }
         .buttonStyle(.plain)
@@ -612,10 +616,10 @@ struct ContentView: View {
 
     var cardBackground: some View {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+            .fill(flowTrackTheme.cardBackground)
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                    .stroke(flowTrackTheme.cardBorder, lineWidth: 1)
             )
     }
 
@@ -639,7 +643,7 @@ struct ContentView: View {
     private var detailAccentColor: Color {
         let activeTab = selectedTab ?? .capture
         let accentRole = activeTab == .review ? editorMode.accentRole : activeTab.accentRole
-        return FlowTrackAccent.color(for: accentRole)
+        return FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
     }
 
     private var flowTrackCommandContext: FlowTrackCommandContext {
