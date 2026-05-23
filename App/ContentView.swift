@@ -14,6 +14,7 @@ struct ContentView: View {
     @Environment(\.flowTrackTheme) var flowTrackTheme
     @Environment(\.flowTrackSavedThemes) var flowTrackSavedThemes
     @Environment(\.flowTrackSelectedThemeID) var flowTrackSelectedThemeID
+    @Environment(\.flowTrackSelectedBuiltInThemeID) var flowTrackSelectedBuiltInThemeID
     @Environment(\.flowTrackThemeActions) var flowTrackThemeActions
     @StateObject var viewModel = CaptureSetupViewModel()
     @State var selectedTab: AppTab? = .capture
@@ -467,6 +468,7 @@ struct ContentView: View {
                             )
                             .padding(.horizontal, 14)
                             .padding(.top, -8)
+                            .opacity(isHelpModeEnabled ? 0 : 1)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 

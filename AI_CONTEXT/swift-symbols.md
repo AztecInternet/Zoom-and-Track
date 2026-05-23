@@ -1,52 +1,52 @@
 # Swift Symbols
 
-Generated: 2026-05-22 12:02:39
+Generated: 2026-05-23 23:29:06
 
 ## App/ContentView.swift
 
 - Line 12:struct ContentView: View {
-- Line 92:    struct OverlayMapping {
-- Line 101:    struct ZoomPreviewState {
-- Line 106:    struct EffectPreviewState {
-- Line 117:    struct PrecisionLoupeFrame {
-- Line 122:    enum EffectRegionHandle: Hashable {
-- Line 133:    enum ActiveEffectHoldPoint {
-- Line 138:    struct ZoomStateEvent {
-- Line 144:    enum MotionDirection {
-- Line 149:    struct MotionProgressSample {
-- Line 191:    enum CaptureInfoField: Hashable {
-- Line 197:    enum MotionTuning {
-- Line 205:    struct LibraryFilterOption: Identifiable {
-- Line 535:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
-- Line 555:    func mappedOverlayPoint(
-- Line 594:    func infoRow(title: String, value: String) -> some View {
-- Line 605:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
-- Line 828:    func updateTimelineScrubAutoScroll(cursorX: CGFloat, width: CGFloat, duration: Double) {
-- Line 858:    func cancelTimelineScrubAutoScroll() {
-- Line 895:    func beginTimelineMarkerDrag(
-- Line 915:    func updateTimelineMarkerDrag(
-- Line 939:    func finishTimelineMarkerDrag(
-- Line 1118:    func navigateToPreviousMarkerFromMenu() {
-- Line 1122:    func navigateToNextMarkerFromMenu() {
-- Line 1182:    func reviewHeaderActionIcon(_ systemName: String, action: ReviewHeaderAction) -> some View {
-- Line 1197:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
-- Line 1210:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
-- Line 1217:    func clearTimelineHover() {
-- Line 1226:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
-- Line 1231:    func clearEffectTimelineHover() {
-- Line 1236:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
-- Line 1246:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
-- Line 1255:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
-- Line 1270:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
-- Line 1282:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
-- Line 1286:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
-- Line 1307:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
-- Line 1379:struct SharingAnchorView: NSViewRepresentable {
-- Line 1382:    func makeNSView(context: Context) -> NSView {
-- Line 1390:    func updateNSView(_ nsView: NSView, context: Context) {
-- Line 1401:enum ReviewHeaderAction {
-- Line 1407:enum AppTab: String, CaseIterable, Identifiable {
-- Line 1442:struct MarkerListEntry: Identifiable {
+- Line 93:    struct OverlayMapping {
+- Line 102:    struct ZoomPreviewState {
+- Line 107:    struct EffectPreviewState {
+- Line 118:    struct PrecisionLoupeFrame {
+- Line 123:    enum EffectRegionHandle: Hashable {
+- Line 134:    enum ActiveEffectHoldPoint {
+- Line 139:    struct ZoomStateEvent {
+- Line 145:    enum MotionDirection {
+- Line 150:    struct MotionProgressSample {
+- Line 192:    enum CaptureInfoField: Hashable {
+- Line 198:    enum MotionTuning {
+- Line 206:    struct LibraryFilterOption: Identifiable {
+- Line 537:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
+- Line 557:    func mappedOverlayPoint(
+- Line 596:    func infoRow(title: String, value: String) -> some View {
+- Line 607:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
+- Line 830:    func updateTimelineScrubAutoScroll(cursorX: CGFloat, width: CGFloat, duration: Double) {
+- Line 860:    func cancelTimelineScrubAutoScroll() {
+- Line 897:    func beginTimelineMarkerDrag(
+- Line 917:    func updateTimelineMarkerDrag(
+- Line 941:    func finishTimelineMarkerDrag(
+- Line 1120:    func navigateToPreviousMarkerFromMenu() {
+- Line 1124:    func navigateToNextMarkerFromMenu() {
+- Line 1184:    func reviewHeaderActionIcon(_ systemName: String, action: ReviewHeaderAction) -> some View {
+- Line 1199:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
+- Line 1212:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
+- Line 1219:    func clearTimelineHover() {
+- Line 1228:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
+- Line 1233:    func clearEffectTimelineHover() {
+- Line 1238:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
+- Line 1248:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
+- Line 1257:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
+- Line 1272:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
+- Line 1284:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
+- Line 1288:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
+- Line 1309:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
+- Line 1381:struct SharingAnchorView: NSViewRepresentable {
+- Line 1384:    func makeNSView(context: Context) -> NSView {
+- Line 1392:    func updateNSView(_ nsView: NSView, context: Context) {
+- Line 1403:enum ReviewHeaderAction {
+- Line 1409:enum AppTab: String, CaseIterable, Identifiable {
+- Line 1444:struct MarkerListEntry: Identifiable {
 
 ## App/FlowTrackCommands.swift
 
@@ -175,7 +175,7 @@ Generated: 2026-05-22 12:02:39
 
 - Line 3:struct FlowTrackThemeStore {
 - Line 31:    func loadLibrary() -> FlowTrackThemeLibrary {
-- Line 49:    func saveLibrary(_ library: FlowTrackThemeLibrary) throws {
+- Line 55:    func saveLibrary(_ library: FlowTrackThemeLibrary) throws {
 
 ## Services/InputEventCaptureService.swift
 
@@ -672,8 +672,8 @@ Generated: 2026-05-22 12:02:39
 
 - Line 3:extension ContentView {
 - Line 86:    func settingsCard(title: String, body: AnyView) -> some View {
-- Line 233:    func distortionMapSourceSummary(for descriptor: DistortionPresetDescriptor) -> String {
-- Line 243:    func distortionImportedMapDetails(for descriptor: DistortionPresetDescriptor) -> DistortionImportedMapAsset? {
+- Line 239:    func distortionMapSourceSummary(for descriptor: DistortionPresetDescriptor) -> String {
+- Line 249:    func distortionImportedMapDetails(for descriptor: DistortionPresetDescriptor) -> DistortionImportedMapAsset? {
 
 ## Views/Shared/ExportProgressSheetViews.swift
 
@@ -688,38 +688,41 @@ Generated: 2026-05-22 12:02:39
 ## Views/Shared/FlowTrackColourLabViews.swift
 
 - Line 4:struct FlowTrackColourLabView: View {
-- Line 459:    enum Mode {
-- Line 628:    func color(in theme: FlowTrackTheme) -> Color {
-- Line 632:    func setColor(_ color: Color, in theme: inout FlowTrackTheme) {
-- Line 817:    func makeCoordinator() -> Coordinator {
-- Line 821:    func makeNSView(context: Context) -> ShortcutMonitorView {
-- Line 830:    func updateNSView(_ nsView: ShortcutMonitorView, context: Context) {
-- Line 853:        func installMonitor(for view: NSView) {
-- Line 892:struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
-- Line 899:    func makeCoordinator() -> Coordinator {
-- Line 903:    func makeNSView(context: Context) -> NSView {
-- Line 907:    func updateNSView(_ nsView: NSView, context: Context) {
-- Line 922:        func update(
-- Line 981:        func windowWillClose(_ notification: Notification) {
-- Line 987:struct FlowTrackColourLabShortcutView: NSViewRepresentable {
-- Line 990:    func makeCoordinator() -> Coordinator {
-- Line 994:    func makeNSView(context: Context) -> ShortcutMonitorView {
-- Line 1003:    func updateNSView(_ nsView: ShortcutMonitorView, context: Context) {
-- Line 1023:        func installMonitor(for view: NSView) {
+- Line 504:    enum Mode {
+- Line 673:    func color(in theme: FlowTrackTheme) -> Color {
+- Line 677:    func setColor(_ color: Color, in theme: inout FlowTrackTheme) {
+- Line 863:    func makeCoordinator() -> Coordinator {
+- Line 867:    func makeNSView(context: Context) -> ShortcutMonitorView {
+- Line 876:    func updateNSView(_ nsView: ShortcutMonitorView, context: Context) {
+- Line 902:        func installMonitor(for view: NSView) {
+- Line 944:struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
+- Line 953:    func makeCoordinator() -> Coordinator {
+- Line 957:    func makeNSView(context: Context) -> NSView {
+- Line 961:    func updateNSView(_ nsView: NSView, context: Context) {
+- Line 978:        func update(
+- Line 1045:        func windowWillClose(_ notification: Notification) {
+- Line 1051:struct FlowTrackColourLabShortcutView: NSViewRepresentable {
+- Line 1054:    func makeCoordinator() -> Coordinator {
+- Line 1058:    func makeNSView(context: Context) -> ShortcutMonitorView {
+- Line 1067:    func updateNSView(_ nsView: ShortcutMonitorView, context: Context) {
+- Line 1087:        func installMonitor(for view: NSView) {
 
 ## Views/Shared/FlowTrackTheme.swift
 
-- Line 6:struct FlowTrackTheme: Codable {
-- Line 37:    func timelineRailColor(for colorScheme: ColorScheme) -> Color {
-- Line 41:    func accentColor(for role: FlowTrackAccentRole) -> Color {
-- Line 56:    enum CodingKeys: String, CodingKey {
-- Line 185:    func encode(to encoder: Encoder) throws {
-- Line 219:struct FlowTrackCodableColor: Codable {
-- Line 245:struct FlowTrackSavedTheme: Codable, Identifiable, Equatable {
-- Line 260:struct FlowTrackThemeLibrary: Codable {
-- Line 265:struct FlowTrackThemeActions {
-- Line 273:enum FlowTrackThemeDefaults {
-- Line 327:extension EnvironmentValues {
+- Line 6:struct FlowTrackBuiltInTheme: Identifiable, Equatable {
+- Line 16:enum FlowTrackThemeTextScheme: String, Codable, CaseIterable {
+- Line 33:struct FlowTrackTheme: Codable {
+- Line 65:    func timelineRailColor(for colorScheme: ColorScheme) -> Color {
+- Line 69:    func accentColor(for role: FlowTrackAccentRole) -> Color {
+- Line 84:    enum CodingKeys: String, CodingKey {
+- Line 217:    func encode(to encoder: Encoder) throws {
+- Line 252:struct FlowTrackCodableColor: Codable {
+- Line 278:struct FlowTrackSavedTheme: Codable, Identifiable, Equatable {
+- Line 293:struct FlowTrackThemeLibrary: Codable {
+- Line 299:    enum CodingKeys: String, CodingKey {
+- Line 327:struct FlowTrackThemeActions {
+- Line 337:enum FlowTrackThemeDefaults {
+- Line 556:extension EnvironmentValues {
 
 ## Views/Shared/HelpModeViews.swift
 

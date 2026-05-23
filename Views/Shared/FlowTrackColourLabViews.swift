@@ -5,13 +5,15 @@ struct FlowTrackColourLabView: View {
     @Binding var theme: FlowTrackTheme
     let savedThemes: [FlowTrackSavedTheme]
     let selectedThemeID: UUID?
+    let selectedBuiltInThemeID: String
+    let builtInThemeOverrides: [String: FlowTrackTheme]
     let actions: FlowTrackThemeActions
     @State private var selectedToken: FlowTrackColourLabToken = .cardBackground
     @State private var copiedColor: Color?
     @State private var copiedTokenTitle: String?
     @State private var baselineTheme = FlowTrackThemeDefaults.standard
     @State private var baselineSignature = Data()
-    @State private var pendingThemeSelectionID: UUID?
+    @State private var pendingThemeSelectionID: String?
     @State private var isConfirmingThemeSwitch = false
     @State private var namingSheet: ColourLabNamingSheet?
     @State private var deleteCandidate: FlowTrackSavedTheme?
@@ -57,7 +59,7 @@ struct FlowTrackColourLabView: View {
             Divider()
 
             HStack {
-                Text(copiedTokenTitle.map { "Copied \($0)" } ?? "Command-C copies, Command-V pastes")
+                Text(colourLabFooterHelpText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -67,6 +69,9 @@ struct FlowTrackColourLabView: View {
         .frame(width: 660)
         .onAppear(perform: syncBaselineToSelection)
         .onChange(of: selectedThemeID) { _, _ in
+            syncBaselineToSelection()
+        }
+        .onChange(of: selectedBuiltInThemeID) { _, _ in
             syncBaselineToSelection()
         }
         .onChange(of: savedThemes) { _, _ in
@@ -116,6 +121,9 @@ struct FlowTrackColourLabView: View {
                 onPaste: {
                     guard let copiedColor else { return }
                     selectedToken.setColor(copiedColor, in: &theme)
+                },
+                onSaveOverride: {
+                    saveDeveloperOverride()
                 }
             )
             .frame(width: 0, height: 0)
@@ -128,21 +136,33 @@ struct FlowTrackColourLabView: View {
     }
 
     private var currentThemeName: String {
-        currentSavedTheme?.name ?? "Built-in Default"
+        currentSavedTheme?.name ?? FlowTrackThemeDefaults.builtInThemeName(withID: selectedBuiltInThemeID)
     }
 
     private var hasUnsavedChanges: Bool {
         themeSignature(theme) != baselineSignature
     }
 
+    private var colourLabFooterHelpText: String {
+        if let copiedTokenTitle {
+            return "Copied \(copiedTokenTitle)"
+        }
+        if selectedThemeID == nil {
+            return "Built-in theme override: press Command-Shift-S to save developer override."
+        }
+        return "Command-C copies, Command-V pastes"
+    }
+
     private var themeToolbar: some View {
         HStack(spacing: 8) {
             Picker("Theme", selection: Binding(
-                get: { selectedThemeID?.uuidString ?? flowTrackBuiltInThemeID },
+                get: { selectedThemeID?.uuidString ?? selectedBuiltInThemeID },
                 set: requestThemeSelection(_:)
             )) {
                 Section("Built-in") {
-                    Text("Built-in Default").tag(flowTrackBuiltInThemeID)
+                    ForEach(FlowTrackThemeDefaults.builtInThemes) { builtInTheme in
+                        Text(builtInTheme.name).tag(builtInTheme.id)
+                    }
                 }
                 Section("Custom") {
                     ForEach(savedThemes) { savedTheme in
@@ -198,7 +218,7 @@ struct FlowTrackColourLabView: View {
     }
 
     private func syncBaselineToSelection() {
-        let selectedTheme = themeForSelection(selectedThemeID)
+        let selectedTheme = themeForSelection(selectedThemeKey)
         baselineTheme = selectedTheme
         baselineSignature = themeSignature(selectedTheme)
     }
@@ -209,12 +229,11 @@ struct FlowTrackColourLabView: View {
     }
 
     private func requestThemeSelection(_ selection: String) {
-        let requestedID = selection == flowTrackBuiltInThemeID ? nil : UUID(uuidString: selection)
-        if requestedID == selectedThemeID {
+        if selection == selectedThemeKey {
             return
         }
 
-        pendingThemeSelectionID = requestedID
+        pendingThemeSelectionID = selection
         if hasUnsavedChanges {
             isConfirmingThemeSwitch = true
         } else {
@@ -223,14 +242,18 @@ struct FlowTrackColourLabView: View {
     }
 
     private func selectPendingTheme() {
-        let themeID = pendingThemeSelectionID
+        let themeID = pendingThemeSelectionID ?? flowTrackBuiltInThemeID
         pendingThemeSelectionID = nil
         selectTheme(themeID)
     }
 
-    private func selectTheme(_ themeID: UUID?) {
-        actions.selectTheme(themeID)
-        let selectedTheme = themeForSelection(themeID)
+    private func selectTheme(_ selectionID: String) {
+        if let customThemeID = UUID(uuidString: selectionID) {
+            actions.selectTheme(customThemeID)
+        } else {
+            actions.selectBuiltInTheme(selectionID)
+        }
+        let selectedTheme = themeForSelection(selectionID)
         theme = selectedTheme
         baselineTheme = selectedTheme
         baselineSignature = themeSignature(selectedTheme)
@@ -264,6 +287,17 @@ struct FlowTrackColourLabView: View {
         baselineSignature = themeSignature(theme)
     }
 
+    private func saveDeveloperOverride() {
+        if currentSavedTheme != nil {
+            saveCurrentTheme()
+            return
+        }
+
+        actions.saveBuiltInOverride(selectedBuiltInThemeID, theme)
+        baselineTheme = theme
+        baselineSignature = themeSignature(theme)
+    }
+
     private func revertWorkingTheme() {
         theme = baselineTheme
     }
@@ -293,6 +327,17 @@ struct FlowTrackColourLabView: View {
             return FlowTrackThemeDefaults.standard
         }
         return savedTheme.theme
+    }
+
+    private var selectedThemeKey: String {
+        selectedThemeID?.uuidString ?? selectedBuiltInThemeID
+    }
+
+    private func themeForSelection(_ selectionID: String) -> FlowTrackTheme {
+        if let customThemeID = UUID(uuidString: selectionID) {
+            return themeForSelection(customThemeID)
+        }
+        return builtInThemeOverrides[selectionID] ?? FlowTrackThemeDefaults.builtInTheme(withID: selectionID)
     }
 
     private func uniqueThemeName(startingWith name: String) -> String {
@@ -813,9 +858,10 @@ private struct HueSpectrumSlider: View {
 private struct ColourLabCopyPasteShortcutView: NSViewRepresentable {
     let onCopy: () -> Void
     let onPaste: () -> Void
+    let onSaveOverride: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onCopy: onCopy, onPaste: onPaste)
+        Coordinator(onCopy: onCopy, onPaste: onPaste, onSaveOverride: onSaveOverride)
     }
 
     func makeNSView(context: Context) -> ShortcutMonitorView {
@@ -830,18 +876,21 @@ private struct ColourLabCopyPasteShortcutView: NSViewRepresentable {
     func updateNSView(_ nsView: ShortcutMonitorView, context: Context) {
         context.coordinator.onCopy = onCopy
         context.coordinator.onPaste = onPaste
+        context.coordinator.onSaveOverride = onSaveOverride
         context.coordinator.installMonitor(for: nsView)
     }
 
     final class Coordinator {
         var onCopy: () -> Void
         var onPaste: () -> Void
+        var onSaveOverride: () -> Void
         private weak var monitoredWindow: NSWindow?
         private var monitor: Any?
 
-        init(onCopy: @escaping () -> Void, onPaste: @escaping () -> Void) {
+        init(onCopy: @escaping () -> Void, onPaste: @escaping () -> Void, onSaveOverride: @escaping () -> Void) {
             self.onCopy = onCopy
             self.onPaste = onPaste
+            self.onSaveOverride = onSaveOverride
         }
 
         deinit {
@@ -860,17 +909,20 @@ private struct ColourLabCopyPasteShortcutView: NSViewRepresentable {
             monitoredWindow = window
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak window] event in
                 guard let self, event.window === window else { return event }
-                guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                      let key = event.charactersIgnoringModifiers?.lowercased() else {
+                let activeModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                guard let key = event.charactersIgnoringModifiers?.lowercased() else {
                     return event
                 }
 
                 switch key {
-                case "c":
+                case "c" where activeModifiers == .command:
                     self.onCopy()
                     return nil
-                case "v":
+                case "v" where activeModifiers == .command:
                     self.onPaste()
+                    return nil
+                case "s" where activeModifiers == [.command, .shift]:
+                    self.onSaveOverride()
                     return nil
                 default:
                     return event
@@ -894,6 +946,8 @@ struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
     @Binding var theme: FlowTrackTheme
     let savedThemes: [FlowTrackSavedTheme]
     let selectedThemeID: UUID?
+    let selectedBuiltInThemeID: String
+    let builtInThemeOverrides: [String: FlowTrackTheme]
     let actions: FlowTrackThemeActions
 
     func makeCoordinator() -> Coordinator {
@@ -910,6 +964,8 @@ struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
             theme: $theme,
             savedThemes: savedThemes,
             selectedThemeID: selectedThemeID,
+            selectedBuiltInThemeID: selectedBuiltInThemeID,
+            builtInThemeOverrides: builtInThemeOverrides,
             actions: actions
         )
     }
@@ -924,6 +980,8 @@ struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
             theme: Binding<FlowTrackTheme>,
             savedThemes: [FlowTrackSavedTheme],
             selectedThemeID: UUID?,
+            selectedBuiltInThemeID: String,
+            builtInThemeOverrides: [String: FlowTrackTheme],
             actions: FlowTrackThemeActions
         ) {
             self.isPresented = isPresented
@@ -933,6 +991,8 @@ struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
                     theme: theme,
                     savedThemes: savedThemes,
                     selectedThemeID: selectedThemeID,
+                    selectedBuiltInThemeID: selectedBuiltInThemeID,
+                    builtInThemeOverrides: builtInThemeOverrides,
                     actions: actions
                 )
             } else {
@@ -944,12 +1004,16 @@ struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
             theme: Binding<FlowTrackTheme>,
             savedThemes: [FlowTrackSavedTheme],
             selectedThemeID: UUID?,
+            selectedBuiltInThemeID: String,
+            builtInThemeOverrides: [String: FlowTrackTheme],
             actions: FlowTrackThemeActions
         ) {
             let content = FlowTrackColourLabView(
                 theme: theme,
                 savedThemes: savedThemes,
                 selectedThemeID: selectedThemeID,
+                selectedBuiltInThemeID: selectedBuiltInThemeID,
+                builtInThemeOverrides: builtInThemeOverrides,
                 actions: actions
             )
 

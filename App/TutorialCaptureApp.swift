@@ -11,6 +11,8 @@ struct TutorialCaptureApp: App {
     @State private var activeFlowTrackTheme = FlowTrackThemeDefaults.standard
     @State private var savedThemes: [FlowTrackSavedTheme] = []
     @State private var selectedThemeID: UUID?
+    @State private var selectedBuiltInThemeID = flowTrackBuiltInThemeID
+    @State private var builtInThemeOverrides: [String: FlowTrackTheme] = [:]
     @State private var isColourLabPresented = false
 
     var body: some Scene {
@@ -19,7 +21,9 @@ struct TutorialCaptureApp: App {
                 .environment(\.flowTrackTheme, activeFlowTrackTheme)
                 .environment(\.flowTrackSavedThemes, savedThemes)
                 .environment(\.flowTrackSelectedThemeID, selectedThemeID)
+                .environment(\.flowTrackSelectedBuiltInThemeID, selectedBuiltInThemeID)
                 .environment(\.flowTrackThemeActions, themeActions)
+                .preferredColorScheme(activeFlowTrackTheme.textScheme.preferredColorScheme)
                 .background(
                     FlowTrackColourLabShortcutView {
                         isColourLabPresented.toggle()
@@ -32,6 +36,8 @@ struct TutorialCaptureApp: App {
                         theme: $activeFlowTrackTheme,
                         savedThemes: savedThemes,
                         selectedThemeID: selectedThemeID,
+                        selectedBuiltInThemeID: selectedBuiltInThemeID,
+                        builtInThemeOverrides: builtInThemeOverrides,
                         actions: themeActions
                     )
                     .frame(width: 0, height: 0)
@@ -46,6 +52,8 @@ struct TutorialCaptureApp: App {
     private var themeActions: FlowTrackThemeActions {
         FlowTrackThemeActions(
             selectTheme: selectTheme(_:),
+            selectBuiltInTheme: selectBuiltInTheme(_:),
+            saveBuiltInOverride: saveBuiltInOverride(id:theme:),
             saveTheme: saveTheme(name:theme:),
             updateTheme: updateTheme(id:name:theme:),
             deleteTheme: deleteTheme(id:),
@@ -57,18 +65,25 @@ struct TutorialCaptureApp: App {
         let library = themeStore.loadLibrary()
         savedThemes = library.savedThemes
         selectedThemeID = library.selectedThemeID
+        selectedBuiltInThemeID = library.selectedBuiltInThemeID ?? flowTrackBuiltInThemeID
+        builtInThemeOverrides = library.builtInOverrides
 
         if let selectedThemeID,
            let savedTheme = savedThemes.first(where: { $0.id == selectedThemeID }) {
             activeFlowTrackTheme = savedTheme.theme
         } else {
             selectedThemeID = nil
-            activeFlowTrackTheme = FlowTrackThemeDefaults.standard
+            activeFlowTrackTheme = effectiveBuiltInTheme(withID: selectedBuiltInThemeID)
         }
     }
 
     private func persistThemes() {
-        let library = FlowTrackThemeLibrary(savedThemes: savedThemes, selectedThemeID: selectedThemeID)
+        let library = FlowTrackThemeLibrary(
+            savedThemes: savedThemes,
+            selectedThemeID: selectedThemeID,
+            selectedBuiltInThemeID: selectedThemeID == nil ? selectedBuiltInThemeID : nil,
+            builtInOverrides: builtInThemeOverrides
+        )
         try? themeStore.saveLibrary(library)
     }
 
@@ -79,8 +94,24 @@ struct TutorialCaptureApp: App {
             activeFlowTrackTheme = savedTheme.theme
         } else {
             selectedThemeID = nil
-            activeFlowTrackTheme = FlowTrackThemeDefaults.standard
+            activeFlowTrackTheme = effectiveBuiltInTheme(withID: selectedBuiltInThemeID)
         }
+        persistThemes()
+    }
+
+    private func selectBuiltInTheme(_ themeID: String) {
+        selectedThemeID = nil
+        selectedBuiltInThemeID = themeID
+        activeFlowTrackTheme = effectiveBuiltInTheme(withID: themeID)
+        persistThemes()
+    }
+
+    private func saveBuiltInOverride(id: String, theme: FlowTrackTheme) {
+        guard FlowTrackThemeDefaults.builtInThemes.contains(where: { $0.id == id }) else { return }
+        builtInThemeOverrides[id] = theme
+        selectedThemeID = nil
+        selectedBuiltInThemeID = id
+        activeFlowTrackTheme = theme
         persistThemes()
     }
 
@@ -124,14 +155,16 @@ struct TutorialCaptureApp: App {
         savedThemes.removeAll { $0.id == id }
         if selectedThemeID == id {
             selectedThemeID = nil
-            activeFlowTrackTheme = FlowTrackThemeDefaults.standard
+            selectedBuiltInThemeID = flowTrackBuiltInThemeID
+            activeFlowTrackTheme = effectiveBuiltInTheme(withID: flowTrackBuiltInThemeID)
         }
         persistThemes()
     }
 
     private func resetToBuiltInDefault() {
         selectedThemeID = nil
-        activeFlowTrackTheme = FlowTrackThemeDefaults.standard
+        selectedBuiltInThemeID = flowTrackBuiltInThemeID
+        activeFlowTrackTheme = effectiveBuiltInTheme(withID: flowTrackBuiltInThemeID)
         persistThemes()
     }
 
@@ -149,5 +182,9 @@ struct TutorialCaptureApp: App {
             index += 1
         }
         return "\(baseName) \(index)"
+    }
+
+    private func effectiveBuiltInTheme(withID id: String) -> FlowTrackTheme {
+        builtInThemeOverrides[id] ?? FlowTrackThemeDefaults.builtInTheme(withID: id)
     }
 }

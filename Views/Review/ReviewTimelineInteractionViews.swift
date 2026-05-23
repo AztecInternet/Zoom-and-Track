@@ -106,7 +106,7 @@ extension ContentView {
                         width: width,
                         verticalOrigin: segmentOriginY,
                         tint: FlowTrackAccent.color(for: .effects, theme: flowTrackTheme),
-                        opacity: 0.34
+                        opacity: 0.90
                     )
                 }
 
@@ -144,7 +144,7 @@ extension ContentView {
                         width: width,
                         verticalOrigin: segmentOriginY,
                         tint: FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme),
-                        opacity: 0.32
+                        opacity: 0.90
                     )
                 }
 

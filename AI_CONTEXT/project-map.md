@@ -1,11 +1,11 @@
 # Project Map
 
-Generated: 2026-05-22 12:02:39
+Generated: 2026-05-23 23:29:06
 
 ## Swift Files
 
 ### App/ContentView.swift
-- Lines: 1449
+- Lines: 1451
 - Imports:
 - import AppKit
 - import AVFoundation
@@ -14,176 +14,177 @@ Generated: 2026-05-22 12:02:39
 - import UniformTypeIdentifiers
 - Types:
 - Line 12:struct ContentView: View {
-- Line 92:    struct OverlayMapping {
-- Line 101:    struct ZoomPreviewState {
-- Line 106:    struct EffectPreviewState {
-- Line 117:    struct PrecisionLoupeFrame {
-- Line 122:    enum EffectRegionHandle: Hashable {
-- Line 133:    enum ActiveEffectHoldPoint {
-- Line 138:    struct ZoomStateEvent {
-- Line 144:    enum MotionDirection {
-- Line 149:    struct MotionProgressSample {
-- Line 191:    enum CaptureInfoField: Hashable {
-- Line 197:    enum MotionTuning {
-- Line 205:    struct LibraryFilterOption: Identifiable {
-- Line 1379:struct SharingAnchorView: NSViewRepresentable {
-- Line 1401:enum ReviewHeaderAction {
-- Line 1407:enum AppTab: String, CaseIterable, Identifiable {
-- Line 1442:struct MarkerListEntry: Identifiable {
+- Line 93:    struct OverlayMapping {
+- Line 102:    struct ZoomPreviewState {
+- Line 107:    struct EffectPreviewState {
+- Line 118:    struct PrecisionLoupeFrame {
+- Line 123:    enum EffectRegionHandle: Hashable {
+- Line 134:    enum ActiveEffectHoldPoint {
+- Line 139:    struct ZoomStateEvent {
+- Line 145:    enum MotionDirection {
+- Line 150:    struct MotionProgressSample {
+- Line 192:    enum CaptureInfoField: Hashable {
+- Line 198:    enum MotionTuning {
+- Line 206:    struct LibraryFilterOption: Identifiable {
+- Line 1381:struct SharingAnchorView: NSViewRepresentable {
+- Line 1403:enum ReviewHeaderAction {
+- Line 1409:enum AppTab: String, CaseIterable, Identifiable {
+- Line 1444:struct MarkerListEntry: Identifiable {
 - Functions / Vars:
-- Line 158:        var time: Double {
-- Line 165:        var zoomMarkerID: String? {
-- Line 174:        var effectMarkerID: String? {
-- Line 183:        var distance: CGFloat {
-- Line 209:        var id: String { label }
-- Line 212:    var body: some View {
-- Line 230:    private var sidebar: some View {
-- Line 253:    private var sidebarBrandHeader: some View {
-- Line 260:    private func sidebarTabRow(_ tab: AppTab) -> some View {
-- Line 286:    private var helpModeToggle: some View {
-- Line 316:    private var detailContent: some View {
-- Line 335:    private var reviewView: some View {
-- Line 535:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
-- Line 555:    func mappedOverlayPoint(
-- Line 594:    func infoRow(title: String, value: String) -> some View {
-- Line 605:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
-- Line 617:    var cardBackground: some View {
-- Line 626:    private var detailBackground: some View {
-- Line 639:    private var accentTint: Color {
-- Line 643:    private var detailAccentColor: Color {
-- Line 649:    private var flowTrackCommandContext: FlowTrackCommandContext {
-- Line 705:    private var timelineCommandDuration: Double? {
-- Line 715:    private var canZoomTimelineInFromMenu: Bool {
-- Line 720:    private var canZoomTimelineOutFromMenu: Bool {
-- Line 724:    private var canResetTimelineZoomFromMenu: Bool {
-- Line 728:    private var canUsePlaybackFromMenu: Bool {
-- Line 732:    private var canNudgePlayheadByFrameFromMenu: Bool {
-- Line 736:    var timelineFrameDuration: Double {
-- Line 740:    private var canDeleteSelectedMarkerFromMenu: Bool {
-- Line 751:    private var canDuplicateSelectedMarkerFromMenu: Bool {
-- Line 766:        var time: Double {
-- Line 776:    private func zoomTimelineFromMenu(by factor: Double) {
-- Line 793:    private func resetTimelineZoomFromMenu() {
-- Line 798:    private func nudgePlayheadByFrame(_ direction: Int) {
-- Line 815:    private func flashPlayheadTimeDisplay() {
-- Line 828:    func updateTimelineScrubAutoScroll(cursorX: CGFloat, width: CGFloat, duration: Double) {
-- Line 858:    func cancelTimelineScrubAutoScroll() {
-- Line 863:    private func tickTimelineScrubAutoScroll() -> Bool {
-- Line 895:    func beginTimelineMarkerDrag(
-- Line 915:    func updateTimelineMarkerDrag(
-- Line 939:    func finishTimelineMarkerDrag(
-- Line 962:    private func timelineMarkerDragTime(
-- Line 973:    private func updateTimelineMarkerAutoScroll(cursorX: CGFloat, width: CGFloat, duration: Double) {
-- Line 992:    private func cancelTimelineMarkerAutoScroll() {
-- Line 997:    private func tickTimelineMarkerAutoScroll() -> Bool {
-- Line 1029:    private func timelineMarkerAutoScrollIntensity(cursorX: CGFloat, width: CGFloat) -> (direction: Double, intensity: Double)? {
-- Line 1045:    private func previousMarkerNavigationTarget() -> MarkerNavigationTarget? {
-- Line 1049:    private func nextMarkerNavigationTarget() -> MarkerNavigationTarget? {
-- Line 1053:    private func markerNavigationTarget(direction: MarkerNavigationDirection) -> MarkerNavigationTarget? {
-- Line 1118:    func navigateToPreviousMarkerFromMenu() {
-- Line 1122:    func navigateToNextMarkerFromMenu() {
-- Line 1126:    private func navigateToMarkerFromMenu(_ target: MarkerNavigationTarget?) {
-- Line 1142:    private func revealTimelineTimeFromMenu(_ time: Double) {
-- Line 1168:    private func deleteSelectedMarkerFromMenu() {
-- Line 1177:    private func duplicateSelectedMarkerFromMenu() {
-- Line 1182:    func reviewHeaderActionIcon(_ systemName: String, action: ReviewHeaderAction) -> some View {
-- Line 1197:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
-- Line 1210:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
-- Line 1217:    func clearTimelineHover() {
-- Line 1226:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
-- Line 1231:    func clearEffectTimelineHover() {
-- Line 1236:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
-- Line 1246:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
-- Line 1255:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
-- Line 1270:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
-- Line 1282:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
-- Line 1286:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
-- Line 1307:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
-- Line 1321:    private func timelinePhase(for marker: ZoomPlanItem, at currentTime: Double) -> MarkerTimingPhase? {
-- Line 1366:    private func timelineMarkerTooltip(for marker: ZoomPlanItem, markerNumber: Int, isEnabled: Bool) -> String {
-- Line 1382:    func makeNSView(context: Context) -> NSView {
-- Line 1390:    func updateNSView(_ nsView: NSView, context: Context) {
-- Line 1413:    var id: String { rawValue }
-- Line 1415:    var systemImage: String {
-- Line 1428:    var accentRole: FlowTrackAccentRole {
-- Line 1448:    var id: String { marker.id }
+- Line 159:        var time: Double {
+- Line 166:        var zoomMarkerID: String? {
+- Line 175:        var effectMarkerID: String? {
+- Line 184:        var distance: CGFloat {
+- Line 210:        var id: String { label }
+- Line 213:    var body: some View {
+- Line 231:    private var sidebar: some View {
+- Line 254:    private var sidebarBrandHeader: some View {
+- Line 261:    private func sidebarTabRow(_ tab: AppTab) -> some View {
+- Line 287:    private var helpModeToggle: some View {
+- Line 317:    private var detailContent: some View {
+- Line 336:    private var reviewView: some View {
+- Line 537:    func effectTintColorBinding(for marker: EffectPlanItem) -> Binding<Color> {
+- Line 557:    func mappedOverlayPoint(
+- Line 596:    func infoRow(title: String, value: String) -> some View {
+- Line 607:    func metadataItem(_ title: String, _ value: String, multiline: Bool = false) -> some View {
+- Line 619:    var cardBackground: some View {
+- Line 628:    private var detailBackground: some View {
+- Line 641:    private var accentTint: Color {
+- Line 645:    private var detailAccentColor: Color {
+- Line 651:    private var flowTrackCommandContext: FlowTrackCommandContext {
+- Line 707:    private var timelineCommandDuration: Double? {
+- Line 717:    private var canZoomTimelineInFromMenu: Bool {
+- Line 722:    private var canZoomTimelineOutFromMenu: Bool {
+- Line 726:    private var canResetTimelineZoomFromMenu: Bool {
+- Line 730:    private var canUsePlaybackFromMenu: Bool {
+- Line 734:    private var canNudgePlayheadByFrameFromMenu: Bool {
+- Line 738:    var timelineFrameDuration: Double {
+- Line 742:    private var canDeleteSelectedMarkerFromMenu: Bool {
+- Line 753:    private var canDuplicateSelectedMarkerFromMenu: Bool {
+- Line 768:        var time: Double {
+- Line 778:    private func zoomTimelineFromMenu(by factor: Double) {
+- Line 795:    private func resetTimelineZoomFromMenu() {
+- Line 800:    private func nudgePlayheadByFrame(_ direction: Int) {
+- Line 817:    private func flashPlayheadTimeDisplay() {
+- Line 830:    func updateTimelineScrubAutoScroll(cursorX: CGFloat, width: CGFloat, duration: Double) {
+- Line 860:    func cancelTimelineScrubAutoScroll() {
+- Line 865:    private func tickTimelineScrubAutoScroll() -> Bool {
+- Line 897:    func beginTimelineMarkerDrag(
+- Line 917:    func updateTimelineMarkerDrag(
+- Line 941:    func finishTimelineMarkerDrag(
+- Line 964:    private func timelineMarkerDragTime(
+- Line 975:    private func updateTimelineMarkerAutoScroll(cursorX: CGFloat, width: CGFloat, duration: Double) {
+- Line 994:    private func cancelTimelineMarkerAutoScroll() {
+- Line 999:    private func tickTimelineMarkerAutoScroll() -> Bool {
+- Line 1031:    private func timelineMarkerAutoScrollIntensity(cursorX: CGFloat, width: CGFloat) -> (direction: Double, intensity: Double)? {
+- Line 1047:    private func previousMarkerNavigationTarget() -> MarkerNavigationTarget? {
+- Line 1051:    private func nextMarkerNavigationTarget() -> MarkerNavigationTarget? {
+- Line 1055:    private func markerNavigationTarget(direction: MarkerNavigationDirection) -> MarkerNavigationTarget? {
+- Line 1120:    func navigateToPreviousMarkerFromMenu() {
+- Line 1124:    func navigateToNextMarkerFromMenu() {
+- Line 1128:    private func navigateToMarkerFromMenu(_ target: MarkerNavigationTarget?) {
+- Line 1144:    private func revealTimelineTimeFromMenu(_ time: Double) {
+- Line 1170:    private func deleteSelectedMarkerFromMenu() {
+- Line 1179:    private func duplicateSelectedMarkerFromMenu() {
+- Line 1184:    func reviewHeaderActionIcon(_ systemName: String, action: ReviewHeaderAction) -> some View {
+- Line 1199:    func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
+- Line 1212:    func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {
+- Line 1219:    func clearTimelineHover() {
+- Line 1228:    func setEffectTimelineHover(markerID: String, anchor: CGPoint) {
+- Line 1233:    func clearEffectTimelineHover() {
+- Line 1238:    func hoveredTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: ZoomPlanItem, markerNumber: Int)? {
+- Line 1248:    func hoveredEffectTimelineTooltipEntry(in summary: RecordingInspectionSummary) -> (marker: EffectPlanItem, markerNumber: Int)? {
+- Line 1257:    func displayedTimelinePhase(for marker: ZoomPlanItem) -> MarkerTimingPhase? {
+- Line 1272:    func isMarkerPlaybackHighlighted(_ marker: ZoomPlanItem) -> Bool {
+- Line 1284:    func isEffectPlaybackHighlighted(_ marker: EffectPlanItem) -> Bool {
+- Line 1288:    func displayedMarkerList(_ markers: [ZoomPlanItem], previewOrder: [String]? = nil) -> [ZoomPlanItem] {
+- Line 1309:    func displayedEffectMarkerList(_ markers: [EffectPlanItem]) -> [EffectPlanItem] {
+- Line 1323:    private func timelinePhase(for marker: ZoomPlanItem, at currentTime: Double) -> MarkerTimingPhase? {
+- Line 1368:    private func timelineMarkerTooltip(for marker: ZoomPlanItem, markerNumber: Int, isEnabled: Bool) -> String {
+- Line 1384:    func makeNSView(context: Context) -> NSView {
+- Line 1392:    func updateNSView(_ nsView: NSView, context: Context) {
+- Line 1415:    var id: String { rawValue }
+- Line 1417:    var systemImage: String {
+- Line 1430:    var accentRole: FlowTrackAccentRole {
+- Line 1450:    var id: String { marker.id }
 - SwiftUI State / Bindings:
 - Line 13:    @Environment(\.colorScheme) var colorScheme
 - Line 14:    @Environment(\.flowTrackTheme) var flowTrackTheme
 - Line 15:    @Environment(\.flowTrackSavedThemes) var flowTrackSavedThemes
 - Line 16:    @Environment(\.flowTrackSelectedThemeID) var flowTrackSelectedThemeID
-- Line 17:    @Environment(\.flowTrackThemeActions) var flowTrackThemeActions
-- Line 18:    @StateObject var viewModel = CaptureSetupViewModel()
-- Line 19:    @State var selectedTab: AppTab? = .capture
-- Line 20:    @State private var playbackVideoHeightOverride: CGFloat?
-- Line 21:    @State var playbackVideoHeightDragOrigin: CGFloat?
-- Line 22:    @State var isPlaybackInspectorVisible = true
-- Line 23:    @State var isHelpModeEnabled = false
-- Line 24:    @State private var isPlaybackInfoPresented = false
-- Line 25:    @State private var playbackScrubTime = 0.0
-- Line 26:    @State private var hoveredReviewHeaderAction: ReviewHeaderAction?
-- Line 27:    @State private var isScrubbingPlayback = false
-- Line 28:    @State var suppressMarkerListAutoScrollUntil: Date?
-- Line 29:    @State private var draggedMarkerListID: String?
-- Line 30:    @State private var markerListDropTargetID: String?
-- Line 31:    @State private var markerListPreviewOrder: [String]?
-- Line 32:    @State var renamingMarkerID: String?
-- Line 33:    @State var markerNameDraft: String = ""
-- Line 34:    @State var renamingEffectMarkerID: String?
-- Line 35:    @State var effectMarkerNameDraft: String = ""
-- Line 36:    @State var hoveredTimelineMarkerID: String?
-- Line 37:    @State var hoveredEffectTimelineMarkerID: String?
-- Line 38:    @State var isDraggingTimeline = false
-- Line 39:    @State var inspectorFocusedTimingPhase: MarkerTimingPhase?
-- Line 40:    @State var hoveredTimelinePhase: MarkerTimingPhase?
-- Line 41:    @State var hoveredTimelineTooltipAnchor: CGPoint?
-- Line 42:    @State var hoveredEffectTimelineTooltipAnchor: CGPoint?
-- Line 43:    @State var exportShareAnchorView: NSView?
-- Line 44:    @State var isPlacingClickFocus = false
-- Line 45:    @State var pendingMarkerDragSourcePoint: CGPoint?
-- Line 46:    @State var activeClickPointPrecisionPoint: CGPoint?
-- Line 47:    @State var activeClickPointLoupeOffset: CGSize = .zero
-- Line 48:    @State var activePrecisionLoupeFrame: PrecisionLoupeFrame?
-- Line 49:    @State var precisionLoupeFrameTask: Task<Void, Never>?
-- Line 50:    @State var isDrawingNoZoomOverflowRegion = false
-- Line 51:    @State var pendingNoZoomOverflowRegion: NoZoomOverflowRegion?
-- Line 52:    @State var isDrawingEffectFocusRegion = false
-- Line 53:    @State var suppressRealtimeEffectPreviewDuringTimingEdit = false
-- Line 54:    @State var activeEffectHoldPoint: ActiveEffectHoldPoint?
-- Line 55:    @State var realtimeEffectPreviewResumeTask: Task<Void, Never>?
-- Line 56:    @State var autoCommitsEffectFocusRegionOnRelease = false
-- Line 57:    @State var pendingEffectFocusRegion: EffectFocusRegion?
-- Line 58:    @State var effectFocusRegionInteractionBase: EffectFocusRegion?
-- Line 59:    @State var activeEffectRegionPrecisionPoint: CGPoint?
-- Line 60:    @State var activeEffectRegionHandle: EffectRegionHandle?
-- Line 61:    @State var activeEffectRegionLoupeOffset: CGSize = .zero
-- Line 62:    @State var activeTimelineMarkerDragID: String?
-- Line 63:    @State var activeTimelineMarkerDragStartTime: Double?
-- Line 64:    @State private var activeTimelineMarkerDragTimeOffset = 0.0
-- Line 65:    @State private var activeTimelineMarkerDragCursorX: CGFloat?
-- Line 66:    @State private var activeTimelineMarkerDragWidth: CGFloat = 1
-- Line 67:    @State private var activeTimelineMarkerDragDuration = 0.0
-- Line 68:    @State private var timelineMarkerAutoScrollTask: Task<Void, Never>?
-- Line 69:    @State private var activeTimelineScrubCursorX: CGFloat?
-- Line 70:    @State private var activeTimelineScrubWidth: CGFloat = 1
-- Line 71:    @State private var activeTimelineScrubDuration = 0.0
-- Line 72:    @State private var timelineScrubAutoScrollTask: Task<Void, Never>?
-- Line 73:    @State var timelineZoomScale = 1.0
-- Line 74:    @State var visibleTimelineStartTime = 0.0
-- Line 75:    @State var isTimelineScrubSnappingEnabled = true
-- Line 76:    @State var isPlayheadTimeNudgeFlashActive = false
-- Line 77:    @State private var playheadTimeNudgeFlashTask: Task<Void, Never>?
-- Line 78:    @State var librarySearchText = ""
-- Line 79:    @State var editorMode: ReviewEditorMode = .zoomAndClicks
-- Line 80:    @State var inspectorMode: EditInspectorMode = .markers
-- Line 81:    @State var selectedLibraryCollectionFilter: String?
-- Line 82:    @State var selectedLibraryProjectFilter: String?
-- Line 83:    @State var selectedLibraryTypeFilter: CaptureType?
-- Line 84:    @State var selectedLibraryCaptureID: UUID?
-- Line 85:    @State var captureInfoTitleDraft = ""
-- Line 86:    @State var captureInfoCollectionDraft = ""
-- Line 87:    @State var captureInfoProjectDraft = ""
-- Line 88:    @State var isConfirmingDistortionPresetDelete = false
+- Line 17:    @Environment(\.flowTrackSelectedBuiltInThemeID) var flowTrackSelectedBuiltInThemeID
+- Line 18:    @Environment(\.flowTrackThemeActions) var flowTrackThemeActions
+- Line 19:    @StateObject var viewModel = CaptureSetupViewModel()
+- Line 20:    @State var selectedTab: AppTab? = .capture
+- Line 21:    @State private var playbackVideoHeightOverride: CGFloat?
+- Line 22:    @State var playbackVideoHeightDragOrigin: CGFloat?
+- Line 23:    @State var isPlaybackInspectorVisible = true
+- Line 24:    @State var isHelpModeEnabled = false
+- Line 25:    @State private var isPlaybackInfoPresented = false
+- Line 26:    @State private var playbackScrubTime = 0.0
+- Line 27:    @State private var hoveredReviewHeaderAction: ReviewHeaderAction?
+- Line 28:    @State private var isScrubbingPlayback = false
+- Line 29:    @State var suppressMarkerListAutoScrollUntil: Date?
+- Line 30:    @State private var draggedMarkerListID: String?
+- Line 31:    @State private var markerListDropTargetID: String?
+- Line 32:    @State private var markerListPreviewOrder: [String]?
+- Line 33:    @State var renamingMarkerID: String?
+- Line 34:    @State var markerNameDraft: String = ""
+- Line 35:    @State var renamingEffectMarkerID: String?
+- Line 36:    @State var effectMarkerNameDraft: String = ""
+- Line 37:    @State var hoveredTimelineMarkerID: String?
+- Line 38:    @State var hoveredEffectTimelineMarkerID: String?
+- Line 39:    @State var isDraggingTimeline = false
+- Line 40:    @State var inspectorFocusedTimingPhase: MarkerTimingPhase?
+- Line 41:    @State var hoveredTimelinePhase: MarkerTimingPhase?
+- Line 42:    @State var hoveredTimelineTooltipAnchor: CGPoint?
+- Line 43:    @State var hoveredEffectTimelineTooltipAnchor: CGPoint?
+- Line 44:    @State var exportShareAnchorView: NSView?
+- Line 45:    @State var isPlacingClickFocus = false
+- Line 46:    @State var pendingMarkerDragSourcePoint: CGPoint?
+- Line 47:    @State var activeClickPointPrecisionPoint: CGPoint?
+- Line 48:    @State var activeClickPointLoupeOffset: CGSize = .zero
+- Line 49:    @State var activePrecisionLoupeFrame: PrecisionLoupeFrame?
+- Line 50:    @State var precisionLoupeFrameTask: Task<Void, Never>?
+- Line 51:    @State var isDrawingNoZoomOverflowRegion = false
+- Line 52:    @State var pendingNoZoomOverflowRegion: NoZoomOverflowRegion?
+- Line 53:    @State var isDrawingEffectFocusRegion = false
+- Line 54:    @State var suppressRealtimeEffectPreviewDuringTimingEdit = false
+- Line 55:    @State var activeEffectHoldPoint: ActiveEffectHoldPoint?
+- Line 56:    @State var realtimeEffectPreviewResumeTask: Task<Void, Never>?
+- Line 57:    @State var autoCommitsEffectFocusRegionOnRelease = false
+- Line 58:    @State var pendingEffectFocusRegion: EffectFocusRegion?
+- Line 59:    @State var effectFocusRegionInteractionBase: EffectFocusRegion?
+- Line 60:    @State var activeEffectRegionPrecisionPoint: CGPoint?
+- Line 61:    @State var activeEffectRegionHandle: EffectRegionHandle?
+- Line 62:    @State var activeEffectRegionLoupeOffset: CGSize = .zero
+- Line 63:    @State var activeTimelineMarkerDragID: String?
+- Line 64:    @State var activeTimelineMarkerDragStartTime: Double?
+- Line 65:    @State private var activeTimelineMarkerDragTimeOffset = 0.0
+- Line 66:    @State private var activeTimelineMarkerDragCursorX: CGFloat?
+- Line 67:    @State private var activeTimelineMarkerDragWidth: CGFloat = 1
+- Line 68:    @State private var activeTimelineMarkerDragDuration = 0.0
+- Line 69:    @State private var timelineMarkerAutoScrollTask: Task<Void, Never>?
+- Line 70:    @State private var activeTimelineScrubCursorX: CGFloat?
+- Line 71:    @State private var activeTimelineScrubWidth: CGFloat = 1
+- Line 72:    @State private var activeTimelineScrubDuration = 0.0
+- Line 73:    @State private var timelineScrubAutoScrollTask: Task<Void, Never>?
+- Line 74:    @State var timelineZoomScale = 1.0
+- Line 75:    @State var visibleTimelineStartTime = 0.0
+- Line 76:    @State var isTimelineScrubSnappingEnabled = true
+- Line 77:    @State var isPlayheadTimeNudgeFlashActive = false
+- Line 78:    @State private var playheadTimeNudgeFlashTask: Task<Void, Never>?
+- Line 79:    @State var librarySearchText = ""
+- Line 80:    @State var editorMode: ReviewEditorMode = .zoomAndClicks
+- Line 81:    @State var inspectorMode: EditInspectorMode = .markers
+- Line 82:    @State var selectedLibraryCollectionFilter: String?
+- Line 83:    @State var selectedLibraryProjectFilter: String?
+- Line 84:    @State var selectedLibraryTypeFilter: CaptureType?
+- Line 85:    @State var selectedLibraryCaptureID: UUID?
+- Line 86:    @State var captureInfoTitleDraft = ""
+- Line 87:    @State var captureInfoCollectionDraft = ""
+- Line 88:    @State var captureInfoProjectDraft = ""
+- Line 89:    @State var isConfirmingDistortionPresetDelete = false
 
 ### App/FlowTrackCommands.swift
 - Lines: 140
@@ -223,28 +224,33 @@ Generated: 2026-05-22 12:02:39
 - Line 45:    var body: some Commands {
 
 ### App/TutorialCaptureApp.swift
-- Lines: 153
+- Lines: 190
 - Imports:
 - import SwiftUI
 - Types:
 - Line 9:struct TutorialCaptureApp: App {
 - Functions / Vars:
-- Line 16:    var body: some Scene {
-- Line 46:    private var themeActions: FlowTrackThemeActions {
-- Line 56:    private func loadThemes() {
-- Line 70:    private func persistThemes() {
-- Line 75:    private func selectTheme(_ themeID: UUID?) {
-- Line 87:    private func saveTheme(name: String, theme: FlowTrackTheme) {
-- Line 107:    private func updateTheme(id: UUID, name: String, theme: FlowTrackTheme) {
-- Line 123:    private func deleteTheme(id: UUID) {
-- Line 132:    private func resetToBuiltInDefault() {
-- Line 138:    private func uniqueThemeName(startingWith name: String) -> String {
-- Line 147:        var index = 2
+- Line 18:    var body: some Scene {
+- Line 52:    private var themeActions: FlowTrackThemeActions {
+- Line 64:    private func loadThemes() {
+- Line 80:    private func persistThemes() {
+- Line 90:    private func selectTheme(_ themeID: UUID?) {
+- Line 102:    private func selectBuiltInTheme(_ themeID: String) {
+- Line 109:    private func saveBuiltInOverride(id: String, theme: FlowTrackTheme) {
+- Line 118:    private func saveTheme(name: String, theme: FlowTrackTheme) {
+- Line 138:    private func updateTheme(id: UUID, name: String, theme: FlowTrackTheme) {
+- Line 154:    private func deleteTheme(id: UUID) {
+- Line 164:    private func resetToBuiltInDefault() {
+- Line 171:    private func uniqueThemeName(startingWith name: String) -> String {
+- Line 180:        var index = 2
+- Line 187:    private func effectiveBuiltInTheme(withID id: String) -> FlowTrackTheme {
 - SwiftUI State / Bindings:
 - Line 11:    @State private var activeFlowTrackTheme = FlowTrackThemeDefaults.standard
 - Line 12:    @State private var savedThemes: [FlowTrackSavedTheme] = []
 - Line 13:    @State private var selectedThemeID: UUID?
-- Line 14:    @State private var isColourLabPresented = false
+- Line 14:    @State private var selectedBuiltInThemeID = flowTrackBuiltInThemeID
+- Line 15:    @State private var builtInThemeOverrides: [String: FlowTrackTheme] = [:]
+- Line 16:    @State private var isColourLabPresented = false
 
 ### Managers/CaptureMetadataManager.swift
 - Lines: 43
@@ -517,7 +523,7 @@ Generated: 2026-05-22 12:02:39
 - Line 53:    private func defaultsFileURL() throws -> URL {
 
 ### Services/FlowTrackThemeStore.swift
-- Lines: 54
+- Lines: 60
 - Imports:
 - import Foundation
 - Types:
@@ -526,7 +532,7 @@ Generated: 2026-05-22 12:02:39
 - Line 17:    var storageURL: URL {
 - Line 31:    func loadLibrary() -> FlowTrackThemeLibrary {
 - Line 38:            var library = try decoder.decode(FlowTrackThemeLibrary.self, from: data)
-- Line 49:    func saveLibrary(_ library: FlowTrackThemeLibrary) throws {
+- Line 55:    func saveLibrary(_ library: FlowTrackThemeLibrary) throws {
 
 ### Services/InputEventCaptureService.swift
 - Lines: 141
@@ -1583,7 +1589,7 @@ Generated: 2026-05-22 12:02:39
 - Line 616:private func timecodeString(for seconds: Double) -> String {
 
 ### Views/Settings/SettingsViews.swift
-- Lines: 249
+- Lines: 255
 - Imports:
 - import SwiftUI
 - Types:
@@ -1592,10 +1598,10 @@ Generated: 2026-05-22 12:02:39
 - Line 4:    var settingsView: some View {
 - Line 86:    func settingsCard(title: String, body: AnyView) -> some View {
 - Line 97:    var appearanceSettingsCardBody: some View {
-- Line 124:    var distortionPresetsSettingsCardBody: some View {
-- Line 159:    var distortionPresetDetailEditor: some View {
-- Line 233:    func distortionMapSourceSummary(for descriptor: DistortionPresetDescriptor) -> String {
-- Line 243:    func distortionImportedMapDetails(for descriptor: DistortionPresetDescriptor) -> DistortionImportedMapAsset? {
+- Line 130:    var distortionPresetsSettingsCardBody: some View {
+- Line 165:    var distortionPresetDetailEditor: some View {
+- Line 239:    func distortionMapSourceSummary(for descriptor: DistortionPresetDescriptor) -> String {
+- Line 249:    func distortionImportedMapDetails(for descriptor: DistortionPresetDescriptor) -> DistortionImportedMapAsset? {
 
 ### Views/Shared/ExportProgressSheetViews.swift
 - Lines: 100
@@ -1626,180 +1632,205 @@ Generated: 2026-05-22 12:02:39
 - Line 34:    private static var usesRoleSpecificAccent: Bool {
 
 ### Views/Shared/FlowTrackColourLabViews.swift
-- Lines: 1055
+- Lines: 1119
 - Imports:
 - import AppKit
 - import SwiftUI
 - Types:
 - Line 4:struct FlowTrackColourLabView: View {
-- Line 459:    enum Mode {
-- Line 892:struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
-- Line 987:struct FlowTrackColourLabShortcutView: NSViewRepresentable {
+- Line 504:    enum Mode {
+- Line 944:struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
+- Line 1051:struct FlowTrackColourLabShortcutView: NSViewRepresentable {
 - Functions / Vars:
-- Line 19:    var body: some View {
-- Line 125:    private var currentSavedTheme: FlowTrackSavedTheme? {
-- Line 130:    private var currentThemeName: String {
-- Line 134:    private var hasUnsavedChanges: Bool {
-- Line 138:    private var themeToolbar: some View {
-- Line 200:    private func syncBaselineToSelection() {
-- Line 206:    private func syncBaselineToSelectionIfClean() {
-- Line 211:    private func requestThemeSelection(_ selection: String) {
-- Line 225:    private func selectPendingTheme() {
-- Line 231:    private func selectTheme(_ themeID: UUID?) {
-- Line 239:    private func discardAndSelectPendingTheme() {
-- Line 243:    private func saveCurrentThemeBeforeSwitch() {
-- Line 254:    private func saveCurrentTheme() {
-- Line 267:    private func revertWorkingTheme() {
-- Line 271:    private func createTheme(named name: String, mode: ColourLabNamingSheet.Mode) {
-- Line 281:    private func deleteSelectedTheme() {
-- Line 290:    private func themeForSelection(_ themeID: UUID?) -> FlowTrackTheme {
-- Line 298:    private func uniqueThemeName(startingWith name: String) -> String {
-- Line 306:        var index = 2
-- Line 313:    private func themeSignature(_ theme: FlowTrackTheme) -> Data {
-- Line 319:    private func tokenSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-- Line 328:    private func tokenRow(_ token: FlowTrackColourLabToken) -> some View {
-- Line 356:    private var colourEditor: some View {
-- Line 410:    private func alphaSlider(value: Double, update: @escaping (Double) -> Void) -> some View {
-- Line 434:    private func updateSelectedToken(hue: Double? = nil, saturation: Double? = nil, brightness: Double? = nil, alpha: Double? = nil) {
-- Line 435:        var hsba = ColourLabHSBA(color: selectedToken.color(in: theme))
-- Line 443:    private func colourSwatch(_ color: Color, size: CGSize) -> some View {
-- Line 464:        var title: String {
-- Line 472:        var actionTitle: String {
-- Line 498:    var body: some View {
-- Line 556:    var id: String { rawValue }
-- Line 566:    var title: String {
-- Line 595:    var section: String {
-- Line 599:    private var keyPath: WritableKeyPath<FlowTrackTheme, Color> {
-- Line 628:    func color(in theme: FlowTrackTheme) -> Color {
-- Line 632:    func setColor(_ color: Color, in theme: inout FlowTrackTheme) {
-- Line 638:    var red: Double
-- Line 639:    var green: Double
-- Line 640:    var blue: Double
-- Line 641:    var alpha: Double
-- Line 664:    var color: Color {
-- Line 668:    var hexString: String {
-- Line 678:    var hue: Double
-- Line 679:    var saturation: Double
-- Line 680:    var brightness: Double
-- Line 681:    var alpha: Double
-- Line 704:    var color: Color {
-- Line 715:    var body: some View {
-- Line 776:    var body: some View {
-- Line 817:    func makeCoordinator() -> Coordinator {
-- Line 821:    func makeNSView(context: Context) -> ShortcutMonitorView {
-- Line 830:    func updateNSView(_ nsView: ShortcutMonitorView, context: Context) {
-- Line 837:        var onCopy: () -> Void
-- Line 838:        var onPaste: () -> Void
-- Line 840:        private var monitor: Any?
-- Line 853:        func installMonitor(for view: NSView) {
-- Line 883:        var onWindowChanged: (() -> Void)?
-- Line 899:    func makeCoordinator() -> Coordinator {
-- Line 903:    func makeNSView(context: Context) -> NSView {
-- Line 907:    func updateNSView(_ nsView: NSView, context: Context) {
-- Line 918:        private var panel: NSPanel?
-- Line 919:        private var hostingView: NSHostingView<FlowTrackColourLabView>?
-- Line 920:        private var isPresented: Binding<Bool>?
-- Line 922:        func update(
-- Line 943:        private func showPanel(
-- Line 981:        func windowWillClose(_ notification: Notification) {
-- Line 990:    func makeCoordinator() -> Coordinator {
-- Line 994:    func makeNSView(context: Context) -> ShortcutMonitorView {
-- Line 1003:    func updateNSView(_ nsView: ShortcutMonitorView, context: Context) {
-- Line 1009:        var onToggle: () -> Void
-- Line 1011:        private var monitor: Any?
-- Line 1023:        func installMonitor(for view: NSView) {
-- Line 1040:        private func isColourLabShortcut(_ event: NSEvent) -> Bool {
-- Line 1048:        var onWindowChanged: (() -> Void)?
+- Line 21:    var body: some View {
+- Line 133:    private var currentSavedTheme: FlowTrackSavedTheme? {
+- Line 138:    private var currentThemeName: String {
+- Line 142:    private var hasUnsavedChanges: Bool {
+- Line 146:    private var colourLabFooterHelpText: String {
+- Line 156:    private var themeToolbar: some View {
+- Line 220:    private func syncBaselineToSelection() {
+- Line 226:    private func syncBaselineToSelectionIfClean() {
+- Line 231:    private func requestThemeSelection(_ selection: String) {
+- Line 244:    private func selectPendingTheme() {
+- Line 250:    private func selectTheme(_ selectionID: String) {
+- Line 262:    private func discardAndSelectPendingTheme() {
+- Line 266:    private func saveCurrentThemeBeforeSwitch() {
+- Line 277:    private func saveCurrentTheme() {
+- Line 290:    private func saveDeveloperOverride() {
+- Line 301:    private func revertWorkingTheme() {
+- Line 305:    private func createTheme(named name: String, mode: ColourLabNamingSheet.Mode) {
+- Line 315:    private func deleteSelectedTheme() {
+- Line 324:    private func themeForSelection(_ themeID: UUID?) -> FlowTrackTheme {
+- Line 332:    private var selectedThemeKey: String {
+- Line 336:    private func themeForSelection(_ selectionID: String) -> FlowTrackTheme {
+- Line 343:    private func uniqueThemeName(startingWith name: String) -> String {
+- Line 351:        var index = 2
+- Line 358:    private func themeSignature(_ theme: FlowTrackTheme) -> Data {
+- Line 364:    private func tokenSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+- Line 373:    private func tokenRow(_ token: FlowTrackColourLabToken) -> some View {
+- Line 401:    private var colourEditor: some View {
+- Line 455:    private func alphaSlider(value: Double, update: @escaping (Double) -> Void) -> some View {
+- Line 479:    private func updateSelectedToken(hue: Double? = nil, saturation: Double? = nil, brightness: Double? = nil, alpha: Double? = nil) {
+- Line 480:        var hsba = ColourLabHSBA(color: selectedToken.color(in: theme))
+- Line 488:    private func colourSwatch(_ color: Color, size: CGSize) -> some View {
+- Line 509:        var title: String {
+- Line 517:        var actionTitle: String {
+- Line 543:    var body: some View {
+- Line 601:    var id: String { rawValue }
+- Line 611:    var title: String {
+- Line 640:    var section: String {
+- Line 644:    private var keyPath: WritableKeyPath<FlowTrackTheme, Color> {
+- Line 673:    func color(in theme: FlowTrackTheme) -> Color {
+- Line 677:    func setColor(_ color: Color, in theme: inout FlowTrackTheme) {
+- Line 683:    var red: Double
+- Line 684:    var green: Double
+- Line 685:    var blue: Double
+- Line 686:    var alpha: Double
+- Line 709:    var color: Color {
+- Line 713:    var hexString: String {
+- Line 723:    var hue: Double
+- Line 724:    var saturation: Double
+- Line 725:    var brightness: Double
+- Line 726:    var alpha: Double
+- Line 749:    var color: Color {
+- Line 760:    var body: some View {
+- Line 821:    var body: some View {
+- Line 863:    func makeCoordinator() -> Coordinator {
+- Line 867:    func makeNSView(context: Context) -> ShortcutMonitorView {
+- Line 876:    func updateNSView(_ nsView: ShortcutMonitorView, context: Context) {
+- Line 884:        var onCopy: () -> Void
+- Line 885:        var onPaste: () -> Void
+- Line 886:        var onSaveOverride: () -> Void
+- Line 888:        private var monitor: Any?
+- Line 902:        func installMonitor(for view: NSView) {
+- Line 935:        var onWindowChanged: (() -> Void)?
+- Line 953:    func makeCoordinator() -> Coordinator {
+- Line 957:    func makeNSView(context: Context) -> NSView {
+- Line 961:    func updateNSView(_ nsView: NSView, context: Context) {
+- Line 974:        private var panel: NSPanel?
+- Line 975:        private var hostingView: NSHostingView<FlowTrackColourLabView>?
+- Line 976:        private var isPresented: Binding<Bool>?
+- Line 978:        func update(
+- Line 1003:        private func showPanel(
+- Line 1045:        func windowWillClose(_ notification: Notification) {
+- Line 1054:    func makeCoordinator() -> Coordinator {
+- Line 1058:    func makeNSView(context: Context) -> ShortcutMonitorView {
+- Line 1067:    func updateNSView(_ nsView: ShortcutMonitorView, context: Context) {
+- Line 1073:        var onToggle: () -> Void
+- Line 1075:        private var monitor: Any?
+- Line 1087:        func installMonitor(for view: NSView) {
+- Line 1104:        private func isColourLabShortcut(_ event: NSEvent) -> Bool {
+- Line 1112:        var onWindowChanged: (() -> Void)?
 - SwiftUI State / Bindings:
 - Line 5:    @Binding var theme: FlowTrackTheme
-- Line 9:    @State private var selectedToken: FlowTrackColourLabToken = .cardBackground
-- Line 10:    @State private var copiedColor: Color?
-- Line 11:    @State private var copiedTokenTitle: String?
-- Line 12:    @State private var baselineTheme = FlowTrackThemeDefaults.standard
-- Line 13:    @State private var baselineSignature = Data()
-- Line 14:    @State private var pendingThemeSelectionID: UUID?
-- Line 15:    @State private var isConfirmingThemeSwitch = false
-- Line 16:    @State private var namingSheet: ColourLabNamingSheet?
-- Line 17:    @State private var deleteCandidate: FlowTrackSavedTheme?
-- Line 489:    @Environment(\.dismiss) private var dismiss
-- Line 490:    @State private var themeName: String
-- Line 893:    @Binding var isPresented: Bool
-- Line 894:    @Binding var theme: FlowTrackTheme
+- Line 11:    @State private var selectedToken: FlowTrackColourLabToken = .cardBackground
+- Line 12:    @State private var copiedColor: Color?
+- Line 13:    @State private var copiedTokenTitle: String?
+- Line 14:    @State private var baselineTheme = FlowTrackThemeDefaults.standard
+- Line 15:    @State private var baselineSignature = Data()
+- Line 16:    @State private var pendingThemeSelectionID: String?
+- Line 17:    @State private var isConfirmingThemeSwitch = false
+- Line 18:    @State private var namingSheet: ColourLabNamingSheet?
+- Line 19:    @State private var deleteCandidate: FlowTrackSavedTheme?
+- Line 534:    @Environment(\.dismiss) private var dismiss
+- Line 535:    @State private var themeName: String
+- Line 945:    @Binding var isPresented: Bool
+- Line 946:    @Binding var theme: FlowTrackTheme
 
 ### Views/Shared/FlowTrackTheme.swift
-- Lines: 347
+- Lines: 581
 - Imports:
 - import AppKit
 - import SwiftUI
 - Types:
-- Line 6:struct FlowTrackTheme: Codable {
-- Line 56:    enum CodingKeys: String, CodingKey {
-- Line 219:struct FlowTrackCodableColor: Codable {
-- Line 245:struct FlowTrackSavedTheme: Codable, Identifiable, Equatable {
-- Line 260:struct FlowTrackThemeLibrary: Codable {
-- Line 265:struct FlowTrackThemeActions {
-- Line 273:enum FlowTrackThemeDefaults {
-- Line 327:extension EnvironmentValues {
+- Line 6:struct FlowTrackBuiltInTheme: Identifiable, Equatable {
+- Line 16:enum FlowTrackThemeTextScheme: String, Codable, CaseIterable {
+- Line 33:struct FlowTrackTheme: Codable {
+- Line 84:    enum CodingKeys: String, CodingKey {
+- Line 252:struct FlowTrackCodableColor: Codable {
+- Line 278:struct FlowTrackSavedTheme: Codable, Identifiable, Equatable {
+- Line 293:struct FlowTrackThemeLibrary: Codable {
+- Line 299:    enum CodingKeys: String, CodingKey {
+- Line 327:struct FlowTrackThemeActions {
+- Line 337:enum FlowTrackThemeDefaults {
+- Line 556:extension EnvironmentValues {
 - Functions / Vars:
-- Line 7:    var appBackground: Color
-- Line 8:    var appBackgroundTint: Color
-- Line 9:    var cardBackground: Color
-- Line 10:    var cardBorder: Color
-- Line 11:    var inspectorBackground: Color
-- Line 12:    var inspectorBorder: Color
-- Line 13:    var primaryText: Color
-- Line 14:    var secondaryText: Color
-- Line 15:    var mutedText: Color
-- Line 16:    var captureAccent: Color
-- Line 17:    var libraryAccent: Color
-- Line 18:    var zoomAccent: Color
-- Line 19:    var effectsAccent: Color
-- Line 20:    var settingsAccent: Color
-- Line 21:    var editAccent: Color
-- Line 22:    var sidebarButtonBackground: Color
-- Line 23:    var sidebarButtonText: Color
-- Line 24:    var sidebarButtonSelectedBackground: Color
-- Line 25:    var sidebarButtonSelectedText: Color
-- Line 26:    var accentButtonText: Color
-- Line 27:    var controlStripText: Color
-- Line 28:    var controlStripMutedText: Color
-- Line 29:    var controlStripBackground: Color
-- Line 30:    var controlStripBorder: Color
-- Line 31:    var timelineRailLight: Color
-- Line 32:    var timelineRailDark: Color
-- Line 33:    var timelineRuler: Color
-- Line 34:    var timelinePlayhead: Color
-- Line 35:    var timelinePlayheadText: Color
-- Line 37:    func timelineRailColor(for colorScheme: ColorScheme) -> Color {
-- Line 41:    func accentColor(for role: FlowTrackAccentRole) -> Color {
-- Line 185:    func encode(to encoder: Encoder) throws {
-- Line 186:        var container = encoder.container(keyedBy: CodingKeys.self)
-- Line 220:    var red: Double
-- Line 221:    var green: Double
-- Line 222:    var blue: Double
-- Line 223:    var alpha: Double
-- Line 240:    var color: Color {
-- Line 246:    var id: UUID
-- Line 247:    var name: String
-- Line 248:    var theme: FlowTrackTheme
-- Line 249:    var createdAt: Date
-- Line 250:    var updatedAt: Date
-- Line 261:    var savedThemes: [FlowTrackSavedTheme] = []
-- Line 262:    var selectedThemeID: UUID?
-- Line 266:    var selectTheme: (UUID?) -> Void = { _ in }
-- Line 267:    var saveTheme: (String, FlowTrackTheme) -> Void = { _, _ in }
-- Line 268:    var updateTheme: (UUID, String, FlowTrackTheme) -> Void = { _, _, _ in }
-- Line 269:    var deleteTheme: (UUID) -> Void = { _ in }
-- Line 270:    var resetToBuiltInDefault: () -> Void = {}
-- Line 274:    static var standard: FlowTrackTheme {
-- Line 310:    static var defaultValue: FlowTrackTheme {
-- Line 316:    static var defaultValue: [FlowTrackSavedTheme] { [] }
-- Line 320:    static var defaultValue: UUID? { nil }
-- Line 324:    static var defaultValue: FlowTrackThemeActions { FlowTrackThemeActions() }
-- Line 328:    var flowTrackTheme: FlowTrackTheme {
-- Line 333:    var flowTrackSavedThemes: [FlowTrackSavedTheme] {
-- Line 338:    var flowTrackSelectedThemeID: UUID? {
-- Line 343:    var flowTrackThemeActions: FlowTrackThemeActions {
+- Line 7:    var id: String
+- Line 8:    var name: String
+- Line 9:    var theme: FlowTrackTheme
+- Line 21:    var preferredColorScheme: ColorScheme? {
+- Line 34:    var textScheme: FlowTrackThemeTextScheme
+- Line 35:    var appBackground: Color
+- Line 36:    var appBackgroundTint: Color
+- Line 37:    var cardBackground: Color
+- Line 38:    var cardBorder: Color
+- Line 39:    var inspectorBackground: Color
+- Line 40:    var inspectorBorder: Color
+- Line 41:    var primaryText: Color
+- Line 42:    var secondaryText: Color
+- Line 43:    var mutedText: Color
+- Line 44:    var captureAccent: Color
+- Line 45:    var libraryAccent: Color
+- Line 46:    var zoomAccent: Color
+- Line 47:    var effectsAccent: Color
+- Line 48:    var settingsAccent: Color
+- Line 49:    var editAccent: Color
+- Line 50:    var sidebarButtonBackground: Color
+- Line 51:    var sidebarButtonText: Color
+- Line 52:    var sidebarButtonSelectedBackground: Color
+- Line 53:    var sidebarButtonSelectedText: Color
+- Line 54:    var accentButtonText: Color
+- Line 55:    var controlStripText: Color
+- Line 56:    var controlStripMutedText: Color
+- Line 57:    var controlStripBackground: Color
+- Line 58:    var controlStripBorder: Color
+- Line 59:    var timelineRailLight: Color
+- Line 60:    var timelineRailDark: Color
+- Line 61:    var timelineRuler: Color
+- Line 62:    var timelinePlayhead: Color
+- Line 63:    var timelinePlayheadText: Color
+- Line 65:    func timelineRailColor(for colorScheme: ColorScheme) -> Color {
+- Line 69:    func accentColor(for role: FlowTrackAccentRole) -> Color {
+- Line 217:    func encode(to encoder: Encoder) throws {
+- Line 218:        var container = encoder.container(keyedBy: CodingKeys.self)
+- Line 253:    var red: Double
+- Line 254:    var green: Double
+- Line 255:    var blue: Double
+- Line 256:    var alpha: Double
+- Line 273:    var color: Color {
+- Line 279:    var id: UUID
+- Line 280:    var name: String
+- Line 281:    var theme: FlowTrackTheme
+- Line 282:    var createdAt: Date
+- Line 283:    var updatedAt: Date
+- Line 294:    var savedThemes: [FlowTrackSavedTheme] = []
+- Line 295:    var selectedThemeID: UUID?
+- Line 296:    var selectedBuiltInThemeID: String?
+- Line 297:    var builtInOverrides: [String: FlowTrackTheme] = [:]
+- Line 328:    var selectTheme: (UUID?) -> Void = { _ in }
+- Line 329:    var selectBuiltInTheme: (String) -> Void = { _ in }
+- Line 330:    var saveBuiltInOverride: (String, FlowTrackTheme) -> Void = { _, _ in }
+- Line 331:    var saveTheme: (String, FlowTrackTheme) -> Void = { _, _ in }
+- Line 332:    var updateTheme: (UUID, String, FlowTrackTheme) -> Void = { _, _, _ in }
+- Line 333:    var deleteTheme: (UUID) -> Void = { _ in }
+- Line 334:    var resetToBuiltInDefault: () -> Void = {}
+- Line 338:    static var standard: FlowTrackTheme {
+- Line 342:    static var builtInThemes: [FlowTrackBuiltInTheme] {
+- Line 444:    static func builtInTheme(withID id: String?) -> FlowTrackTheme {
+- Line 448:    static func builtInThemeName(withID id: String?) -> String {
+- Line 452:    private static var defaultTheme: FlowTrackTheme {
+- Line 486:    private static func c(_ red: Double, _ green: Double, _ blue: Double, _ alpha: Double = 1.0) -> Color {
+- Line 490:    private static func theme(
+- Line 535:    static var defaultValue: FlowTrackTheme {
+- Line 541:    static var defaultValue: [FlowTrackSavedTheme] { [] }
+- Line 545:    static var defaultValue: UUID? { nil }
+- Line 549:    static var defaultValue: String { flowTrackBuiltInThemeID }
+- Line 553:    static var defaultValue: FlowTrackThemeActions { FlowTrackThemeActions() }
+- Line 557:    var flowTrackTheme: FlowTrackTheme {
+- Line 562:    var flowTrackSavedThemes: [FlowTrackSavedTheme] {
+- Line 567:    var flowTrackSelectedThemeID: UUID? {
+- Line 572:    var flowTrackSelectedBuiltInThemeID: String {
+- Line 577:    var flowTrackThemeActions: FlowTrackThemeActions {
 
 ### Views/Shared/HelpModeViews.swift
 - Lines: 232

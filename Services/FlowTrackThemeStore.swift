@@ -40,6 +40,12 @@ struct FlowTrackThemeStore {
                !library.savedThemes.contains(where: { $0.id == selectedThemeID }) {
                 library.selectedThemeID = nil
             }
+            if let selectedBuiltInThemeID = library.selectedBuiltInThemeID,
+               !FlowTrackThemeDefaults.builtInThemes.contains(where: { $0.id == selectedBuiltInThemeID }) {
+                library.selectedBuiltInThemeID = flowTrackBuiltInThemeID
+            }
+            let builtInIDs = Set(FlowTrackThemeDefaults.builtInThemes.map(\.id))
+            library.builtInOverrides = library.builtInOverrides.filter { builtInIDs.contains($0.key) }
             return library
         } catch {
             return FlowTrackThemeLibrary()
