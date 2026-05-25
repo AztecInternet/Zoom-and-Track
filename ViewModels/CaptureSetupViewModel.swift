@@ -94,6 +94,12 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published var distortionLoupeImage: NSImage?
     @Published var isRenderingDistortionLoupe = false
     @Published var isShowingDistortionMapOverlay = false
+    @Published private(set) var pendingSmartSetupSuggestions: [SmartSetupSuggestion] = []
+    @Published private(set) var selectedSmartSetupSuggestionID: String?
+    @Published private(set) var smartSetupSelectionPulseToken = 0
+    @Published private(set) var activeSmartSuggestionPreviewEndTime: Double?
+    @Published private(set) var smartSetupStatusMessage: String?
+    @Published private(set) var isRunningSmartSetup = false
     
     private var hasRestoredLastRecording = false
     private var activePlaybackScopeURL: URL?
@@ -137,6 +143,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private let markerPreviewRenderService = MarkerPreviewRenderService()
     private let markerPreviewCacheService = MarkerPreviewCacheService()
     private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
+    private let smartSetupSuggestionService = SmartSetupSuggestionService()
     private let exportManager = ExportManager()
     private let previewTransitionFadeInDuration: TimeInterval = 0.12
     private let previewTransitionHoldDuration: TimeInterval = 1.0
@@ -516,6 +523,147 @@ final class CaptureSetupViewModel: ObservableObject {
     func openRecording() {
         guard let bundleURL = projectBundleService.openRecordingBundle() else { return }
         openCapture(at: bundleURL)
+    }
+
+    func runSmartSetup() {
+        guard !isRunningSmartSetup else { return }
+        guard let summary = recordingSummary else {
+            smartSetupStatusMessage = "Load a capture before running Smart Suggestions."
+            return
+        }
+
+        isRunningSmartSetup = true
+        smartSetupStatusMessage = "Running Smart Suggestions..."
+        defer { isRunningSmartSetup = false }
+
+        do {
+            let events = try projectBundleService.loadRecordedEvents(from: summary.bundleURL)
+            let suggestions = smartSetupSuggestionService.generateSuggestions(
+                events: events,
+                duration: summary.duration ?? summary.lastEventTimestamp ?? 0,
+                contentCoordinateSize: summary.contentCoordinateSize,
+                existingZoomMarkers: summary.zoomMarkers,
+                existingEffectMarkers: summary.effectMarkers
+            )
+            pendingSmartSetupSuggestions = suggestions
+            selectedSmartSetupSuggestionID = suggestions.first?.suggestionID
+            activeSmartSuggestionPreviewEndTime = nil
+            smartSetupStatusMessage = suggestions.isEmpty
+                ? "Smart Suggestions did not find any useful suggestions."
+                : "Smart Suggestions found \(suggestions.count) suggestion\(suggestions.count == 1 ? "" : "s")."
+        } catch {
+            pendingSmartSetupSuggestions = []
+            selectedSmartSetupSuggestionID = nil
+            activeSmartSuggestionPreviewEndTime = nil
+            smartSetupStatusMessage = "Smart Suggestions could not load recorded events: \(error.localizedDescription)"
+        }
+    }
+
+    func acceptSmartSetupSuggestion(_ suggestionID: String) {
+        guard recordingSummary != nil,
+              let suggestion = pendingSmartSetupSuggestions.first(where: { $0.suggestionID == suggestionID }) else {
+            return
+        }
+
+        switch suggestion.proposal {
+        case .zoom, .zoomAdjustment:
+            smartSetupStatusMessage = "Zoom suggestions are review-only until Smart Adjust can apply changes to existing markers."
+        case .effect:
+            smartSetupStatusMessage = "Effect suggestions are review-only for now. Check them before adding effects manually."
+        case .regionTighten:
+            smartSetupStatusMessage = "Region suggestions are review-only until Visual Assist is added."
+        }
+    }
+
+    func selectSmartSetupSuggestion(_ suggestionID: String, previewRange: Bool = true) {
+        guard let suggestion = pendingSmartSetupSuggestions.first(where: { $0.suggestionID == suggestionID }) else { return }
+        selectedSmartSetupSuggestionID = suggestionID
+        smartSetupSelectionPulseToken &+= 1
+        if previewRange {
+            previewSmartSetupSuggestion(suggestion)
+        }
+    }
+
+    func clearSelectedSmartSetupSuggestion() {
+        selectedSmartSetupSuggestionID = nil
+        cancelSmartSuggestionPreview()
+    }
+
+    func dismissSmartSetupSuggestion(_ suggestionID: String) {
+        pendingSmartSetupSuggestions.removeAll { $0.suggestionID == suggestionID }
+        if selectedSmartSetupSuggestionID == suggestionID {
+            selectedSmartSetupSuggestionID = nil
+            cancelSmartSuggestionPreview()
+        }
+        if pendingSmartSetupSuggestions.isEmpty {
+            smartSetupStatusMessage = "All Smart Suggestions dismissed."
+        }
+    }
+
+    func clearSmartSetupSuggestions() {
+        pendingSmartSetupSuggestions = []
+        selectedSmartSetupSuggestionID = nil
+        cancelSmartSuggestionPreview()
+        smartSetupStatusMessage = nil
+    }
+
+    private func previewSmartSetupSuggestion(_ suggestion: SmartSetupSuggestion) {
+        guard let player = mainPlayer else { return }
+        let range = smartSetupPreviewRange(for: suggestion)
+        guard range.endTime > range.startTime else { return }
+
+        cancelPendingMarkerPreviewRender()
+        stopPreviewPlayback(seekMainTo: currentPlaybackTime, retainSlate: false)
+        cancelPreviewMode()
+        playbackTransitionPlateState = .hidden
+        playbackPresentationMode = .normal
+        activeSmartSuggestionPreviewEndTime = range.endTime
+        manualSelectionSuppressionUntil = Date().addingTimeInterval(max(range.endTime - range.startTime, 0.35) + 0.15)
+        seekPlayback(to: range.startTime)
+        player.play()
+        isPlaybackActive = true
+    }
+
+    private func cancelSmartSuggestionPreview() {
+        if activeSmartSuggestionPreviewEndTime != nil {
+            mainPlayer?.pause()
+            isPlaybackActive = false
+        }
+        activeSmartSuggestionPreviewEndTime = nil
+    }
+
+    private func smartSetupPreviewRange(for suggestion: SmartSetupSuggestion) -> (startTime: Double, endTime: Double) {
+        let duration = max(recordingSummary?.duration ?? recordingSummary?.lastEventTimestamp ?? 0, 0)
+        let sourceRange = suggestion.sourceTimeRange ?? fallbackSmartSetupPreviewRange(for: suggestion)
+        let clampedStart = min(max(sourceRange.startTime, 0), max(duration, 0))
+        var clampedEnd = min(max(sourceRange.endTime, clampedStart), max(duration, clampedStart))
+        clampedEnd = min(clampedEnd, clampedStart + 8.0)
+
+        if clampedEnd - clampedStart < 1.0 {
+            clampedEnd = min(max(clampedStart + 1.0, clampedEnd), max(duration, clampedEnd))
+        }
+
+        return (clampedStart, max(clampedEnd, clampedStart))
+    }
+
+    private func fallbackSmartSetupPreviewRange(for suggestion: SmartSetupSuggestion) -> SmartSetupSourceTimeRange {
+        let duration = max(recordingSummary?.duration ?? recordingSummary?.lastEventTimestamp ?? 0, 0)
+        let sourceTime: Double
+        switch suggestion.proposal {
+        case .zoom(let proposal):
+            sourceTime = proposal.sourceEventTimestamp
+        case .zoomAdjustment(let proposal):
+            sourceTime = proposal.startTime
+        case .effect(let proposal):
+            sourceTime = proposal.sourceEventTimestamp
+        case .regionTighten(let proposal):
+            sourceTime = proposal.sourceTime
+        }
+
+        return SmartSetupSourceTimeRange(
+            startTime: max(sourceTime - 0.5, 0),
+            endTime: min(sourceTime + 1.5, max(duration, sourceTime))
+        )
     }
 
     func exportRecording() {
@@ -2166,6 +2314,11 @@ final class CaptureSetupViewModel: ObservableObject {
         activePlaybackScopeURL = playbackScopeURL
 
         recordingSummary = summary
+        pendingSmartSetupSuggestions = []
+        selectedSmartSetupSuggestionID = nil
+        activeSmartSuggestionPreviewEndTime = nil
+        smartSetupStatusMessage = nil
+        isRunningSmartSetup = false
         mainPlayer = AVPlayer(playerItem: AVPlayerItem(url: summary.recordingURL))
         previewPlayer = nil
         collectionName = summary.collectionName
@@ -2200,6 +2353,11 @@ final class CaptureSetupViewModel: ObservableObject {
         mainPlayer = nil
         previewPlayer = nil
         recordingSummary = nil
+        pendingSmartSetupSuggestions = []
+        selectedSmartSetupSuggestionID = nil
+        activeSmartSuggestionPreviewEndTime = nil
+        smartSetupStatusMessage = nil
+        isRunningSmartSetup = false
         selectedZoomMarkerID = nil
         currentPlaybackTime = 0
         isPlaybackActive = false
@@ -2224,6 +2382,44 @@ final class CaptureSetupViewModel: ObservableObject {
         publishOnNextRunLoop { [weak self] in
             self?.currentPlaybackTime = clampedSeconds
             self?.scheduleDistortionLoupeRefreshIfNeeded()
+        }
+    }
+
+    private func acceptSmartSetupEffectProposal(
+        _ proposal: SmartSetupEffectMarkerProposal,
+        suggestionID: String,
+        summary: RecordingInspectionSummary
+    ) {
+        var effectMarkers = summary.effectMarkers
+        var marker = EffectPlanItem(
+            id: nextEffectMarkerID(from: effectMarkers),
+            markerName: "Smart Suggestions Effect",
+            sourceEventTimestamp: proposal.sourceEventTimestamp,
+            startTime: proposal.startTime,
+            holdStartTime: proposal.holdStartTime,
+            holdEndTime: proposal.holdEndTime,
+            endTime: proposal.endTime,
+            enabled: true,
+            displayOrder: nextEffectDisplayOrder(from: effectMarkers),
+            style: proposal.style,
+            amount: proposal.amount,
+            blurAmount: proposal.blurAmount,
+            darkenAmount: proposal.darkenAmount,
+            tintAmount: proposal.tintAmount,
+            cornerRadius: proposal.cornerRadius,
+            feather: proposal.feather,
+            tintColor: proposal.tintColor,
+            focusRegion: proposal.focusRegion,
+            distortion: proposal.distortion
+        )
+        syncEffectTiming(&marker, maxDuration: summary.duration)
+        effectMarkers.append(marker)
+
+        selectedEffectMarkerID = marker.id
+        isEffectMarkerSelectionPinned = true
+        if saveEffectMarkers(effectMarkers, basedOn: summary) {
+            pendingSmartSetupSuggestions.removeAll { $0.suggestionID == suggestionID }
+            smartSetupStatusMessage = "Accepted Smart Suggestions effect marker."
         }
     }
 
@@ -2273,7 +2469,8 @@ final class CaptureSetupViewModel: ObservableObject {
         saveEffectMarkers(effectMarkers, basedOn: summary)
     }
 
-    private func saveZoomMarkers(_ markers: [ZoomPlanItem], basedOn summary: RecordingInspectionSummary) {
+    @discardableResult
+    private func saveZoomMarkers(_ markers: [ZoomPlanItem], basedOn summary: RecordingInspectionSummary) -> Bool {
         do {
             let envelope = ZoomPlanEnvelope(
                 schemaVersion: 1,
@@ -2284,8 +2481,10 @@ final class CaptureSetupViewModel: ObservableObject {
             try projectBundleService.saveZoomPlan(envelope, in: summary.bundleURL)
             let updatedSummary = summaryWithMarkers(markers, basedOn: summary)
             recordingSummary = updatedSummary
+            return true
         } catch {
             statusMessage = "Could not save zoomPlan.json: \(error.localizedDescription)"
+            return false
         }
     }
 
@@ -2361,7 +2560,8 @@ final class CaptureSetupViewModel: ObservableObject {
         )
     }
 
-    private func saveEffectMarkers(_ effectMarkers: [EffectPlanItem], basedOn summary: RecordingInspectionSummary) {
+    @discardableResult
+    private func saveEffectMarkers(_ effectMarkers: [EffectPlanItem], basedOn summary: RecordingInspectionSummary) -> Bool {
         do {
             let envelope = ZoomPlanEnvelope(
                 schemaVersion: 1,
@@ -2401,8 +2601,10 @@ final class CaptureSetupViewModel: ObservableObject {
                 self?.recordingSummary = updatedSummary
                 self?.scheduleDistortionLoupeRefreshIfNeeded()
             }
+            return true
         } catch {
             statusMessage = "Could not save zoomPlan.json: \(error.localizedDescription)"
+            return false
         }
     }
 
@@ -2845,6 +3047,14 @@ final class CaptureSetupViewModel: ObservableObject {
                 isPlaybackActive = false
                 cancelPreviewMode()
             }
+            return
+        }
+
+        if let activeSmartSuggestionPreviewEndTime, currentTime >= activeSmartSuggestionPreviewEndTime - 0.02 {
+            player.pause()
+            isPlaybackActive = false
+            self.activeSmartSuggestionPreviewEndTime = nil
+            seekPlayback(to: activeSmartSuggestionPreviewEndTime)
             return
         }
 

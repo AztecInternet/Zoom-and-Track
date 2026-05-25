@@ -863,6 +863,8 @@ extension ContentView {
                         editorMode: editorMode,
                         segmentLayouts: segmentLayouts,
                         effectLayouts: effectLayouts,
+                        smartSetupHighlightRange: selectedSmartSetupTimelineRange(),
+                        smartSetupHighlightPulseToken: viewModel.smartSetupSelectionPulseToken,
                         timelineInteractionSuppressed: timelineInteractionSuppressed,
                         selectedZoomMarkerID: viewModel.selectedZoomMarkerID,
                         hoveredTimelineMarkerID: hoveredTimelineMarkerID,

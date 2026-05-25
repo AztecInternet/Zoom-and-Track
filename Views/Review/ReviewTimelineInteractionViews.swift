@@ -1,6 +1,63 @@
 import AppKit
 import SwiftUI
 
+private struct SmartSuggestionsTimelineHighlightView: View {
+    let startX: CGFloat
+    let endX: CGFloat
+    let trackCenterY: CGFloat
+    let accentColor: Color
+    let pulseToken: Int
+
+    @State private var pulseActive = false
+
+    var body: some View {
+        let rawWidth = max(endX - startX, 1)
+        let bandWidth = max(rawWidth, 12)
+        let bandCenterX = startX + (rawWidth / 2)
+        let bandHeight: CGFloat = 28
+        let bracketHeight: CGFloat = 34
+        let lineOpacity = pulseActive ? 0.95 : 0.72
+        let fillOpacity = pulseActive ? 0.28 : 0.18
+
+        ZStack {
+            Rectangle()
+                .fill(accentColor.opacity(fillOpacity))
+                .frame(width: bandWidth, height: bandHeight)
+
+            Rectangle()
+                .stroke(accentColor.opacity(lineOpacity), lineWidth: 1)
+                .frame(width: bandWidth, height: bandHeight)
+
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(accentColor.opacity(lineOpacity))
+                    .frame(width: 2, height: bracketHeight)
+                Spacer(minLength: 0)
+                Rectangle()
+                    .fill(accentColor.opacity(lineOpacity))
+                    .frame(width: 2, height: bracketHeight)
+            }
+            .frame(width: bandWidth, height: bracketHeight)
+        }
+        .scaleEffect(x: 1, y: pulseActive ? 1.12 : 1, anchor: .center)
+        .position(x: bandCenterX, y: trackCenterY)
+        .allowsHitTesting(false)
+        .task(id: pulseToken) {
+            guard pulseToken > 0 else { return }
+            for _ in 0..<2 {
+                withAnimation(.easeOut(duration: 0.14)) {
+                    pulseActive = true
+                }
+                try? await Task.sleep(nanoseconds: 140_000_000)
+                withAnimation(.easeOut(duration: 0.16)) {
+                    pulseActive = false
+                }
+                try? await Task.sleep(nanoseconds: 120_000_000)
+            }
+        }
+    }
+}
+
 private struct TimelinePlayheadHandleShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -60,6 +117,8 @@ extension ContentView {
         editorMode: ReviewEditorMode,
         segmentLayouts: [TimelineSegmentLayout],
         effectLayouts: [EffectTimelineSegmentLayout],
+        smartSetupHighlightRange: SmartSetupSourceTimeRange?,
+        smartSetupHighlightPulseToken: Int,
         timelineInteractionSuppressed: Bool,
         selectedZoomMarkerID: String?,
         hoveredTimelineMarkerID: String?,
@@ -94,6 +153,16 @@ extension ContentView {
                     .fill(Color.accentColor.opacity(0.14))
                     .frame(height: 24)
                     .position(x: width / 2, y: trackCenterY)
+            }
+
+            if let smartSetupHighlightRange {
+                smartSetupTimelineHighlight(
+                    range: smartSetupHighlightRange,
+                    visibleRange: visibleRange,
+                    width: width,
+                    trackCenterY: trackCenterY,
+                    pulseToken: smartSetupHighlightPulseToken
+                )
             }
 
             if editorMode == .zoomAndClicks {
@@ -188,6 +257,25 @@ extension ContentView {
                     isDraggingTimeline: isDraggingTimeline
                 )
             }
+        }
+    }
+
+    @ViewBuilder
+    func smartSetupTimelineHighlight(
+        range: SmartSetupSourceTimeRange,
+        visibleRange: TimelineVisibleRange,
+        width: CGFloat,
+        trackCenterY: CGFloat,
+        pulseToken: Int
+    ) -> some View {
+        if let clippedRange = visibleRange.clippedRange(start: range.startTime, end: range.endTime) {
+            SmartSuggestionsTimelineHighlightView(
+                startX: timelineX(for: clippedRange.start, visibleRange: visibleRange, width: width),
+                endX: timelineX(for: clippedRange.end, visibleRange: visibleRange, width: width),
+                trackCenterY: trackCenterY,
+                accentColor: FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme),
+                pulseToken: pulseToken
+            )
         }
     }
 

@@ -341,6 +341,31 @@ struct ProjectBundleService {
         )
     }
 
+    func loadRecordedEventEnvelope(from bundleURL: URL) throws -> RecordedEventEnvelope {
+        let accessURL = try beginPlaybackAccess(for: bundleURL)
+        defer {
+            endPlaybackAccess(accessURL)
+        }
+
+        guard bundleURL.pathExtension == "captureproj" else {
+            throw NSError(domain: "ProjectBundleService", code: 11, userInfo: [NSLocalizedDescriptionKey: "Selected item is not a .captureproj bundle."])
+        }
+
+        let manifestURL = try resolveManifestURL(in: bundleURL)
+        guard fileManager.fileExists(atPath: manifestURL.path) else {
+            throw NSError(domain: "ProjectBundleService", code: 12, userInfo: [NSLocalizedDescriptionKey: "This capture is missing its manifest file."])
+        }
+
+        let manifestData = try Data(contentsOf: manifestURL)
+        let manifest = try JSONDecoder.manifestDecoder.decode(ProjectManifest.self, from: manifestData)
+        let eventsURL = bundleURL.appendingPathComponent(manifest.eventFileName)
+        return loadEventsEnvelope(from: eventsURL)
+    }
+
+    func loadRecordedEvents(from bundleURL: URL) throws -> [RecordedEvent] {
+        try loadRecordedEventEnvelope(from: bundleURL).events
+    }
+
     func persistLastRecordingBundle(_ url: URL) -> Bool {
         UserDefaults.standard.set(url.path, forKey: lastRecordingBundlePathKey)
         if persistSecurityScopedURL(url, key: lastRecordingBundleBookmarkKey) {
