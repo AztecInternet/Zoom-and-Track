@@ -68,7 +68,9 @@ extension ContentView {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(cardBackground)
         .overlay {
-            if isHelpModeEnabled {
+            if isGuidedTourStage(.captureTarget) {
+                FlowTrackOnboardingRegionHighlight()
+            } else if isHelpModeEnabled {
                 HelpModeRegionHighlight()
             }
         }
@@ -86,7 +88,9 @@ extension ContentView {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(cardBackground)
             .overlay {
-                if isHelpModeEnabled {
+                if isGuidedTourStage(.captureSetup) {
+                    FlowTrackOnboardingRegionHighlight()
+                } else if isHelpModeEnabled {
                     HelpModeRegionHighlight()
                 }
             }
@@ -106,7 +110,9 @@ extension ContentView {
             controls: { recordingControlButton }
         )
         .overlay {
-            if isHelpModeEnabled {
+            if isGuidedTourStage(.captureSetup) {
+                FlowTrackOnboardingRegionHighlight()
+            } else if isHelpModeEnabled {
                 HelpModeRegionHighlight()
             }
         }
@@ -272,7 +278,9 @@ extension ContentView {
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(cardBackground)
         .overlay {
-            if isHelpModeEnabled {
+            if isGuidedTourStage(.captureSetup) {
+                FlowTrackOnboardingRegionHighlight()
+            } else if isHelpModeEnabled {
                 HelpModeRegionHighlight()
             }
         }
@@ -422,6 +430,12 @@ extension ContentView {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(viewModel.canStopRecording || viewModel.sessionState == .stopping ? Color.red : Color.accentColor)
             )
+            .overlay {
+                if isGuidedTourStage(.startCapture) {
+                    FlowTrackOnboardingRegionHighlight()
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+            }
             .opacity(primaryButtonEnabled ? 1.0 : 0.45)
             .disabled(!primaryButtonEnabled)
             Spacer()

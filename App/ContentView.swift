@@ -17,6 +17,10 @@ struct ContentView: View {
     @Environment(\.flowTrackSelectedBuiltInThemeID) var flowTrackSelectedBuiltInThemeID
     @Environment(\.flowTrackThemeActions) var flowTrackThemeActions
     @StateObject var viewModel = CaptureSetupViewModel()
+    @State var onboardingManager = FlowTrackOnboardingManager()
+    @State private var guidedTourPanelOffset = CGSize(width: 0, height: 0)
+    @State private var guidedTourPanelDragStartOffset: CGSize?
+    @State private var isGuidedTourCollapsed = false
     @State var selectedTab: AppTab? = .capture
     @State private var playbackVideoHeightOverride: CGFloat?
     @State var playbackVideoHeightDragOrigin: CGFloat?
@@ -217,6 +221,9 @@ struct ContentView: View {
             detailContent
         }
         .frame(minWidth: 1180, minHeight: 760)
+        .overlay(alignment: .topLeading) {
+            guidedTourOverlay
+        }
         .task {
             await viewModel.load()
         }
@@ -225,7 +232,134 @@ struct ContentView: View {
                 selectedTab = .review
             }
         }
-        .focusedValue(\.flowTrackCommandContext, flowTrackCommandContext)
+        .focusedSceneValue(\.flowTrackCommandContext, flowTrackCommandContext)
+    }
+
+    @ViewBuilder
+    private var guidedTourOverlay: some View {
+        GeometryReader { geometry in
+            if onboardingManager.isPresented, let stage = onboardingManager.currentStage {
+                let panelSize = guidedTourPanelSize
+                let origin = guidedTourPanelOrigin(in: geometry.size, panelSize: panelSize)
+
+                FlowTrackOnboardingCoachCard(
+                    stage: stage,
+                    canGoBack: stage.previousStage != nil,
+                    isFinalStage: stage.nextStage == nil,
+                    isCollapsed: isGuidedTourCollapsed,
+                    onBack: onboardingManager.back,
+                    onNext: onboardingManager.advance,
+                    onSkip: onboardingManager.skip,
+                    onDone: onboardingManager.advance,
+                    onToggleCollapse: {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                            isGuidedTourCollapsed.toggle()
+                            guidedTourPanelOffset = clampedGuidedTourPanelOffset(
+                                guidedTourPanelOffset,
+                                in: geometry.size,
+                                panelSize: guidedTourPanelSize
+                            )
+                        }
+                    }
+                )
+                .offset(x: origin.x, y: origin.y)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            let startOffset = guidedTourPanelDragStartOffset ?? guidedTourPanelOffset
+                            if guidedTourPanelDragStartOffset == nil {
+                                guidedTourPanelDragStartOffset = startOffset
+                            }
+
+                            let proposedOffset = CGSize(
+                                width: startOffset.width + value.translation.width,
+                                height: startOffset.height + value.translation.height
+                            )
+                            guidedTourPanelOffset = clampedGuidedTourPanelOffset(
+                                proposedOffset,
+                                in: geometry.size,
+                                panelSize: panelSize
+                            )
+                        }
+                        .onEnded { _ in
+                            guidedTourPanelDragStartOffset = nil
+                        }
+                )
+                .transition(.scale(scale: 0.98).combined(with: .opacity))
+                .zIndex(20)
+            }
+        }
+    }
+
+    private var guidedTourPanelSize: CGSize {
+        isGuidedTourCollapsed
+            ? CGSize(width: 270, height: 48)
+            : CGSize(width: 480, height: 248)
+    }
+
+    private func guidedTourDefaultPanelOrigin(in containerSize: CGSize, panelSize: CGSize) -> CGPoint {
+        let margin: CGFloat = 28
+        let preferredX = (containerSize.width * 0.68) - (panelSize.width / 2)
+        let minX = margin
+        let maxX = max(minX, containerSize.width - panelSize.width - margin)
+        return CGPoint(
+            x: min(max(preferredX, minX), maxX),
+            y: margin
+        )
+    }
+
+    private func guidedTourPanelOrigin(in containerSize: CGSize, panelSize: CGSize) -> CGPoint {
+        let defaultOrigin = guidedTourDefaultPanelOrigin(in: containerSize, panelSize: panelSize)
+        return CGPoint(
+            x: defaultOrigin.x + guidedTourPanelOffset.width,
+            y: defaultOrigin.y + guidedTourPanelOffset.height
+        )
+    }
+
+    private func clampedGuidedTourPanelOffset(
+        _ proposedOffset: CGSize,
+        in containerSize: CGSize,
+        panelSize: CGSize
+    ) -> CGSize {
+        let margin: CGFloat = 12
+        let defaultOrigin = guidedTourDefaultPanelOrigin(in: containerSize, panelSize: panelSize)
+        let proposedOrigin = CGPoint(
+            x: defaultOrigin.x + proposedOffset.width,
+            y: defaultOrigin.y + proposedOffset.height
+        )
+        let minX = margin
+        let maxX = max(minX, containerSize.width - panelSize.width - margin)
+        let minY = margin
+        let maxY = max(minY, containerSize.height - panelSize.height - margin)
+        let clampedOrigin = CGPoint(
+            x: min(max(proposedOrigin.x, minX), maxX),
+            y: min(max(proposedOrigin.y, minY), maxY)
+        )
+        return CGSize(
+            width: clampedOrigin.x - defaultOrigin.x,
+            height: clampedOrigin.y - defaultOrigin.y
+        )
+    }
+
+    var activeGuidedTourStage: FlowTrackOnboardingStage? {
+        guard onboardingManager.isPresented,
+              let currentStage = onboardingManager.currentStage else {
+            return nil
+        }
+
+        switch (selectedTab ?? .capture, currentStage) {
+        case (.capture, .captureTarget),
+             (.capture, .captureSetup),
+             (.review, .timelineMarkers),
+             (.review, .markerInspector):
+            return currentStage
+        default:
+            return nil
+        }
+    }
+
+    func isGuidedTourStage(_ stage: FlowTrackOnboardingStage) -> Bool {
+        activeGuidedTourStage == stage
     }
 
     private var sidebar: some View {
@@ -484,6 +618,9 @@ struct ContentView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .zIndex(0)
+                    .onAppear {
+                        isTimelineKeyboardFocused = true
+                    }
                     .onChange(of: summary.recordingURL) {
                         cancelTimelineMarkerAutoScroll()
                         cancelTimelineScrubAutoScroll()
@@ -494,6 +631,7 @@ struct ContentView: View {
                         isPlacingClickFocus = false
                         pendingMarkerDragSourcePoint = nil
                         resetClickPointPrecisionLoupe()
+                        isTimelineKeyboardFocused = true
                     }
                     .onChange(of: viewModel.currentPlaybackTime) {
                         guard !isScrubbingPlayback else { return }
@@ -667,6 +805,11 @@ struct ContentView: View {
             canGoToNextMarker: nextMarkerNavigationTarget() != nil,
             canDeleteSelectedMarker: canDeleteSelectedMarkerFromMenu,
             canDuplicateSelectedMarker: canDuplicateSelectedMarkerFromMenu,
+            startGuidedTour: {
+                guidedTourPanelOffset = .zero
+                isGuidedTourCollapsed = false
+                onboardingManager.startManualTour()
+            },
             toggleHelpMode: {
                 isHelpModeEnabled.toggle()
             },
@@ -1240,16 +1383,19 @@ struct ContentView: View {
     }
 
     func sectionHeader(title: String, subtitle: String, accentWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.system(size: 30, weight: .semibold))
-            Text(subtitle)
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                .padding(.top, 4)
-
+        HStack(alignment: .top, spacing: 18) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.system(size: 30, weight: .semibold))
+                Text(subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .padding(.top, 4)
+            }
+            .layoutPriority(1)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     func setTimelineHover(markerID: String, phase: MarkerTimingPhase?, anchor: CGPoint) {

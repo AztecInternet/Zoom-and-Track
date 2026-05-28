@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DD2512CC2FC5979C0043ED21 /* FlowTrackOnboardingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512CB2FC5979C0043ED21 /* FlowTrackOnboardingManager.swift */; };
+		DD2512CE2FC599930043ED21 /* FlowTrackOnboardingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512CD2FC599930043ED21 /* FlowTrackOnboardingViews.swift */; };
 		DD367DF52FBCD8A000F44877 /* HelpModeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */; };
 		DD367DF72FBCE4AC00F44877 /* FlowTrackCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF62FBCE4AC00F44877 /* FlowTrackCommands.swift */; };
 		DD367DF92FBF034000F44877 /* FlowTrackTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF82FBF034000F44877 /* FlowTrackTheme.swift */; };
@@ -58,6 +60,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		DD2512CB2FC5979C0043ED21 /* FlowTrackOnboardingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackOnboardingManager.swift; sourceTree = "<group>"; };
+		DD2512CD2FC599930043ED21 /* FlowTrackOnboardingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackOnboardingViews.swift; sourceTree = "<group>"; };
 		DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpModeViews.swift; sourceTree = "<group>"; };
 		DD367DF62FBCE4AC00F44877 /* FlowTrackCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackCommands.swift; sourceTree = "<group>"; };
 		DD367DF82FBF034000F44877 /* FlowTrackTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackTheme.swift; sourceTree = "<group>"; };
@@ -164,6 +168,7 @@
 				DD88BC7E2FAB995C00BFFBBF /* ExportManager.swift */,
 				DD88BC942FABD8A800BFFBBF /* PlaybackTransportManager.swift */,
 				DD88BC962FABDFD800BFFBBF /* TimelineScrubManager.swift */,
+				DD2512CB2FC5979C0043ED21 /* FlowTrackOnboardingManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -261,6 +266,7 @@
 				DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */,
 				DD367DF82FBF034000F44877 /* FlowTrackTheme.swift */,
 				DD367DFA2FBF04BE00F44877 /* FlowTrackColourLabViews.swift */,
+				DD2512CD2FC599930043ED21 /* FlowTrackOnboardingViews.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -407,7 +413,9 @@
 				DD88BC612FA8562800BFFBBF /* ScreenCaptureService.swift in Sources */,
 				DD88BC622FA8562800BFFBBF /* TimelineToolbarControls.swift in Sources */,
 				DD88BC812FABA0A500BFFBBF /* CaptureTargetManager.swift in Sources */,
+				DD2512CC2FC5979C0043ED21 /* FlowTrackOnboardingManager.swift in Sources */,
 				DD88BC692FAA9C8600BFFBBF /* ReviewTimelineViews.swift in Sources */,
+				DD2512CE2FC599930043ED21 /* FlowTrackOnboardingViews.swift in Sources */,
 				DD88BC632FA8562800BFFBBF /* TutorialCaptureApp.swift in Sources */,
 				DD367E012FC3A39A00F44877 /* SmartSetupSuggestionService.swift in Sources */,
 			);

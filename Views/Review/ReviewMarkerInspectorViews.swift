@@ -31,7 +31,9 @@ extension ContentView {
             inspectorCardBackground(accentRole: accentRole)
         }
         .overlay {
-            if isHelpModeEnabled, inspectorMode == .markers {
+            if isGuidedTourStage(.markerInspector), inspectorMode == .markers {
+                FlowTrackOnboardingRegionHighlight()
+            } else if isHelpModeEnabled, inspectorMode == .markers {
                 HelpModeRegionHighlight()
             }
         }
@@ -362,13 +364,13 @@ extension ContentView {
                             Text(String(format: "%.1fx", marker.zoomScale))
                                 .font(.system(size: 12, design: .monospaced))
                         }
-                        Slider(
-                            value: Binding(
-                                get: { marker.zoomScale },
-                                set: { viewModel.setSelectedMarkerZoomScale($0) }
-                            ),
-                            in: 1.0...3.0
-                        )
+                        FlowTrackInspectorSlider(
+                            value: marker.zoomScale,
+                            in: 1.0...3.0,
+                            accentRole: accentRole
+                        ) { newValue in
+                            viewModel.setSelectedMarkerZoomScale(newValue)
+                        }
                     }
                 }
 
@@ -512,13 +514,13 @@ extension ContentView {
                                     .font(.system(size: 12, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
-                            Slider(
-                                value: Binding(
-                                    get: { marker.bounceAmount },
-                                    set: { viewModel.setSelectedMarkerBounceAmount($0) }
-                                ),
-                                in: 0...1
-                            )
+                            FlowTrackInspectorSlider(
+                                value: marker.bounceAmount,
+                                in: 0...1,
+                                accentRole: accentRole
+                            ) { newValue in
+                                viewModel.setSelectedMarkerBounceAmount(newValue)
+                            }
                         }
                     }
                 }
@@ -637,13 +639,13 @@ extension ContentView {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                     HStack {
-                        Slider(
-                            value: Binding(
-                                get: { marker.cornerRadius },
-                                set: { viewModel.setSelectedEffectCornerRadius($0) }
-                            ),
-                            in: 0...80
-                        )
+                        FlowTrackInspectorSlider(
+                            value: marker.cornerRadius,
+                            in: 0...80,
+                            accentRole: accentRole
+                        ) { newValue in
+                            viewModel.setSelectedEffectCornerRadius(newValue)
+                        }
                         Text(String(format: "%.0f", marker.cornerRadius))
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundStyle(.secondary)
@@ -656,13 +658,13 @@ extension ContentView {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                     HStack {
-                        Slider(
-                            value: Binding(
-                                get: { marker.feather },
-                                set: { viewModel.setSelectedEffectFeather($0) }
-                            ),
-                            in: 0...60
-                        )
+                        FlowTrackInspectorSlider(
+                            value: marker.feather,
+                            in: 0...60,
+                            accentRole: accentRole
+                        ) { newValue in
+                            viewModel.setSelectedEffectFeather(newValue)
+                        }
                         Text(String(format: "%.0f", marker.feather))
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundStyle(.secondary)
@@ -718,16 +720,16 @@ extension ContentView {
                 )
                     .frame(width: 72, height: 22)
             }
-            Slider(
-                value: Binding(
-                    get: { value },
-                    set: action
-                ),
+            FlowTrackInspectorSlider(
+                value: value,
                 in: range,
+                accentRole: inspectorAccentRole,
                 onEditingChanged: { isEditing in
                     inspectorFocusedTimingPhase = isEditing ? phase : (inspectorFocusedTimingPhase == phase ? nil : inspectorFocusedTimingPhase)
                 }
-            )
+            ) { newValue in
+                action(newValue)
+            }
         }
     }
 
@@ -1008,13 +1010,13 @@ extension ContentView {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
             HStack {
-                Slider(
-                    value: Binding(
-                        get: { value },
-                        set: action
-                    ),
-                    in: 0...1
-                )
+                FlowTrackInspectorSlider(
+                    value: value,
+                    in: 0...1,
+                    accentRole: inspectorAccentRole
+                ) { newValue in
+                    action(newValue)
+                }
                 Text(String(format: "%.0f%%", value * 100))
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.secondary)
@@ -1034,6 +1036,118 @@ extension ContentView {
         case .noZoom:
             return "smallcircle.filled.circle"
         }
+    }
+}
+
+private struct FlowTrackInspectorSlider: View {
+    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
+    let value: Double
+    let range: ClosedRange<Double>
+    let accentRole: FlowTrackAccentRole
+    let onEditingChanged: (Bool) -> Void
+    let action: (Double) -> Void
+
+    @State private var isDragging = false
+
+    init(
+        value: Double,
+        in range: ClosedRange<Double>,
+        accentRole: FlowTrackAccentRole,
+        onEditingChanged: @escaping (Bool) -> Void = { _ in },
+        action: @escaping (Double) -> Void
+    ) {
+        self.value = value
+        self.range = range
+        self.accentRole = accentRole
+        self.onEditingChanged = onEditingChanged
+        self.action = action
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let dimensions = sliderDimensions(in: geometry.size)
+
+            ZStack(alignment: .leading) {
+                Capsule(style: .continuous)
+                    .fill(Color.secondary.opacity(0.18))
+                    .frame(height: dimensions.trackHeight)
+                    .frame(maxHeight: .infinity, alignment: .center)
+
+                Capsule(style: .continuous)
+                    .fill(accentColor.opacity(0.88))
+                    .frame(width: dimensions.filledWidth, height: dimensions.trackHeight)
+                    .frame(maxHeight: .infinity, alignment: .center)
+
+                Circle()
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .frame(width: dimensions.thumbSize, height: dimensions.thumbSize)
+                    .overlay {
+                        Circle()
+                            .fill(accentColor)
+                            .padding(isDragging ? 3 : 4)
+                    }
+                    .overlay {
+                        Circle()
+                            .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                    }
+                    .shadow(color: Color.black.opacity(0.18), radius: 2, x: 0, y: 1)
+                    .position(x: dimensions.thumbCenterX, y: geometry.size.height / 2)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { dragValue in
+                        beginEditingIfNeeded()
+                        action(value(for: dragValue.location.x, in: geometry.size))
+                    }
+                    .onEnded { _ in
+                        endEditingIfNeeded()
+                    }
+            )
+            .accessibilityLabel("Inspector slider")
+            .accessibilityValue(Text(String(format: "%.2f", clampedValue)))
+        }
+        .frame(height: 22)
+    }
+
+    private var accentColor: Color {
+        FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
+    }
+
+    private var clampedValue: Double {
+        min(max(value, range.lowerBound), range.upperBound)
+    }
+
+    private func sliderDimensions(in size: CGSize) -> (trackHeight: CGFloat, thumbSize: CGFloat, thumbCenterX: CGFloat, filledWidth: CGFloat) {
+        let trackHeight: CGFloat = 4
+        let thumbSize: CGFloat = 14
+        let thumbInset = thumbSize / 2
+        let usableWidth = max(size.width - (thumbInset * 2), 1)
+        let span = max(range.upperBound - range.lowerBound, 0.0001)
+        let fraction = min(max((clampedValue - range.lowerBound) / span, 0), 1)
+        let thumbCenterX = thumbInset + (usableWidth * fraction)
+        return (trackHeight, thumbSize, thumbCenterX, max(thumbCenterX, 0))
+    }
+
+    private func value(for locationX: CGFloat, in size: CGSize) -> Double {
+        let thumbInset: CGFloat = 7
+        let usableWidth = max(size.width - (thumbInset * 2), 1)
+        let localX = min(max(locationX - thumbInset, 0), usableWidth)
+        let fraction = usableWidth <= 0 ? 0 : localX / usableWidth
+        return range.lowerBound + ((range.upperBound - range.lowerBound) * Double(fraction))
+    }
+
+    private func beginEditingIfNeeded() {
+        guard !isDragging else { return }
+        isDragging = true
+        onEditingChanged(true)
+    }
+
+    private func endEditingIfNeeded() {
+        guard isDragging else { return }
+        isDragging = false
+        onEditingChanged(false)
     }
 }
 

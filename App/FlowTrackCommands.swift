@@ -13,6 +13,7 @@ struct FlowTrackCommandContext {
     var canGoToNextMarker: Bool
     var canDeleteSelectedMarker: Bool
     var canDuplicateSelectedMarker: Bool
+    var startGuidedTour: () -> Void
     var toggleHelpMode: () -> Void
     var zoomTimelineIn: () -> Void
     var zoomTimelineOut: () -> Void
@@ -131,6 +132,11 @@ struct FlowTrackCommands: Commands {
         }
 
         CommandGroup(after: .help) {
+            Button("Start Guided Tour") {
+                commandContext?.startGuidedTour()
+            }
+            .disabled(commandContext == nil)
+
             Button(commandContext?.isHelpModeEnabled == true ? "Turn Help Mode Off" : "Turn Help Mode On") {
                 commandContext?.toggleHelpMode()
             }

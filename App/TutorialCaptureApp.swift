@@ -188,3 +188,4 @@ struct TutorialCaptureApp: App {
         builtInThemeOverrides[id] ?? FlowTrackThemeDefaults.builtInTheme(withID: id)
     }
 }
+

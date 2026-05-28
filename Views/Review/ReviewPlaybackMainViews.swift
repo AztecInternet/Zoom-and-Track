@@ -680,7 +680,9 @@ extension ContentView {
             }
         }
         .overlay {
-            if isHelpModeEnabled {
+            if isGuidedTourStage(.reviewBasics) {
+                FlowTrackOnboardingRegionHighlight()
+            } else if isHelpModeEnabled {
                 HelpModeRegionHighlight()
             }
         }
@@ -1100,7 +1102,9 @@ extension ContentView {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .overlay {
-            if isHelpModeEnabled {
+            if isGuidedTourStage(.timelineMarkers) {
+                FlowTrackOnboardingRegionHighlight()
+            } else if isHelpModeEnabled {
                 HelpModeRegionHighlight()
             }
         }
