@@ -1,0 +1,337 @@
+# Shared Views Map
+
+Generated: 2026-05-29 12:01:48
+
+## Files
+
+### Views/Shared/ExportProgressSheetViews.swift
+- Lines: 100
+- Imports:
+- import AppKit
+- import SwiftUI
+- Types:
+- Line 4:extension ContentView {
+- Functions / Vars:
+- Line 5:    var exportProgressSheet: some View {
+- Line 56:    var exportSheetTitle: String {
+- Line 75:    var progressValueForDisplay: Double {
+- Line 76:        let progress = max(0, min(viewModel.exportProgress, 1))
+- Line 87:    func presentExportSharePicker() {
+- Line 89:              let exportShareAnchorView else {
+- Line 93:        let picker = NSSharingServicePicker(items: [exportedRecordingURL])
+
+### Views/Shared/FlowTrackAccent.swift
+- Lines: 37
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:enum FlowTrackAccentRole {
+- Line 11:enum FlowTrackAccent {
+- Functions / Vars:
+- Line 12:    static func color(for role: FlowTrackAccentRole, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+- Line 18:    static func panelFill(for role: FlowTrackAccentRole, opacity: Double = 0.045, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+- Line 22:    static func panelBorder(for role: FlowTrackAccentRole, opacity: Double = 0.10, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+- Line 26:    static func subtleFill(for role: FlowTrackAccentRole, opacity: Double, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+- Line 30:    static func selectedStroke(for role: FlowTrackAccentRole, opacity: Double = 0.35, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+- Line 34:    private static var usesRoleSpecificAccent: Bool {
+
+### Views/Shared/FlowTrackColourLabViews.swift
+- Lines: 1119
+- Imports:
+- import AppKit
+- import SwiftUI
+- Types:
+- Line 4:struct FlowTrackColourLabView: View {
+- Line 504:    enum Mode {
+- Line 944:struct FlowTrackColourLabPanelPresenter: NSViewRepresentable {
+- Line 1051:struct FlowTrackColourLabShortcutView: NSViewRepresentable {
+- Functions / Vars:
+- Line 6:    let savedThemes: [FlowTrackSavedTheme]
+- Line 7:    let selectedThemeID: UUID?
+- Line 8:    let selectedBuiltInThemeID: String
+- Line 9:    let builtInThemeOverrides: [String: FlowTrackTheme]
+- Line 10:    let actions: FlowTrackThemeActions
+- Line 21:    var body: some View {
+- Line 133:    private var currentSavedTheme: FlowTrackSavedTheme? {
+- Line 138:    private var currentThemeName: String {
+- Line 142:    private var hasUnsavedChanges: Bool {
+- Line 146:    private var colourLabFooterHelpText: String {
+- Line 156:    private var themeToolbar: some View {
+- Line 220:    private func syncBaselineToSelection() {
+- Line 221:        let selectedTheme = themeForSelection(selectedThemeKey)
+- Line 226:    private func syncBaselineToSelectionIfClean() {
+- Line 231:    private func requestThemeSelection(_ selection: String) {
+- Line 244:    private func selectPendingTheme() {
+- Line 245:        let themeID = pendingThemeSelectionID ?? flowTrackBuiltInThemeID
+- Line 250:    private func selectTheme(_ selectionID: String) {
+- Line 256:        let selectedTheme = themeForSelection(selectionID)
+- Line 262:    private func discardAndSelectPendingTheme() {
+- Line 266:    private func saveCurrentThemeBeforeSwitch() {
+- Line 277:    private func saveCurrentTheme() {
+- Line 290:    private func saveDeveloperOverride() {
+- Line 301:    private func revertWorkingTheme() {
+- Line 305:    private func createTheme(named name: String, mode: ColourLabNamingSheet.Mode) {
+- Line 306:        let finalName = uniqueThemeName(startingWith: name)
+- Line 315:    private func deleteSelectedTheme() {
+- Line 324:    private func themeForSelection(_ themeID: UUID?) -> FlowTrackTheme {
+- Line 326:              let savedTheme = savedThemes.first(where: { $0.id == themeID }) else {
+- Line 332:    private var selectedThemeKey: String {
+- Line 336:    private func themeForSelection(_ selectionID: String) -> FlowTrackTheme {
+- Line 343:    private func uniqueThemeName(startingWith name: String) -> String {
+- Line 344:        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 345:        let baseName = trimmedName.isEmpty ? "Untitled Theme" : trimmedName
+- Line 346:        let existingNames = Set(savedThemes.map { $0.name.lowercased() })
+- Line 351:        var index = 2
+- Line 358:    private func themeSignature(_ theme: FlowTrackTheme) -> Data {
+- Line 359:        let encoder = JSONEncoder()
+- Line 364:    private func tokenSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+- Line 373:    private func tokenRow(_ token: FlowTrackColourLabToken) -> some View {
+- Line 374:        let isSelected = selectedToken == token
+- Line 401:    private var colourEditor: some View {
+- Line 402:        let rgba = ColourLabRGBA(color: selectedToken.color(in: theme))
+- Line 403:        let hsba = ColourLabHSBA(color: selectedToken.color(in: theme))
+- Line 455:    private func alphaSlider(value: Double, update: @escaping (Double) -> Void) -> some View {
+- Line 479:    private func updateSelectedToken(hue: Double? = nil, saturation: Double? = nil, brightness: Double? = nil, alpha: Double? = nil) {
+- Line 480:        var hsba = ColourLabHSBA(color: selectedToken.color(in: theme))
+- Line 488:    private func colourSwatch(_ color: Color, size: CGSize) -> some View {
+- Line 509:        var title: String {
+- Line 517:        var actionTitle: String {
+- Line 526:    let id = UUID()
+- Line 527:    let mode: Mode
+- Line 528:    let suggestedName: String
+- Line 532:    let sheet: ColourLabNamingSheet
+- Line 533:    let onCommit: (String) -> Void
+- Line 543:    var body: some View {
+- Line 571:    let title: String
+- Line 572:    let tokens: [FlowTrackColourLabToken]
+- Line 601:    var id: String { rawValue }
+- Line 603:    static let sections: [FlowTrackColourLabSection] = [
+- Line 611:    var title: String {
+- Line 640:    var section: String {
+- Line 644:    private var keyPath: WritableKeyPath<FlowTrackTheme, Color> {
+- Line 673:    func color(in theme: FlowTrackTheme) -> Color {
+- Line 677:    func setColor(_ color: Color, in theme: inout FlowTrackTheme) {
+- Line 683:    var red: Double
+- Line 684:    var green: Double
+- Line 685:    var blue: Double
+- Line 686:    var alpha: Double
+- Line 709:    var color: Color {
+- Line 713:    var hexString: String {
+- Line 714:        let redValue = Int((red * 255).rounded())
+- Line 715:        let greenValue = Int((green * 255).rounded())
+- Line 716:        let blueValue = Int((blue * 255).rounded())
+- Line 717:        let alphaValue = Int((alpha * 255).rounded())
+- Line 723:    var hue: Double
+- Line 724:    var saturation: Double
+- Line 725:    var brightness: Double
+- Line 726:    var alpha: Double
+- Line 749:    var color: Color {
+- SwiftUI State:
+- Line 5:    @Binding var theme: FlowTrackTheme
+- Line 11:    @State private var selectedToken: FlowTrackColourLabToken = .cardBackground
+- Line 12:    @State private var copiedColor: Color?
+- Line 13:    @State private var copiedTokenTitle: String?
+- Line 14:    @State private var baselineTheme = FlowTrackThemeDefaults.standard
+- Line 15:    @State private var baselineSignature = Data()
+- Line 16:    @State private var pendingThemeSelectionID: String?
+- Line 17:    @State private var isConfirmingThemeSwitch = false
+- Line 18:    @State private var namingSheet: ColourLabNamingSheet?
+- Line 19:    @State private var deleteCandidate: FlowTrackSavedTheme?
+- Line 534:    @Environment(\.dismiss) private var dismiss
+- Line 535:    @State private var themeName: String
+- Line 945:    @Binding var isPresented: Bool
+- Line 946:    @Binding var theme: FlowTrackTheme
+
+### Views/Shared/FlowTrackOnboardingViews.swift
+- Lines: 331
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:struct FlowTrackOnboardingCoachCard: View {
+- Line 253:struct FlowTrackOnboardingRegionHighlight: View {
+- Line 277:    enum Kind {
+- Functions / Vars:
+- Line 7:    private let trafficLightDiameter: CGFloat = 12
+- Line 8:    private let nativeMeasuredDiameter: CGFloat = 24
+- Line 9:    private let nativeMeasuredGap: CGFloat = 17
+- Line 10:    private let titleBarHeight: CGFloat = 32
+- Line 12:    let stage: FlowTrackOnboardingStage
+- Line 13:    let canGoBack: Bool
+- Line 14:    let isFinalStage: Bool
+- Line 15:    let isCollapsed: Bool
+- Line 16:    let onBack: () -> Void
+- Line 17:    let onNext: () -> Void
+- Line 18:    let onSkip: () -> Void
+- Line 19:    let onDone: () -> Void
+- Line 20:    let onToggleCollapse: () -> Void
+- Line 22:    var body: some View {
+- Line 35:    private var expandedPanel: some View {
+- Line 84:    private var collapsedPill: some View {
+- Line 120:    private var titleBar: some View {
+- Line 141:    private var header: some View {
+- Line 166:    private var trafficLightGroup: some View {
+- Line 185:    private var trafficLightGap: CGFloat {
+- Line 189:    private var progressIndicator: some View {
+- Line 200:    private func trafficLightButton(
+- Line 229:    private var cardFill: some View {
+- Line 238:    private var cardBorder: some View {
+- Line 248:    private var accentColor: Color {
+- Line 256:    var body: some View {
+- Line 271:    private var accentColor: Color {
+- Line 282:    let kind: Kind
+- Line 283:    let accentColor: Color
+- Line 285:    func makeBody(configuration: Configuration) -> some View {
+- Line 305:    private var foregroundColor: Color {
+- Line 314:    private func backgroundColor(isPressed: Bool) -> Color {
+- Line 323:    private var borderColor: Color {
+- SwiftUI State:
+- Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 5:    @State private var isTrafficLightGroupHovered = false
+- Line 254:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
+### Views/Shared/FlowTrackTheme.swift
+- Lines: 581
+- Imports:
+- import AppKit
+- import SwiftUI
+- Types:
+- Line 6:struct FlowTrackBuiltInTheme: Identifiable, Equatable {
+- Line 16:enum FlowTrackThemeTextScheme: String, Codable, CaseIterable {
+- Line 33:struct FlowTrackTheme: Codable {
+- Line 84:    enum CodingKeys: String, CodingKey {
+- Line 252:struct FlowTrackCodableColor: Codable {
+- Line 278:struct FlowTrackSavedTheme: Codable, Identifiable, Equatable {
+- Line 293:struct FlowTrackThemeLibrary: Codable {
+- Line 299:    enum CodingKeys: String, CodingKey {
+- Line 327:struct FlowTrackThemeActions {
+- Line 337:enum FlowTrackThemeDefaults {
+- Line 556:extension EnvironmentValues {
+- Functions / Vars:
+- Line 4:let flowTrackBuiltInThemeID = "built-in-default"
+- Line 7:    var id: String
+- Line 8:    var name: String
+- Line 9:    var theme: FlowTrackTheme
+- Line 11:    static func == (lhs: FlowTrackBuiltInTheme, rhs: FlowTrackBuiltInTheme) -> Bool {
+- Line 21:    var preferredColorScheme: ColorScheme? {
+- Line 34:    var textScheme: FlowTrackThemeTextScheme
+- Line 35:    var appBackground: Color
+- Line 36:    var appBackgroundTint: Color
+- Line 37:    var cardBackground: Color
+- Line 38:    var cardBorder: Color
+- Line 39:    var inspectorBackground: Color
+- Line 40:    var inspectorBorder: Color
+- Line 41:    var primaryText: Color
+- Line 42:    var secondaryText: Color
+- Line 43:    var mutedText: Color
+- Line 44:    var captureAccent: Color
+- Line 45:    var libraryAccent: Color
+- Line 46:    var zoomAccent: Color
+- Line 47:    var effectsAccent: Color
+- Line 48:    var settingsAccent: Color
+- Line 49:    var editAccent: Color
+- Line 50:    var sidebarButtonBackground: Color
+- Line 51:    var sidebarButtonText: Color
+- Line 52:    var sidebarButtonSelectedBackground: Color
+- Line 53:    var sidebarButtonSelectedText: Color
+- Line 54:    var accentButtonText: Color
+- Line 55:    var controlStripText: Color
+- Line 56:    var controlStripMutedText: Color
+- Line 57:    var controlStripBackground: Color
+- Line 58:    var controlStripBorder: Color
+- Line 59:    var timelineRailLight: Color
+- Line 60:    var timelineRailDark: Color
+- Line 61:    var timelineRuler: Color
+- Line 62:    var timelinePlayhead: Color
+- Line 63:    var timelinePlayheadText: Color
+- Line 65:    func timelineRailColor(for colorScheme: ColorScheme) -> Color {
+- Line 69:    func accentColor(for role: FlowTrackAccentRole) -> Color {
+- Line 182:        let container = try decoder.container(keyedBy: CodingKeys.self)
+- Line 217:    func encode(to encoder: Encoder) throws {
+- Line 218:        var container = encoder.container(keyedBy: CodingKeys.self)
+- Line 253:    var red: Double
+- Line 254:    var green: Double
+- Line 255:    var blue: Double
+- Line 256:    var alpha: Double
+- Line 273:    var color: Color {
+- Line 279:    var id: UUID
+- Line 280:    var name: String
+- Line 281:    var theme: FlowTrackTheme
+- Line 282:    var createdAt: Date
+- Line 283:    var updatedAt: Date
+- Line 285:    static func == (lhs: FlowTrackSavedTheme, rhs: FlowTrackSavedTheme) -> Bool {
+- Line 294:    var savedThemes: [FlowTrackSavedTheme] = []
+- Line 295:    var selectedThemeID: UUID?
+- Line 296:    var selectedBuiltInThemeID: String?
+- Line 297:    var builtInOverrides: [String: FlowTrackTheme] = [:]
+- Line 319:        let container = try decoder.container(keyedBy: CodingKeys.self)
+- Line 328:    var selectTheme: (UUID?) -> Void = { _ in }
+- Line 329:    var selectBuiltInTheme: (String) -> Void = { _ in }
+- Line 330:    var saveBuiltInOverride: (String, FlowTrackTheme) -> Void = { _, _ in }
+- Line 331:    var saveTheme: (String, FlowTrackTheme) -> Void = { _, _ in }
+- Line 332:    var updateTheme: (UUID, String, FlowTrackTheme) -> Void = { _, _, _ in }
+- Line 333:    var deleteTheme: (UUID) -> Void = { _ in }
+- Line 334:    var resetToBuiltInDefault: () -> Void = {}
+- Line 338:    static var standard: FlowTrackTheme {
+- Line 342:    static var builtInThemes: [FlowTrackBuiltInTheme] {
+- Line 444:    static func builtInTheme(withID id: String?) -> FlowTrackTheme {
+- Line 448:    static func builtInThemeName(withID id: String?) -> String {
+- Line 452:    private static var defaultTheme: FlowTrackTheme {
+- Line 486:    private static func c(_ red: Double, _ green: Double, _ blue: Double, _ alpha: Double = 1.0) -> Color {
+- Line 490:    private static func theme(
+- Line 535:    static var defaultValue: FlowTrackTheme {
+- Line 541:    static var defaultValue: [FlowTrackSavedTheme] { [] }
+- Line 545:    static var defaultValue: UUID? { nil }
+- Line 549:    static var defaultValue: String { flowTrackBuiltInThemeID }
+- Line 553:    static var defaultValue: FlowTrackThemeActions { FlowTrackThemeActions() }
+- Line 557:    var flowTrackTheme: FlowTrackTheme {
+- Line 562:    var flowTrackSavedThemes: [FlowTrackSavedTheme] {
+- Line 567:    var flowTrackSelectedThemeID: UUID? {
+- Line 572:    var flowTrackSelectedBuiltInThemeID: String {
+
+### Views/Shared/HelpModeViews.swift
+- Lines: 232
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:enum HelpTopic {
+- Line 133:struct HelpModeHintView: View {
+- Line 222:struct HelpModeRegionHighlight: View {
+- Functions / Vars:
+- Line 14:    var iconName: String {
+- Line 37:    var title: String {
+- Line 60:    var details: [String] {
+- Line 134:    let topic: HelpTopic
+- Line 135:    let isPresented: Bool
+- Line 136:    let staggerIndex: Int
+- Line 146:    var body: some View {
+- Line 194:    private var revealDelay: Double {
+- Line 198:    private func updatePresentation(animated: Bool) {
+- Line 200:        let generation = presentationGeneration
+- Line 203:            let changes = { isVisible = false }
+- Line 223:    var body: some View {
+- SwiftUI State:
+- Line 137:    @State private var isVisible = false
+- Line 138:    @State private var presentationGeneration = 0
+
+### Views/Shared/TimecodeFormatting.swift
+- Lines: 23
+- Imports:
+- import Foundation
+- Types:
+- Line 3:extension ContentView {
+- Functions / Vars:
+- Line 4:    func timecodeString(since start: Date, now: Date) -> String {
+- Line 5:        let elapsed = max(now.timeIntervalSince(start), 0)
+- Line 6:        let totalFrames = Int(elapsed * 30)
+- Line 7:        let hours = totalFrames / (30 * 60 * 60)
+- Line 8:        let minutes = (totalFrames / (30 * 60)) % 60
+- Line 9:        let seconds = (totalFrames / 30) % 60
+- Line 10:        let frames = totalFrames % 30
+- Line 14:    func timecodeString(for seconds: Double) -> String {
+- Line 15:        let clampedSeconds = max(seconds, 0)
+- Line 16:        let totalFrames = Int(clampedSeconds * 30)
+- Line 17:        let hours = totalFrames / (30 * 60 * 60)
+- Line 18:        let minutes = (totalFrames / (30 * 60)) % 60
+- Line 19:        let secs = (totalFrames / 30) % 60
+- Line 20:        let frames = totalFrames % 30
+

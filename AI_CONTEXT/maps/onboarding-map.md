@@ -1,0 +1,283 @@
+# Onboarding Map
+
+Generated: 2026-05-29 12:01:48
+
+## Files
+
+### App/ContentView.swift
+- Lines: 1640
+- Imports:
+- import AppKit
+- import AVFoundation
+- import AVKit
+- import SwiftUI
+- import UniformTypeIdentifiers
+- Types:
+- Line 12:struct ContentView: View {
+- Line 97:    struct OverlayMapping {
+- Line 106:    struct ZoomPreviewState {
+- Line 111:    struct EffectPreviewState {
+- Line 122:    struct PrecisionLoupeFrame {
+- Line 127:    enum EffectRegionHandle: Hashable {
+- Line 138:    enum ActiveEffectHoldPoint {
+- Line 143:    struct ZoomStateEvent {
+- Line 149:    enum MotionDirection {
+- Line 154:    struct MotionProgressSample {
+- Line 196:    enum CaptureInfoField: Hashable {
+- Line 202:    enum MotionTuning {
+- Line 210:    struct LibraryFilterOption: Identifiable {
+- Line 1570:struct SharingAnchorView: NSViewRepresentable {
+- Line 1592:enum ReviewHeaderAction {
+- Line 1598:enum AppTab: String, CaseIterable, Identifiable {
+- Line 1633:struct MarkerListEntry: Identifiable {
+- Functions / Vars:
+- Line 98:        let point: CGPoint
+- Line 99:        let fittedRect: CGRect
+- Line 100:        let sourceSize: CGSize
+- Line 101:        let sourcePoint: CGPoint
+- Line 102:        let rawPoint: CGPoint?
+- Line 103:        let captureSourceLabel: String
+- Line 107:        let scale: CGFloat
+- Line 108:        let normalizedPoint: CGPoint
+- Line 112:        let style: EffectStyle
+- Line 113:        let region: EffectFocusRegion
+- Line 114:        let blurIntensity: Double
+- Line 115:        let darkenIntensity: Double
+- Line 116:        let tintIntensity: Double
+- Line 117:        let cornerRadius: CGFloat
+- Line 118:        let feather: CGFloat
+- Line 119:        let tintColor: Color
+- Line 123:        let image: NSImage
+- Line 124:        let playbackTime: Double
+- Line 144:        let marker: ZoomPlanItem
+- Line 145:        let normalizedPoint: CGPoint
+- Line 146:        let scale: CGFloat
+- Line 155:        let scale: Double
+- Line 156:        let pan: Double
+- Line 163:        var time: Double {
+- Line 170:        var zoomMarkerID: String? {
+- Line 179:        var effectMarkerID: String? {
+- Line 188:        var distance: CGFloat {
+- Line 203:        static let bounceApproachFraction = 0.82
+- Line 204:        static let bounceMaxOvershoot = 0.14
+- Line 205:        static let bounceMinOvershoot = 0.04
+- Line 206:        static let bounceOscillationCount = 2.6
+- Line 207:        static let panBounceInfluence = 0.35
+- Line 211:        let label: String
+- Line 212:        let count: Int
+- Line 214:        var id: String { label }
+- Line 217:    var body: some View {
+- Line 239:    private var guidedTourOverlay: some View {
+- Line 242:                let panelSize = guidedTourPanelSize
+- Line 243:                let origin = guidedTourPanelOrigin(in: geometry.size, panelSize: panelSize)
+- Line 269:                            let startOffset = guidedTourPanelDragStartOffset ?? guidedTourPanelOffset
+- Line 274:                            let proposedOffset = CGSize(
+- Line 294:    private var guidedTourPanelSize: CGSize {
+- Line 300:    private func guidedTourDefaultPanelOrigin(in containerSize: CGSize, panelSize: CGSize) -> CGPoint {
+- Line 301:        let margin: CGFloat = 28
+- Line 302:        let preferredX = (containerSize.width * 0.68) - (panelSize.width / 2)
+- Line 303:        let minX = margin
+- Line 304:        let maxX = max(minX, containerSize.width - panelSize.width - margin)
+- Line 311:    private func guidedTourPanelOrigin(in containerSize: CGSize, panelSize: CGSize) -> CGPoint {
+- Line 312:        let defaultOrigin = guidedTourDefaultPanelOrigin(in: containerSize, panelSize: panelSize)
+- Line 319:    private func clampedGuidedTourPanelOffset(
+- Line 324:        let margin: CGFloat = 12
+- Line 325:        let defaultOrigin = guidedTourDefaultPanelOrigin(in: containerSize, panelSize: panelSize)
+- Line 326:        let proposedOrigin = CGPoint(
+- Line 330:        let minX = margin
+- Line 331:        let maxX = max(minX, containerSize.width - panelSize.width - margin)
+- Line 332:        let minY = margin
+- Line 333:        let maxY = max(minY, containerSize.height - panelSize.height - margin)
+- Line 334:        let clampedOrigin = CGPoint(
+- Line 344:    var activeGuidedTourStage: FlowTrackOnboardingStage? {
+- Line 346:              let currentStage = onboardingManager.currentStage else {
+- Line 361:    func isGuidedTourStage(_ stage: FlowTrackOnboardingStage) -> Bool {
+- Line 365:    private var sidebar: some View {
+- Line 388:    private var sidebarBrandHeader: some View {
+- Line 395:    private func sidebarTabRow(_ tab: AppTab) -> some View {
+- Line 396:        let isSelected = (selectedTab ?? .capture) == tab
+- Line 421:    private var helpModeToggle: some View {
+- Line 451:    private var detailContent: some View {
+- Line 470:    private var reviewView: some View {
+- Line 471:        let reviewTitle = viewModel.recordingSummary?.displayTitle ?? "Edit"
+- Line 472:        let reviewSubtitle = viewModel.recordingSummary.map { "\($0.displaySubtitle) • \($0.bundleName)" } ?? "Review your latest capture"
+- Line 535:                    let safeAspectRatio = max(summary.videoAspectRatio, 0.1)
+- Line 536:                    let inspectorWidth: CGFloat = 320
+- Line 537:                    let activeInspectorWidth = isPlaybackInspectorVisible ? inspectorWidth : 0
+- Line 538:                    let contentWidth = max(geometry.size.width - activeInspectorWidth - (isPlaybackInspectorVisible ? 22 : 0), 320)
+- Line 539:                    let reservedBottomHeight: CGFloat = 132
+- Line 540:                    let totalVerticalSpacing: CGFloat = 16
+- Line 541:                    let maxVideoHeight = max(180, min(geometry.size.height - reservedBottomHeight - totalVerticalSpacing, geometry.size.height * 0.7))
+- Line 542:                    let minVideoHeight = min(280, maxVideoHeight)
+- Line 543:                    let defaultVideoHeight = min(max(contentWidth / safeAspectRatio, minVideoHeight), maxVideoHeight)
+- Line 544:                    let videoHeight = min(max(playbackVideoHeightOverride ?? defaultVideoHeight, minVideoHeight), maxVideoHeight)
+- SwiftUI State:
+- Line 13:    @Environment(\.colorScheme) var colorScheme
+- Line 14:    @Environment(\.flowTrackTheme) var flowTrackTheme
+- Line 15:    @Environment(\.flowTrackSavedThemes) var flowTrackSavedThemes
+- Line 16:    @Environment(\.flowTrackSelectedThemeID) var flowTrackSelectedThemeID
+- Line 17:    @Environment(\.flowTrackSelectedBuiltInThemeID) var flowTrackSelectedBuiltInThemeID
+- Line 18:    @Environment(\.flowTrackThemeActions) var flowTrackThemeActions
+- Line 19:    @StateObject var viewModel = CaptureSetupViewModel()
+- Line 20:    @State var onboardingManager = FlowTrackOnboardingManager()
+- Line 21:    @State private var guidedTourPanelOffset = CGSize(width: 0, height: 0)
+- Line 22:    @State private var guidedTourPanelDragStartOffset: CGSize?
+- Line 23:    @State private var isGuidedTourCollapsed = false
+- Line 24:    @State var selectedTab: AppTab? = .capture
+- Line 25:    @State private var playbackVideoHeightOverride: CGFloat?
+- Line 26:    @State var playbackVideoHeightDragOrigin: CGFloat?
+- Line 27:    @State var isPlaybackInspectorVisible = true
+- Line 28:    @State var isHelpModeEnabled = false
+- Line 29:    @State private var isPlaybackInfoPresented = false
+- Line 30:    @State private var playbackScrubTime = 0.0
+- Line 31:    @State private var hoveredReviewHeaderAction: ReviewHeaderAction?
+- Line 32:    @State private var isScrubbingPlayback = false
+- Line 33:    @State var suppressMarkerListAutoScrollUntil: Date?
+- Line 34:    @State private var draggedMarkerListID: String?
+- Line 35:    @State private var markerListDropTargetID: String?
+- Line 36:    @State private var markerListPreviewOrder: [String]?
+- Line 37:    @State var renamingMarkerID: String?
+- Line 38:    @State var markerNameDraft: String = ""
+- Line 39:    @State var renamingEffectMarkerID: String?
+- Line 40:    @State var effectMarkerNameDraft: String = ""
+- Line 41:    @State var hoveredTimelineMarkerID: String?
+- Line 42:    @State var hoveredEffectTimelineMarkerID: String?
+- Line 43:    @State var isDraggingTimeline = false
+- Line 44:    @State var inspectorFocusedTimingPhase: MarkerTimingPhase?
+- Line 45:    @State var hoveredTimelinePhase: MarkerTimingPhase?
+- Line 46:    @State var hoveredTimelineTooltipAnchor: CGPoint?
+- Line 47:    @State var hoveredEffectTimelineTooltipAnchor: CGPoint?
+- Line 48:    @State var exportShareAnchorView: NSView?
+- Line 49:    @State var isPlacingClickFocus = false
+- Line 50:    @State var pendingMarkerDragSourcePoint: CGPoint?
+- Line 51:    @State var activeClickPointPrecisionPoint: CGPoint?
+- Line 52:    @State var activeClickPointLoupeOffset: CGSize = .zero
+
+### Managers/FlowTrackOnboardingManager.swift
+- Lines: 288
+- Imports:
+- import Foundation
+- import Observation
+- Types:
+- Line 4:struct FlowTrackOnboardingState: Codable, Equatable {
+- Line 22:enum FlowTrackOnboardingStage: String, CaseIterable, Codable, Identifiable, Hashable {
+- Line 131:struct FlowTrackOnboardingStore {
+- Functions / Vars:
+- Line 5:    var schemaVersion: Int
+- Line 6:    var completedStages: Set<FlowTrackOnboardingStage>
+- Line 7:    var hasCompletedOnboarding: Bool
+- Line 8:    var dismissedVersion: Int
+- Line 10:    static let currentSchemaVersion = 1
+- Line 12:    static var initial: FlowTrackOnboardingState {
+- Line 32:    var id: String { rawValue }
+- Line 34:    static let activeTourStages: [FlowTrackOnboardingStage] = [
+- Line 43:    var title: String {
+- Line 64:    var body: String {
+- Line 85:    var iconName: String {
+- Line 106:    var stageIndex: Int {
+- Line 110:    var progressIndex: Int {
+- Line 114:    var progressCount: Int {
+- Line 118:    var nextStage: FlowTrackOnboardingStage? {
+- Line 119:        let nextIndex = stageIndex + 1
+- Line 124:    var previousStage: FlowTrackOnboardingStage? {
+- Line 125:        let previousIndex = stageIndex - 1
+- Line 133:        static let schemaVersion = "FlowTrackOnboarding.schemaVersion"
+- Line 134:        static let completedStages = "FlowTrackOnboarding.completedStages"
+- Line 135:        static let hasCompleted = "FlowTrackOnboarding.hasCompleted"
+- Line 136:        static let dismissedVersion = "FlowTrackOnboarding.dismissedVersion"
+- Line 139:    private let userDefaults: UserDefaults
+- Line 145:    func loadState() -> FlowTrackOnboardingState {
+- Line 146:        let storedSchemaVersion = userDefaults.integer(forKey: Key.schemaVersion)
+- Line 151:        let completedStages = Set(
+- Line 164:    func saveState(_ state: FlowTrackOnboardingState) {
+- Line 171:    func reset() {
+- Line 178:    private func sortedStageIDs(from stages: Set<FlowTrackOnboardingStage>) -> [String] {
+- Line 188:    private let store: FlowTrackOnboardingStore
+- Line 189:    private var state: FlowTrackOnboardingState
+- Line 199:        let resolvedStore = store ?? FlowTrackOnboardingStore()
+- Line 201:        let loadedState = resolvedStore.loadState()
+- Line 211:    func startFirstRunIfNeeded() {
+- Line 218:    func startManualTour() {
+- Line 224:    func advance() {
+- Line 235:    func back() {
+- Line 240:    func skip() {
+- Line 248:    func markComplete(_ stage: FlowTrackOnboardingStage) {
+- Line 256:    func reset() {
+- Line 267:    private func completeOnboarding() {
+- Line 275:    private func nextIncompleteStage() -> FlowTrackOnboardingStage? {
+- Line 279:    private func persistState() {
+- SwiftUI State:
+- Line 186:@Observable
+
+### Views/Shared/FlowTrackOnboardingViews.swift
+- Lines: 331
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:struct FlowTrackOnboardingCoachCard: View {
+- Line 253:struct FlowTrackOnboardingRegionHighlight: View {
+- Line 277:    enum Kind {
+- Functions / Vars:
+- Line 7:    private let trafficLightDiameter: CGFloat = 12
+- Line 8:    private let nativeMeasuredDiameter: CGFloat = 24
+- Line 9:    private let nativeMeasuredGap: CGFloat = 17
+- Line 10:    private let titleBarHeight: CGFloat = 32
+- Line 12:    let stage: FlowTrackOnboardingStage
+- Line 13:    let canGoBack: Bool
+- Line 14:    let isFinalStage: Bool
+- Line 15:    let isCollapsed: Bool
+- Line 16:    let onBack: () -> Void
+- Line 17:    let onNext: () -> Void
+- Line 18:    let onSkip: () -> Void
+- Line 19:    let onDone: () -> Void
+- Line 20:    let onToggleCollapse: () -> Void
+- Line 22:    var body: some View {
+- Line 35:    private var expandedPanel: some View {
+- Line 84:    private var collapsedPill: some View {
+- Line 120:    private var titleBar: some View {
+- Line 141:    private var header: some View {
+- Line 166:    private var trafficLightGroup: some View {
+- Line 185:    private var trafficLightGap: CGFloat {
+- Line 189:    private var progressIndicator: some View {
+- Line 200:    private func trafficLightButton(
+- Line 229:    private var cardFill: some View {
+- Line 238:    private var cardBorder: some View {
+- Line 248:    private var accentColor: Color {
+- Line 256:    var body: some View {
+- Line 271:    private var accentColor: Color {
+- Line 282:    let kind: Kind
+- Line 283:    let accentColor: Color
+- Line 285:    func makeBody(configuration: Configuration) -> some View {
+- Line 305:    private var foregroundColor: Color {
+- Line 314:    private func backgroundColor(isPressed: Bool) -> Color {
+- Line 323:    private var borderColor: Color {
+- SwiftUI State:
+- Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 5:    @State private var isTrafficLightGroupHovered = false
+- Line 254:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
+### Views/Shared/HelpModeViews.swift
+- Lines: 232
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:enum HelpTopic {
+- Line 133:struct HelpModeHintView: View {
+- Line 222:struct HelpModeRegionHighlight: View {
+- Functions / Vars:
+- Line 14:    var iconName: String {
+- Line 37:    var title: String {
+- Line 60:    var details: [String] {
+- Line 134:    let topic: HelpTopic
+- Line 135:    let isPresented: Bool
+- Line 136:    let staggerIndex: Int
+- Line 146:    var body: some View {
+- Line 194:    private var revealDelay: Double {
+- Line 198:    private func updatePresentation(animated: Bool) {
+- Line 200:        let generation = presentationGeneration
+- Line 203:            let changes = { isVisible = false }
+- Line 223:    var body: some View {
+- SwiftUI State:
+- Line 137:    @State private var isVisible = false
+- Line 138:    @State private var presentationGeneration = 0
+

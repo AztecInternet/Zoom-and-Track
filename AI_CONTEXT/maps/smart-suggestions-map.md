@@ -1,0 +1,223 @@
+# Smart Suggestions Map
+
+Generated: 2026-05-29 12:01:48
+
+## Files
+
+### Models/SmartSetupModels.swift
+- Lines: 168
+- Imports:
+- import Foundation
+- Types:
+- Line 3:struct SmartSetupSuggestionEnvelope: Codable, Equatable {
+- Line 22:struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
+- Line 34:enum SmartSetupSuggestionKind: String, Codable, CaseIterable {
+- Line 40:enum SmartSetupSuggestionReason: String, Codable, CaseIterable {
+- Line 49:struct SmartSetupCandidateScore: Codable, Equatable {
+- Line 59:struct SmartSetupScoreComponent: Codable, Equatable {
+- Line 65:struct SmartSetupSourceTimeRange: Codable, Equatable {
+- Line 75:struct SmartSetupSourceEventReference: Codable, Equatable {
+- Line 96:enum SmartSetupMarkerProposal: Codable, Equatable {
+- Line 103:struct SmartSetupZoomMarkerAdjustmentProposal: Codable, Equatable {
+- Line 114:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
+- Line 133:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
+- Line 151:struct SmartSetupRegionTightenProposal: Codable, Equatable {
+- Functions / Vars:
+- Line 4:    var schemaVersion: Int
+- Line 5:    var source: String
+- Line 6:    var generatedAt: Date
+- Line 7:    var suggestions: [SmartSetupSuggestion]
+- Line 23:    var suggestionID: String
+- Line 24:    var kind: SmartSetupSuggestionKind
+- Line 25:    var sourceTimeRange: SmartSetupSourceTimeRange?
+- Line 26:    var sourceEvents: [SmartSetupSourceEventReference]
+- Line 27:    var proposal: SmartSetupMarkerProposal
+- Line 28:    var score: SmartSetupCandidateScore
+- Line 29:    var reasons: [SmartSetupSuggestionReason]
+- Line 31:    var id: String { suggestionID }
+- Line 50:    var value: Double
+- Line 51:    var components: [SmartSetupScoreComponent]
+- Line 60:    var reason: SmartSetupSuggestionReason
+- Line 61:    var weight: Double
+- Line 62:    var detail: String?
+- Line 66:    var startTime: Double
+- Line 67:    var endTime: Double
+- Line 76:    var type: RecordedEventType
+- Line 77:    var timestamp: Double
+- Line 78:    var x: Double
+- Line 79:    var y: Double
+- Line 104:    var targetMarkerIDs: [String]
+- Line 105:    var startTime: Double
+- Line 106:    var endTime: Double
+- Line 107:    var suggestedFirstZoomType: ZoomType
+- Line 108:    var suggestedMiddleZoomType: ZoomType
+- Line 109:    var suggestedFinalZoomType: ZoomType
+- Line 110:    var suggestedHoldDuration: Double?
+- Line 111:    var markerCount: Int
+- Line 115:    var sourceEventTimestamp: Double
+- Line 116:    var rawX: Double?
+- Line 117:    var rawY: Double?
+- Line 118:    var centerX: Double
+- Line 119:    var centerY: Double
+- Line 120:    var zoomScale: Double
+- Line 121:    var leadInTime: Double
+- Line 122:    var zoomInDuration: Double
+- Line 123:    var holdDuration: Double
+- Line 124:    var zoomOutDuration: Double
+- Line 125:    var easeStyle: ZoomEaseStyle
+- Line 126:    var zoomType: ZoomType
+- Line 127:    var bounceAmount: Double
+- Line 128:    var clickPulse: ClickPulseConfiguration?
+- Line 129:    var noZoomFallbackMode: NoZoomFallbackMode
+- Line 130:    var noZoomOverflowRegion: NoZoomOverflowRegion?
+- Line 134:    var sourceEventTimestamp: Double
+- Line 135:    var startTime: Double
+- Line 136:    var holdStartTime: Double
+- Line 137:    var holdEndTime: Double
+- Line 138:    var endTime: Double
+- Line 139:    var style: EffectStyle
+- Line 140:    var amount: Double
+- Line 141:    var blurAmount: Double
+- Line 142:    var darkenAmount: Double
+- Line 143:    var tintAmount: Double
+- Line 144:    var cornerRadius: Double
+- Line 145:    var feather: Double
+- Line 146:    var tintColor: EffectTintColor
+- Line 147:    var focusRegion: EffectFocusRegion?
+- Line 148:    var distortion: DistortionConfiguration?
+- Line 152:    var sourceTime: Double
+- Line 153:    var originalRegion: EffectFocusRegion
+- Line 154:    var proposedRegion: EffectFocusRegion
+- Line 155:    var confidence: Double
+
+### Services/SmartSetupSuggestionService.swift
+- Lines: 444
+- Imports:
+- import CoreGraphics
+- import Foundation
+- Types:
+- Line 4:struct SmartSetupSuggestionService {
+- Functions / Vars:
+- Line 6:        static let maxZoomAdjustmentSuggestions = 8
+- Line 7:        static let maxPauseSuggestions = 18
+- Line 8:        static let maxRepeatedZoneSuggestions = 6
+- Line 9:        static let zoomSequenceMinimumMarkers = 3
+- Line 10:        static let zoomSequenceMaximumGap = 4.0
+- Line 11:        static let zoomSequenceAreaTolerance = 0.12
+- Line 12:        static let existingZoomTimeTolerance = 0.65
+- Line 13:        static let existingEffectTimeTolerance = 0.80
+- Line 14:        static let minimumCursorPauseDuration = 0.85
+- Line 15:        static let maximumCursorPauseDuration = 6.0
+- Line 16:        static let pauseMovementTolerance: Double = 28
+- Line 17:        static let pauseEffectLeadIn = 0.20
+- Line 18:        static let pauseEffectTail = 0.35
+- Line 19:        static let repeatedZoneMinimumEvents = 3
+- Line 20:        static let repeatedZoneMinimumDuration = 2.0
+- Line 21:        static let repeatedZoneCellSize: CGFloat = 180
+- Line 22:        static let repeatedZoneMaximumDuration = 7.0
+- Line 25:    func generateSuggestions(
+- Line 32:        let safeDuration = max(duration, 0)
+- Line 33:        let safeContentSize = CGSize(
+- Line 37:        let sortedEvents = events.sorted { lhs, rhs in
+- Line 44:        var suggestions: [SmartSetupSuggestion] = []
+- Line 64:            let lhsTime = lhs.sourceTimeRange?.startTime ?? lhs.sourceEvents.first?.timestamp ?? 0
+- Line 65:            let rhsTime = rhs.sourceTimeRange?.startTime ?? rhs.sourceEvents.first?.timestamp ?? 0
+- Line 73:    private func zoomMarkerAdjustmentSuggestions(
+- Line 77:        let clickMarkers = existingZoomMarkers
+- Line 82:        var suggestions: [SmartSetupSuggestion] = []
+- Line 83:        var currentGroup: [ZoomPlanItem] = []
+- Line 85:        func flushCurrentGroup() {
+- Line 87:                  let first = currentGroup.first,
+- Line 88:                  let last = currentGroup.last else {
+- Line 93:            let proposal = SmartSetupZoomMarkerAdjustmentProposal(
+- Line 103:            let scoreValue = min(0.92, 0.52 + (Double(currentGroup.count) * 0.09))
+- Line 104:            let center = averagePoint(for: currentGroup, contentCoordinateSize: contentCoordinateSize)
+- Line 141:            let timeGap = marker.sourceEventTimestamp - previous.sourceEventTimestamp
+- Line 142:            let areaDistance = normalizedDistance(from: previous, to: marker, contentCoordinateSize: contentCoordinateSize)
+- Line 159:    private func cursorPauseSuggestions(
+- Line 165:        let cursorEvents = events.filter { $0.type == .cursorMoved }
+- Line 168:        var suggestions: [SmartSetupSuggestion] = []
+- Line 171:            let previous = pair.0
+- Line 172:            let next = pair.1
+- Line 173:            let pauseDuration = next.timestamp - previous.timestamp
+- Line 181:            let point = clampedContentPoint(for: previous, contentCoordinateSize: contentCoordinateSize)
+- Line 182:            let proposal = effectProposal(
+- Line 190:            let scoreValue = min(0.92, 0.52 + (pauseDuration / 5.0))
+- Line 191:            let score = SmartSetupCandidateScore(
+- Line 222:    private func repeatedActivityZoneSuggestions(
+- Line 229:        let activityEvents = events.filter { event in
+- Line 234:        let groupedEvents = Dictionary(grouping: activityEvents) { event in
+- Line 238:        var candidates: [(key: String, events: [RecordedEvent])] = groupedEvents.compactMap { key, events in
+- Line 239:            let sorted = events.sorted { $0.timestamp < $1.timestamp }
+- Line 241:                  let first = sorted.first,
+- Line 242:                  let last = sorted.last,
+- Line 255:        var suggestions: [SmartSetupSuggestion] = []
+- Line 259:            let startTime = first.timestamp
+- Line 260:            let endTime = min(last.timestamp, startTime + Tuning.repeatedZoneMaximumDuration)
+- Line 264:            let center = averagePoint(for: candidate.events, contentCoordinateSize: contentCoordinateSize)
+- Line 265:            let proposal = effectProposal(
+- Line 273:            let scoreValue = min(0.88, 0.48 + (Double(candidate.events.count) * 0.08))
+- Line 274:            let score = SmartSetupCandidateScore(
+- Line 305:    private func effectProposal(
+- Line 313:        let normalizedCenter = normalizedPoint(center, contentCoordinateSize: contentCoordinateSize)
+- Line 314:        let safeEndTime = max(endTime, startTime + 0.40)
+- Line 315:        let safeHoldStart = min(max(startTime + 0.18, startTime), safeEndTime)
+- Line 316:        let safeHoldEnd = min(max(holdEndTime, safeHoldStart), safeEndTime)
+- Line 342:    private func hasNearbyZoomMarker(at time: Double, existingZoomMarkers: [ZoomPlanItem]) -> Bool {
+- Line 348:    private func hasNearbyEffectMarker(at time: Double, existingEffectMarkers: [EffectPlanItem]) -> Bool {
+- Line 355:    private func hasNearbySuggestion(at time: Double, in suggestions: [SmartSetupSuggestion]) -> Bool {
+- Line 358:            let suggestionTime = suggestion.sourceTimeRange?.startTime ?? suggestion.sourceEvents.first?.timestamp ?? 0
+- Line 363:    private func clampedContentPoint(for event: RecordedEvent, contentCoordinateSize: CGSize) -> CGPoint {
+- Line 370:    private func averagePoint(for events: [RecordedEvent], contentCoordinateSize: CGSize) -> CGPoint {
+- Line 372:        let total = events.reduce(CGPoint.zero) { partialResult, event in
+- Line 373:            let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
+- Line 379:    private func averagePoint(for markers: [ZoomPlanItem], contentCoordinateSize: CGSize) -> CGPoint {
+- Line 381:        let total = markers.reduce(CGPoint.zero) { partialResult, marker in
+- Line 382:            let point = contentPoint(for: marker, contentCoordinateSize: contentCoordinateSize)
+- Line 388:    private func normalizedDistance(from lhs: ZoomPlanItem, to rhs: ZoomPlanItem, contentCoordinateSize: CGSize) -> Double {
+- Line 389:        let lhsPoint = normalizedPoint(contentPoint(for: lhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
+- Line 390:        let rhsPoint = normalizedPoint(contentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
+- Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
+
+### Views/Review/SmartSetupViews.swift
+- Lines: 318
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:struct SmartSetupReviewPanel: View {
+- Functions / Vars:
+- Line 7:    var body: some View {
+- Line 34:    private var header: some View {
+- Line 73:    private var suggestionList: some View {
+- Line 98:    let suggestion: SmartSetupSuggestion
+- Line 99:    let isSelected: Bool
+- Line 100:    let onSelect: () -> Void
+- Line 101:    let onDismiss: () -> Void
+- Line 103:    var body: some View {
+- Line 104:        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
+- Line 151:    private func explanationLine(title: String, text: String) -> some View {
+- Line 165:    var displayTitle: String {
+- Line 178:    var displayTitle: String {
+- Line 197:    var headline: String {
+- Line 210:    var reviewStateLabel: String {
+- Line 219:    var whatFlowTrackNoticed: String {
+- Line 238:    var suggestedChange: String {
+- Line 251:    var whyItMayHelp: String {
+- Line 264:    var displayTimeRange: String {
+- Line 269:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
+- Line 273:    var displayMetadata: String {
+- Line 274:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
+- Line 282:    private var zoomScaleText: String? {
+- Line 293:    private var confidenceText: String {
+- Line 297:    private var proposalTime: Double {
+- Line 310:    static func timeString(_ seconds: Double) -> String {
+- Line 311:        let clampedSeconds = max(seconds, 0)
+- Line 312:        let wholeSeconds = Int(clampedSeconds)
+- Line 313:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+- Line 314:        let minutes = wholeSeconds / 60
+- Line 315:        let secondsRemainder = wholeSeconds % 60
+- SwiftUI State:
+- Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 5:    @ObservedObject var viewModel: CaptureSetupViewModel
+- Line 96:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+

@@ -102,9 +102,7 @@ extension ContentView {
                         markerNameDraft: $effectMarkerNameDraft,
                         onBeginRename: { marker in
                             renamingEffectMarkerID = marker.id
-                            effectMarkerNameDraft = marker.markerName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-                                ? marker.markerName ?? ""
-                                : "Unnamed Effect"
+                            effectMarkerNameDraft = marker.resolvedMarkerName
                         },
                         onCommitRename: { markerID, name in
                             viewModel.setEffectMarkerName(name, for: markerID)
@@ -162,9 +160,7 @@ extension ContentView {
                         markerNameDraft: $markerNameDraft,
                         onBeginRename: { marker in
                             renamingMarkerID = marker.id
-                            markerNameDraft = marker.markerName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-                                ? marker.markerName ?? ""
-                                : "Unnamed Marker"
+                            markerNameDraft = marker.resolvedMarkerName
                         },
                         onCommitRename: { markerID, name in
                             viewModel.setMarkerName(name, for: markerID)
@@ -541,7 +537,7 @@ extension ContentView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(marker.markerName?.isEmpty == false ? (marker.markerName ?? "Unnamed Effect") : "Unnamed Effect")
+                        Text(marker.resolvedMarkerName)
                             .font(.headline)
                         Spacer()
                         Text(timecodeString(for: marker.sourceEventTimestamp))

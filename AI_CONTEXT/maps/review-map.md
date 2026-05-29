@@ -1,0 +1,1263 @@
+# Review & Timeline Map
+
+Generated: 2026-05-29 12:01:48
+
+## Files
+
+### Managers/TimelineScrubManager.swift
+- Lines: 136
+- Imports:
+- import Foundation
+- Types:
+- Line 3:struct TimelineScrubBeginPlan {
+- Line 16:struct TimelineScrubUpdatePlan {
+- Line 22:struct TimelineScrubEndPlan {
+- Line 31:struct TimelineDirectSeekPlan {
+- Line 43:struct TimelineScrubManager {
+- Functions / Vars:
+- Line 4:    let shouldResetPreviewPresentation: Bool
+- Line 5:    let shouldStopPreviewPlayback: Bool
+- Line 6:    let stopPreviewSeekTime: Double
+- Line 7:    let retainSlate: Bool
+- Line 8:    let shouldCancelPreviewMode: Bool
+- Line 9:    let wasPlayingBeforeTimelineScrub: Bool
+- Line 10:    let shouldPause: Bool
+- Line 11:    let shouldSetPlaybackInactive: Bool
+- Line 12:    let isTimelineScrubbing: Bool
+- Line 13:    let suppressionInterval: TimeInterval
+- Line 17:    let selectedZoomMarkerID: String?
+- Line 18:    let selectedEffectMarkerID: String?
+- Line 19:    let targetTime: Double
+- Line 23:    let selectedZoomMarkerID: String?
+- Line 24:    let selectedEffectMarkerID: String?
+- Line 25:    let targetTime: Double
+- Line 26:    let isTimelineScrubbing: Bool
+- Line 27:    let suppressionInterval: TimeInterval
+- Line 28:    let shouldResumePlayback: Bool
+- Line 32:    let shouldResetPreviewPresentation: Bool
+- Line 33:    let shouldStopPreviewPlayback: Bool
+- Line 34:    let stopPreviewSeekTime: Double
+- Line 35:    let retainSlate: Bool
+- Line 36:    let shouldCancelPreviewMode: Bool
+- Line 37:    let selectedZoomMarkerID: String?
+- Line 38:    let selectedEffectMarkerID: String?
+- Line 39:    let suppressionInterval: TimeInterval?
+- Line 40:    let targetTime: Double
+- Line 44:    func beginScrubPlan(
+- Line 70:    func updateScrubPlan(
+- Line 87:    func endScrubPlan(
+- Line 108:    func directSeekPlan(
+- Line 121:        let suppressionInterval: TimeInterval? =
+
+### Services/MarkerPreviewCacheService.swift
+- Lines: 415
+- Imports:
+- import AVFoundation
+- import CryptoKit
+- import Foundation
+- Functions / Vars:
+- Line 6:    private let fileManager = FileManager.default
+- Line 7:    private let cacheLifetime: TimeInterval = 7 * 24 * 60 * 60
+- Line 8:    private let previewRenderVersion = 18
+- Line 10:    func cachedPreview(
+- Line 15:        let cacheURL = try await cacheURL(for: recordingURL, summary: summary, marker: marker)
+- Line 25:        let bounds = previewBounds(for: marker)
+- Line 34:    func cachedEffectPreview(
+- Line 39:        let cacheURL = try await effectCacheURL(for: recordingURL, summary: summary, marker: marker)
+- Line 49:        let bounds = previewBounds(for: marker)
+- Line 58:    func storePreview(
+- Line 64:        let cacheURL = try await cacheURL(for: recordingURL, summary: summary, marker: marker)
+- Line 78:    func storeEffectPreview(
+- Line 84:        let cacheURL = try await effectCacheURL(for: recordingURL, summary: summary, marker: marker)
+- Line 98:    func pruneStaleFiles() {
+- Line 107:        let expirationDate = Date().addingTimeInterval(-cacheLifetime)
+- Line 111:                let resourceValues = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey]),
+- Line 123:    private var cacheDirectoryURL: URL {
+- Line 124:        let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first ?? fileManager.temporaryDirectory
+- Line 130:    private func ensureCacheDirectoryExists() throws {
+- Line 134:    private func cacheURL(
+- Line 140:        let key = try await cacheKey(for: recordingURL, summary: summary, marker: marker)
+- Line 146:    private func effectCacheURL(
+- Line 152:        let key = try await effectCacheKey(for: recordingURL, summary: summary, marker: marker)
+- Line 158:    private func cacheKey(
+- Line 163:        let fileAttributes = try fileManager.attributesOfItem(atPath: recordingURL.path)
+- Line 164:        let fileModificationDate = (fileAttributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+- Line 165:        let fileSize = (fileAttributes[.size] as? NSNumber)?.int64Value ?? 0
+- Line 166:        let renderSize = try await renderSize(for: recordingURL)
+- Line 168:        let keyMaterial = [
+- Line 201:        let digest = SHA256.hash(data: Data(keyMaterial.utf8))
+- Line 205:    private func effectCacheKey(
+- Line 210:        let fileAttributes = try fileManager.attributesOfItem(atPath: recordingURL.path)
+- Line 211:        let fileModificationDate = (fileAttributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+- Line 212:        let fileSize = (fileAttributes[.size] as? NSNumber)?.int64Value ?? 0
+- Line 213:        let renderSize = try await renderSize(for: recordingURL)
+- Line 215:        let keyMaterial = [
+- Line 250:        let digest = SHA256.hash(data: Data(keyMaterial.utf8))
+- Line 254:    private func effectCacheSignature(for effectMarkers: [EffectPlanItem]) -> String {
+- Line 292:    private func distortionSignature(for distortion: DistortionConfiguration?) -> String {
+- Line 294:        let presetReference: String
+- Line 303:        let mapSource: String
+- Line 326:    private func zoomCacheSignature(for zoomMarkers: [ZoomPlanItem]) -> String {
+- Line 361:    private func renderSize(for recordingURL: URL) async throws -> CGSize {
+- Line 362:        let asset = AVURLAsset(url: recordingURL)
+- Line 363:        let tracks = try await asset.loadTracks(withMediaType: .video)
+- Line 371:        let naturalSize = try await track.load(.naturalSize)
+- Line 372:        let preferredTransform = try await track.load(.preferredTransform)
+- Line 373:        let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+- Line 374:        let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+- Line 385:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
+- Line 387:        let scale = maxWidth / sourceSize.width
+- Line 391:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 392:        let startTime = max(0, marker.startTime)
+- Line 401:    private func previewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 408:    private func isPlayablePreview(at url: URL) async throws -> Bool {
+- Line 409:        let asset = AVURLAsset(url: url)
+- Line 410:        let tracks = try await asset.loadTracks(withMediaType: .video)
+- Line 412:        let duration = try await asset.load(.duration)
+
+### Services/MarkerPreviewRenderService.swift
+- Lines: 2364
+- Imports:
+- import AppKit
+- import CoreGraphics
+- import CoreImage
+- import Foundation
+- Types:
+- Line 33:struct RenderedMarkerPreview {
+- Line 636:enum ExportRenderPhase {
+- Line 642:struct ExportRenderResult {
+- Functions / Vars:
+- Line 8:    let red: CIImage?
+- Line 9:    let blue: CIImage?
+- Line 10:    let cyan: CIImage?
+- Line 13:private let distortionColorMaskContext = CIContext()
+- Line 14:private let distortionColorMaskCache = DistortionColorMaskCache()
+- Line 17:    private let lock = NSLock()
+- Line 18:    private var storage: [String: DistortionImportedColorMaskSet] = [:]
+- Line 20:    func value(for key: String) -> DistortionImportedColorMaskSet? {
+- Line 26:    func store(_ value: DistortionImportedColorMaskSet, for key: String) {
+- Line 34:    let outputURL: URL
+- Line 35:    let sourceStartTime: Double
+- Line 36:    let sourceEndTime: Double
+- Line 37:    let deleteWhenFinished: Bool
+- Line 41:    private let ciContext = CIContext()
+- Line 42:    private let previewPaddingBefore: Double = 0.10
+- Line 43:    private let previewPaddingAfter: Double = 0.10
+- Line 44:    private let projectBundleService = ProjectBundleService()
+- Line 45:    private var importedDistortionMapCache: [String: CIImage] = [:]
+- Line 47:    private func importedDistortionMapImage(for mapID: String) -> CIImage? {
+- Line 53:              let image = CIImage(contentsOf: mapURL) else {
+- Line 61:    func renderPreview(
+- Line 66:        let asset = AVURLAsset(url: recordingURL)
+- Line 67:        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+- Line 76:        let audioTrack = try await asset.loadTracks(withMediaType: .audio).first
+- Line 77:        let naturalSize = try await sourceVideoTrack.load(.naturalSize)
+- Line 78:        let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+- Line 79:        let nominalFrameRate = try await sourceVideoTrack.load(.nominalFrameRate)
+- Line 80:        let assetDuration = try await asset.load(.duration).seconds
+- Line 82:        let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+- Line 83:        let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+- Line 92:        let baseOrientationTransform = preferredTransform.concatenating(
+- Line 95:        let outputSize = cappedRenderSize(for: orientedSize, maxWidth: 1440)
+- Line 96:        let previewBounds = SharedMotionEngine.previewBounds(for: selectedMarker)
+- Line 97:        let sourceStartTime = max(0, previewBounds.startTime - previewPaddingBefore)
+- Line 98:        let sourceEndTime = min(
+- Line 102:        let sourceTimeRange = CMTimeRange(
+- Line 107:        let composition = AVMutableComposition()
+- Line 121:           let compositionAudioTrack = composition.addMutableTrack(
+- Line 128:        let frameRate = max(nominalFrameRate.isFinite && nominalFrameRate > 0 ? nominalFrameRate : 30, 30)
+- Line 129:        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(frameRate.rounded()))
+- Line 130:        let outputRect = CGRect(origin: .zero, size: outputSize)
+- Line 131:        let baseScale = outputSize.width / orientedSize.width
+- Line 132:        let markers = summary.zoomMarkers
+- Line 133:        let effectMarkers = summary.effectMarkers
+- Line 134:        let contentCoordinateSize = summary.contentCoordinateSize
+- Line 141:        let videoComposition = try await AVVideoComposition.videoComposition(with: composition) { [weak self] request in
+- Line 147:            let sourceTime = sourceStartTime + request.compositionTime.seconds
+- Line 148:            let previewState = SharedMotionEngine.activeZoomState(
+- Line 155:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+- Line 158:            let pulseImage = makeClickPulseOverlay(
+- Line 167:                let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
+- Line 172:            let effectImage = makeEffectOverlay(
+- Line 183:            var outputImage = image.cropped(to: outputRect)
+- Line 194:        let outputURL = FileManager.default.temporaryDirectory
+- Line 228:    func renderEffectPreview(
+- Line 233:        let asset = AVURLAsset(url: recordingURL)
+- Line 234:        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+- Line 243:        let audioTrack = try await asset.loadTracks(withMediaType: .audio).first
+- Line 244:        let naturalSize = try await sourceVideoTrack.load(.naturalSize)
+- Line 245:        let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+- Line 246:        let nominalFrameRate = try await sourceVideoTrack.load(.nominalFrameRate)
+- Line 247:        let assetDuration = try await asset.load(.duration).seconds
+- Line 249:        let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+- Line 250:        let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+- Line 259:        let baseOrientationTransform = preferredTransform.concatenating(
+- Line 262:        let outputSize = cappedRenderSize(for: orientedSize, maxWidth: 1440)
+- Line 263:        let previewBounds = effectPreviewBounds(for: selectedMarker)
+- Line 264:        let sourceStartTime = max(0, previewBounds.startTime - previewPaddingBefore)
+- Line 265:        let sourceEndTime = min(
+- Line 269:        let sourceTimeRange = CMTimeRange(
+- Line 274:        let composition = AVMutableComposition()
+- Line 288:           let compositionAudioTrack = composition.addMutableTrack(
+- Line 295:        let frameRate = max(nominalFrameRate.isFinite && nominalFrameRate > 0 ? nominalFrameRate : 30, 30)
+- Line 296:        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(frameRate.rounded()))
+- Line 297:        let outputRect = CGRect(origin: .zero, size: outputSize)
+- Line 298:        let baseScale = outputSize.width / orientedSize.width
+- Line 299:        let markers = summary.zoomMarkers
+- Line 300:        let effectMarkers = summary.effectMarkers
+- Line 301:        let contentCoordinateSize = summary.contentCoordinateSize
+- Line 303:        let videoComposition = try await AVVideoComposition.videoComposition(with: composition) { [weak self] request in
+
+### Views/Review/CaptureInfoInspectorViews.swift
+- Lines: 292
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:extension ContentView {
+- Functions / Vars:
+- Line 4:    func captureInfoInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 145:    func syncCaptureInfoDrafts(from summary: RecordingInspectionSummary, force: Bool = false) {
+- Line 157:    var collectionAutocompleteSuggestions: [String] {
+- Line 166:    var projectAutocompleteSuggestions: [String] {
+- Line 167:        let query = captureInfoProjectDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 169:        let preferredCollection = captureInfoCollectionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 170:        let items = viewModel.libraryItems
+- Line 172:        let preferredProjects = autocompleteSuggestions(
+- Line 184:        let allProjects = autocompleteSuggestions(
+- Line 191:        var combined = preferredProjects
+- Line 201:    func autocompleteSuggestions(from values: [String], matching query: String) -> [String] {
+- Line 202:        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 204:        let uniqueValues = Array(Set(values)).sorted {
+- Line 210:                let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 222:    func selectCollectionSuggestion(_ suggestion: String) {
+- Line 228:    func selectProjectSuggestion(_ suggestion: String) {
+- Line 234:    func autocompleteSuggestionPanel(
+- Line 271:    func captureTypeChips(selectedType: CaptureType) -> some View {
+
+### Views/Review/EffectsEditorViews.swift
+- Lines: 795
+- Imports:
+- import AppKit
+- import SwiftUI
+- Types:
+- Line 95:struct EffectTimelineSegmentLayout: Identifiable {
+- Line 107:struct EffectTimelineSegmentView: View {
+- Line 211:struct EffectsTimelineTrackView: View {
+- Line 350:struct EffectListEntry: Identifiable {
+- Line 359:struct EffectListTableView: NSViewRepresentable {
+- Functions / Vars:
+- Line 4:func compactTimelineLaneCenterY(for lane: Int, verticalOrigin: CGFloat) -> CGFloat {
+- Line 5:    let laneStep: CGFloat = 7
+- Line 6:    let centeredLaneOffset = CGFloat(lane) - 1
+- Line 10:func effectTimelineSegmentLayouts(
+- Line 15:    let maxLaneCount = 3
+- Line 16:    var laneEndRatios = Array(repeating: -Double.infinity, count: maxLaneCount)
+- Line 33:            let eventRatio = visibleRange.clampedRatio(for: marker.snapTime)
+- Line 34:            let startRatio = visibleRange.clampedRatio(for: clippedWindow.start)
+- Line 35:            let holdStartRatio = max(visibleRange.clampedRatio(for: marker.holdStartTime), startRatio)
+- Line 36:            let holdEndRatio = max(visibleRange.clampedRatio(for: marker.holdEndTime), holdStartRatio)
+- Line 37:            let endRatio = max(visibleRange.clampedRatio(for: clippedWindow.end), startRatio)
+- Line 38:            let lane = effectTimelineLane(
+- Line 57:private func effectTimelineLane(
+- Line 63:    let lanePadding = 0.008
+- Line 87:private func preferredEffectTimelineLane(for markerID: String, maxLaneCount: Int) -> Int {
+- Line 89:    let checksum = markerID.unicodeScalars.reduce(into: 0) { partialResult, scalar in
+- Line 96:    let marker: EffectPlanItem
+- Line 97:    let lane: Int
+- Line 98:    let startRatio: Double
+- Line 99:    let holdStartRatio: Double
+- Line 100:    let holdEndRatio: Double
+- Line 101:    let eventRatio: Double
+- Line 102:    let endRatio: Double
+- Line 104:    var id: String { marker.id }
+- Line 110:    let layout: EffectTimelineSegmentLayout
+- Line 111:    let width: CGFloat
+- Line 112:    let verticalOrigin: CGFloat
+- Line 113:    let isSelected: Bool
+- Line 114:    let isHovered: Bool
+- Line 115:    let isEnabled: Bool
+- Line 116:    let isPlaybackHighlighted: Bool
+- Line 117:    let activeHoldPoint: ContentView.ActiveEffectHoldPoint?
+- Line 118:    let onHoverChanged: (Bool, CGPoint?) -> Void
+- Line 119:    let onSelect: () -> Void
+- Line 121:    var body: some View {
+- Line 122:        let laneHeight: CGFloat = 9
+- Line 123:        let laneY = compactTimelineLaneCenterY(for: layout.lane, verticalOrigin: verticalOrigin)
+- Line 124:        let startX = CGFloat(layout.startRatio) * width
+- Line 125:        let holdStartX = CGFloat(layout.holdStartRatio) * width
+- Line 126:        let holdEndX = CGFloat(layout.holdEndRatio) * width
+- Line 127:        let endX = CGFloat(layout.endRatio) * width
+- Line 128:        let actualBarWidth = max(endX - startX, 1)
+- Line 129:        let hitTargetWidth = max(actualBarWidth, 18)
+- Line 130:        let effectsAccent = FlowTrackAccent.color(for: .effects, theme: flowTrackTheme)
+- Line 131:        let baseColor: Color = isSelected
+- Line 134:        let barColor = isPlaybackHighlighted ? effectsAccent : baseColor
+- Line 135:        let hoverHighlightColor = (isSelected ? effectsAccent : baseColor).opacity(isHovered ? (isEnabled ? 0.22 : 0.12) : 0)
+- Line 136:        let hoverTargetHeight: CGFloat = laneHeight
+- Line 137:        let hoverAnchor = CGPoint(x: startX + (actualBarWidth / 2), y: max(laneY - 20, 10))
+- Line 138:        let highlightedBarWidth = actualBarWidth + 10
+- Line 139:        let hitPadding = max((hitTargetWidth - actualBarWidth) / 2, 0)
+- Line 140:        let localMinX = startX - hitPadding
+- Line 141:        let localWidth = hitTargetWidth
+- Line 142:        let localCenterX = localMinX + (localWidth / 2)
+- Line 143:        let localCenterY = hoverTargetHeight / 2
+- Line 144:        let localStartX = startX - localMinX
+- Line 145:        let localHoldStartX = holdStartX - localMinX
+- Line 146:        let localHoldEndX = holdEndX - localMinX
+- Line 147:        let fadeInWidth = max(localHoldStartX - localStartX, 0)
+- Line 148:        let holdWidth = max(localHoldEndX - localHoldStartX, 0)
+- Line 149:        let fadeOutWidth = max(actualBarWidth - (fadeInWidth + holdWidth), 0)
+- Line 150:        let localBarCenterX = localStartX + (actualBarWidth / 2)
+- Line 212:    let effectLayouts: [EffectTimelineSegmentLayout]
+- Line 213:    let width: CGFloat
+- Line 214:    let verticalOrigin: CGFloat
+- Line 215:    let timelineInteractionSuppressed: Bool
+- Line 216:    let hoveredEffectTimelineMarkerID: String?
+- Line 217:    let selectedEffectMarkerID: String?
+- Line 218:    let activeEffectHoldPoint: ContentView.ActiveEffectHoldPoint?
+- Line 219:    let hoveredTooltipMarker: EffectPlanItem?
+- Line 220:    let hoveredTooltipMarkerNumber: Int?
+- Line 221:    let hoveredTooltipAnchor: CGPoint?
+- Line 222:    let playbackHighlightProvider: (EffectPlanItem) -> Bool
+- Line 223:    let onHoverChanged: (String, Bool, CGPoint?) -> Void
+- Line 224:    let onSelect: (String) -> Void
+- Line 226:    var body: some View {
+- Line 255:               let hoveredTooltipMarker,
+- Line 256:               let hoveredTooltipMarkerNumber,
+- Line 257:               let hoveredTooltipAnchor {
+- Line 271:private func effectTimelineTooltipOverlay(
+- SwiftUI State:
+- Line 108:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 365:    @Binding var renamingMarkerID: String?
+- Line 366:    @Binding var markerNameDraft: String
+- Line 583:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 587:    @Binding var renamingMarkerID: String?
+- Line 588:    @Binding var markerNameDraft: String
+- Line 593:    @State private var isRenameButtonHovered = false
+
+### Views/Review/MarkerListTableViews.swift
+- Lines: 507
+- Imports:
+- import AppKit
+- import SwiftUI
+- import UniformTypeIdentifiers
+- Types:
+- Line 5:struct MarkerListTableView: NSViewRepresentable {
+- Functions / Vars:
+- Line 6:    let entries: [MarkerListEntry]
+- Line 7:    let selectedMarkerID: String?
+- Line 8:    let onSelectMarker: (String) -> Void
+- Line 9:    let onToggleMarkerEnabled: (String) -> Void
+- Line 10:    let onReorderMarkers: ([String]) -> Void
+- Line 11:    let accentColor: Color
+- Line 14:    let onBeginRename: (ZoomPlanItem) -> Void
+- Line 15:    let onCommitRename: (String, String) -> Void
+- Line 16:    let onCancelRename: () -> Void
+- Line 18:    func makeCoordinator() -> Coordinator {
+- Line 22:    func makeNSView(context: Context) -> NSScrollView {
+- Line 23:        let scrollView = InspectorOverflowHintingScrollView()
+- Line 30:        let tableView = MarkerListNativeTableView()
+- Line 50:        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("MarkerColumn"))
+- Line 61:    func updateNSView(_ nsView: NSScrollView, context: Context) {
+- Line 70:        var parent: MarkerListTableView
+- Line 72:        private var isProgrammaticSelectionChange = false
+- Line 73:        private var draggedMarkerID: String?
+- Line 74:        private var lastRenderedEntryIDs: [String] = []
+- Line 75:        private var lastRenderedSelectionID: String?
+- Line 76:        private var lastRenderedHighlightSignature: String = ""
+- Line 77:        private var lastRenderedRenamingMarkerID: String?
+- Line 84:        func handleTableViewAction(_ sender: Any?) {
+- Line 86:            let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+- Line 94:        func numberOfRows(in tableView: NSTableView) -> Int {
+- Line 98:        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+- Line 102:        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+- Line 103:            let identifier = NSUserInterfaceItemIdentifier("MarkerListHostingCellView")
+- Line 104:            let cell = (tableView.makeView(withIdentifier: identifier, owner: nil) as? MarkerListHostingCellView) ?? MarkerListHostingCellView(identifier: identifier)
+- Line 109:        func tableViewSelectionDidChange(_ notification: Notification) {
+- Line 111:                  let tableView,
+- Line 122:        func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
+- Line 124:            let markerID = parent.entries[row].id
+- Line 126:            let item = NSPasteboardItem()
+- Line 131:        func tableView(
+- Line 141:        func tableView(
+- Line 147:            let markerIDs = parent.entries.map(\.id)
+- Line 149:                  let fromIndex = markerIDs.firstIndex(of: draggedMarkerID) else {
+- Line 153:            var reordered = markerIDs
+- Line 154:            let draggedID = reordered.remove(at: fromIndex)
+- Line 155:            let insertionIndex = max(0, min(row > fromIndex ? row - 1 : row, reordered.count))
+- Line 162:        func syncSelection() {
+- Line 164:            let targetRow = parent.entries.firstIndex { $0.id == parent.selectedMarkerID } ?? -1
+- Line 179:        func refreshTableIfNeeded() {
+- Line 182:            let entryIDs = parent.entries.map(\.id)
+- Line 183:            let selectionID = parent.selectedMarkerID
+- Line 184:            let highlightSignature = parent.entries.map { "\($0.id):\($0.isSelected):\($0.isPlaybackHighlighted):\($0.marker.markerName ?? ""):\($0.marker.enabled)" }.joined(separator: "|")
+- Line 185:            let renamingMarkerID = parent.renamingMarkerID
+- Line 187:            let shouldReload: Bool
+- Line 207:        func refreshVisibleRows() {
+- Line 217:        private func cellContent(for row: Int) -> MarkerListCellContent {
+- Line 218:            let entry = parent.entries[row]
+- Line 242:    let entry: MarkerListEntry
+- Line 243:    let accentColor: Color
+- Line 244:    let onToggleEnabled: () -> Void
+- Line 247:    let onBeginRename: () -> Void
+- Line 248:    let onCommitRename: (String) -> Void
+- Line 249:    let onCancelRename: () -> Void
+- Line 253:    var body: some View {
+- Line 254:        let marker = entry.marker
+- Line 255:        let resolvedMarkerName = marker.resolvedMarkerName
+- Line 256:        let isRenaming = renamingMarkerID == entry.id
+- Line 257:        let backgroundFill: Color = entry.isPlaybackHighlighted
+- Line 262:        let strokeColor: Color = entry.isPlaybackHighlighted
+- Line 382:    private var dragGrip: some View {
+- Line 404:    private func timecodeString(_ seconds: Double) -> String {
+- Line 405:        let clampedSeconds = max(seconds, 0)
+- Line 406:        let totalFrames = Int(clampedSeconds * 30)
+- Line 407:        let hours = totalFrames / (30 * 60 * 60)
+- Line 408:        let minutes = (totalFrames / (30 * 60)) % 60
+- Line 409:        let secs = (totalFrames / 30) % 60
+- Line 410:        let frames = totalFrames % 30
+- Line 416:    private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
+- Line 437:    func update(rootView: MarkerListCellContent) {
+- Line 449:    let targetMarkerID: String
+- Line 453:    let reorderAction: ([String]) -> Void
+- Line 455:    func validateDrop(info: DropInfo) -> Bool {
+- Line 459:    func dropEntered(info: DropInfo) {
+- Line 463:              let fromIndex = previewOrder.firstIndex(of: draggedMarkerID),
+- Line 464:              let toIndex = previewOrder.firstIndex(of: targetMarkerID),
+- SwiftUI State:
+- Line 12:    @Binding var renamingMarkerID: String?
+- Line 13:    @Binding var markerNameDraft: String
+- Line 245:    @Binding var renamingMarkerID: String?
+- Line 246:    @Binding var markerNameDraft: String
+- Line 251:    @State private var isRenameButtonHovered = false
+- Line 450:    @Binding var previewOrder: [String]?
+- Line 451:    @Binding var draggedMarkerID: String?
+- Line 452:    @Binding var dropTargetMarkerID: String?
+
+### Views/Review/RealtimeEffectPreviewSurface.swift
+- Lines: 237
+- Imports:
+- import AVFoundation
+- import CoreImage
+- import MetalKit
+- import SwiftUI
+- Types:
+- Line 6:struct RealtimeEffectPreviewSurface: NSViewRepresentable {
+- Functions / Vars:
+- Line 7:    let player: AVPlayer
+- Line 8:    let summary: RecordingInspectionSummary
+- Line 9:    let selectedEffectMarker: EffectPlanItem
+- Line 10:    let currentPlaybackTime: Double
+- Line 11:    let logicalVideoSize: CGSize
+- Line 12:    let isVisible: Bool
+- Line 14:    func makeCoordinator() -> Coordinator {
+- Line 18:    func makeNSView(context: Context) -> MTKView {
+- Line 22:    func updateNSView(_ nsView: MTKView, context: Context) {
+- Line 34:    static func dismantleNSView(_ nsView: MTKView, coordinator: Coordinator) {
+- Line 39:        private let renderService = MarkerPreviewRenderService()
+- Line 40:        private let device = MTLCreateSystemDefaultDevice()
+- Line 46:        private let colorSpace = CGColorSpaceCreateDeviceRGB()
+- Line 47:        private let videoOutput = AVPlayerItemVideoOutput(
+- Line 56:        private var summary: RecordingInspectionSummary?
+- Line 57:        private var selectedEffectMarker: EffectPlanItem?
+- Line 58:        private var currentPlaybackTime: Double = 0
+- Line 59:        private var logicalVideoSize: CGSize = .zero
+- Line 60:        private var isVisible = false
+- Line 61:        private var preferredTransform: CGAffineTransform = .identity
+- Line 62:        private var orientedVideoSize: CGSize = .zero
+- Line 63:        private var metadataTask: Task<Void, Never>?
+- Line 65:        func makeView() -> MTKView {
+- Line 66:            let view = MTKView(frame: .zero, device: device)
+- Line 78:        func update(
+- Line 106:        func detach() {
+- Line 118:        func draw(in view: MTKView) {
+- Line 120:                  let summary,
+- Line 121:                  let selectedEffectMarker,
+- Line 123:                  let drawable = view.currentDrawable,
+- Line 124:                  let commandQueue,
+- Line 125:                  let ciContext,
+- Line 134:            let targetTime = CMTime(seconds: max(currentPlaybackTime, 0), preferredTimescale: 600)
+- Line 135:            var displayTime = targetTime
+- Line 142:            let drawableSize = CGSize(width: view.drawableSize.width, height: view.drawableSize.height)
+- Line 143:            let compositionSize = logicalVideoSize
+- Line 167:            let scaleX = drawableSize.width / compositionSize.width
+- Line 168:            let scaleY = drawableSize.height / compositionSize.height
+- Line 169:            let drawableImage = outputImage
+- Line 172:            let bounds = CGRect(origin: .zero, size: drawableSize)
+- Line 184:        func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+- Line 189:        private func attachVideoOutputIfNeeded(to item: AVPlayerItem?) {
+- Line 200:        private func loadVideoMetadata(from recordingURL: URL) {
+- Line 204:                let asset = AVURLAsset(url: recordingURL)
+- Line 206:                      let naturalSize = try? await track.load(.naturalSize),
+- Line 207:                      let preferredTransform = try? await track.load(.preferredTransform) else {
+- Line 211:                let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+- Line 212:                let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+- Line 223:        private func clear(_ view: MTKView) {
+- Line 225:                  let drawable = view.currentDrawable,
+- Line 226:                  let commandQueue,
+- Line 227:                  let commandBuffer = commandQueue.makeCommandBuffer(),
+- Line 228:                  let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+
+### Views/Review/ReviewEditorControls.swift
+- Lines: 140
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:enum ReviewEditorMode: String, CaseIterable, Identifiable {
+- Line 10:struct ReviewEditorModeControlStrip: View {
+- Line 65:struct EffectsPlaceholderControlStrip: View {
+- Line 131:extension ReviewEditorMode {
+- Functions / Vars:
+- Line 7:    var id: String { rawValue }
+- Line 13:    let editorMode: ReviewEditorMode
+- Line 14:    let onSelectMode: (ReviewEditorMode) -> Void
+- Line 16:    var body: some View {
+- Line 68:    var body: some View {
+- Line 119:func segmentedPillTextColor(isSelected: Bool, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+- Line 123:func segmentedPillBackgroundColor(isSelected: Bool, theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+- Line 127:func accentContrastingTextColor(theme: FlowTrackTheme = FlowTrackThemeDefaults.standard) -> Color {
+- Line 132:    var accentRole: FlowTrackAccentRole {
+- SwiftUI State:
+- Line 11:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 66:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
+### Views/Review/ReviewInspectorViews.swift
+- Lines: 795
+- Imports:
+- import AppKit
+- import SwiftUI
+- Types:
+- Line 4:enum EditInspectorMode: String, CaseIterable, Identifiable {
+- Line 11:struct InspectorSectionHeaderView: View {
+- Line 28:struct EffectsInspectorPlaceholderView: View {
+- Line 74:struct InspectorOverflowHintView: View {
+- Line 118:struct ResizableInspectorSplitView<TopContent: View, BottomContent: View>: View {
+- Line 719:struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
+- Functions / Vars:
+- Line 8:    var id: String { rawValue }
+- Line 12:    let title: String
+- Line 13:    let accentRole: FlowTrackAccentRole?
+- Line 20:    var body: some View {
+- Line 29:    let effectMarkerCount: Int
+- Line 30:    let accentRole: FlowTrackAccentRole?
+- Line 37:    var body: some View {
+- Line 67:    var body: some View {
+- Line 75:    var body: some View {
+- Line 91:    var contentHeight: CGFloat
+- Line 92:    var contentOffset: CGFloat
+- Line 93:    var viewportHeight: CGFloat
+- Line 103:    var body: some View {
+- Line 111:    static var defaultValue: CGFloat = 0
+- Line 113:    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+- Line 122:    let minTopHeight: CGFloat
+- Line 123:    let minBottomHeight: CGFloat
+- Line 139:    var body: some View {
+- Line 172:    private var measuredBottomMaximumHeight: CGFloat? {
+- Line 179:    let content: Content
+- Line 181:    func makeCoordinator() -> Coordinator { Coordinator() }
+- Line 183:    func makeNSView(context: Context) -> NSScrollView {
+- Line 187:    func updateNSView(_ nsView: NSScrollView, context: Context) {
+- Line 192:        private let documentView = InspectorScrollDocumentView()
+- Line 193:        private var boundsObserver: NSObjectProtocol?
+- Line 201:        func makeScrollView(rootView: AnyView) -> NSScrollView {
+- Line 202:            let scrollView = InspectorOverflowHintingScrollView()
+- Line 222:        func update(scrollView: NSScrollView, rootView: AnyView) {
+- Line 230:        private func installBoundsObserver(for scrollView: NSScrollView) {
+- Line 241:        private func updateLayout(for scrollView: NSScrollView) {
+- Line 242:            let viewportHeight = scrollView.contentView.bounds.height
+- Line 243:            let viewportWidth = scrollView.contentView.bounds.width
+- Line 248:            let contentHeight = documentView.contentFittingHeight
+- Line 255:        private func publishMetrics(for scrollView: NSScrollView) {
+- Line 262:    private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
+- Line 263:    private var currentWidth: CGFloat = 0
+- Line 278:    var contentFittingHeight: CGFloat {
+- Line 285:    func update(rootView: AnyView) {
+- Line 289:    func updateWidth(_ width: CGFloat) {
+- Line 300:    private let hintHostingView = InspectorOverflowHintHostingView(rootView: AnyView(InspectorOverflowHintView()))
+- Line 301:    private var boundsObserver: NSObjectProtocol?
+- Line 302:    private var documentFrameObserver: NSObjectProtocol?
+- Line 304:    private var isHintVisible = false
+- Line 305:    private var hadHiddenContentBelow = false
+- Line 306:    private var hideWorkItem: DispatchWorkItem?
+- Line 307:    private var suppressTriggersUntil = Date.distantPast
+- Line 308:    private var lastObservedContentOffset: CGFloat = 0
+- Line 310:    private let hintVisibleDuration: TimeInterval = 2.0
+- Line 311:    private let hintFadeDuration: TimeInterval = 0.5
+- Line 312:    private let retriggerSuppressionDuration: TimeInterval = 30.0
+- Line 334:    private func setupOverflowHint() {
+- Line 351:    func observeDocumentView(_ documentView: NSView?) {
+- Line 384:    private func layoutHintView() {
+- Line 385:        let fittingSize = hintHostingView.fittingSize
+- Line 386:        let x = floor((bounds.width - fittingSize.width) / 2)
+- Line 387:        let y = 6.0
+- Line 397:    func updateOverflowHintVisibility(animated: Bool = true) {
+- Line 411:        let remainingContentBelow = documentView.frame.height - contentView.documentVisibleRect.maxY
+- Line 412:        let hasHiddenContentBelow = remainingContentBelow > 2
+- Line 426:    private func handleBoundsChanged() {
+- Line 427:        let newOffset = contentView.bounds.origin.y
+- Line 428:        let didScroll = abs(newOffset - lastObservedContentOffset) > 0.5
+- Line 438:    private func triggerHintIfAllowed(animated: Bool) {
+- Line 443:    private func showHint(animated: Bool) {
+- Line 458:        let workItem = DispatchWorkItem { [weak self] in
+- Line 465:    private func hideHint(animated: Bool) {
+- Line 494:    let minTopHeight: CGFloat
+- Line 495:    let minBottomHeight: CGFloat
+- Line 496:    let maxBottomHeight: CGFloat?
+- Line 497:    let topContent: TopPane
+- Line 498:    let bottomContent: BottomPane
+- Line 516:    func makeCoordinator() -> Coordinator {
+- Line 520:    func makeNSView(context: Context) -> InspectorSplitView {
+- Line 530:    func updateNSView(_ nsView: InspectorSplitView, context: Context) {
+- Line 544:        private let topHostingView = NSHostingView(rootView: AnyView(EmptyView()))
+- Line 545:        private let bottomHostingView = NSHostingView(rootView: AnyView(EmptyView()))
+- Line 546:        private var isApplyingProgrammaticLayout = false
+- Line 547:        private var pendingTopSectionFraction: CGFloat?
+- Line 548:        private var minTopHeight: CGFloat = 180
+- Line 549:        private var minBottomHeight: CGFloat = 220
+- SwiftUI State:
+- Line 119:    @State private var topSectionFraction: CGFloat = 0.42
+- Line 120:    @State private var bottomContentHeight: CGFloat = 0
+- Line 493:    @Binding var topSectionFraction: CGFloat
+- Line 543:        @Binding private var topSectionFraction: CGFloat
+- Line 721:    @Binding var inspectorMode: EditInspectorMode
+
+### Views/Review/ReviewMarkerInspectorViews.swift
+- Lines: 1240
+- Imports:
+- import AppKit
+- import SwiftUI
+- Types:
+- Line 4:extension ContentView {
+- Functions / Vars:
+- Line 5:    private var inspectorAccentRole: FlowTrackAccentRole {
+- Line 9:    func markerInspectorCard(_ summary: RecordingInspectionSummary) -> some View {
+- Line 10:        let accentRole = inspectorAccentRole
+- Line 53:    private func inspectorCardBackground(accentRole: FlowTrackAccentRole?) -> some View {
+- Line 69:    func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 70:        let accentRole = inspectorAccentRole
+- Line 71:        let displayedMarkers = displayedEffectMarkerList(summary.effectMarkers)
+- Line 72:        let entries = displayedMarkers.enumerated().map { index, marker in
+- Line 126:    func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 127:        let accentRole = inspectorAccentRole
+- Line 128:        let displayedMarkers = displayedMarkerList(summary.zoomMarkers)
+- Line 129:        let entries = displayedMarkers.enumerated().map { index, marker in
+- Line 184:    func markerListRow(
+- Line 195:        let selectionColor = FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
+- Line 196:        let backgroundFill: Color = isPlaybackHighlighted
+- Line 201:        let strokeColor: Color = isPlaybackHighlighted
+- Line 316:    func markerListDragPreview(
+- Line 322:        let accentRole = inspectorAccentRole
+- Line 338:    var markerEditorSection: some View {
+- Line 339:        let accentRole = inspectorAccentRole
+- Line 534:    var effectEditorSection: some View {
+- Line 535:        let accentRole = inspectorAccentRole
+- Line 598:                    let maxTimelineTime = max(viewModel.recordingSummary?.duration ?? marker.endTime, marker.holdEndTime)
+- Line 599:                    let maxFadeInDuration = max(min(3.0, marker.holdStartTime), 0)
+- Line 600:                    let maxFadeOutDuration = max(min(3.0, maxTimelineTime - marker.holdEndTime), 0)
+- Line 680:    func supportsCreatorDefaults(_ style: EffectStyle) -> Bool {
+- Line 689:    func markerDisplayNumber(for marker: ZoomPlanItem) -> Int {
+- Line 691:              let index = summary.zoomMarkers.firstIndex(where: { $0.id == marker.id }) else {
+- Line 697:    func timingSliderRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
+- Line 732:    func pointTimingRow(
+- Line 764:                let lowerBound = range.lowerBound
+- Line 765:                let upperBound = range.upperBound
+- Line 766:                let span = max(upperBound - lowerBound, 0.0001)
+- Line 767:                let clampedValue = min(max(value, lowerBound), upperBound)
+- Line 768:                let fraction = min(max((clampedValue - lowerBound) / span, 0), 1)
+- Line 769:                let handleInset: CGFloat = 3
+- Line 770:                let usableWidth = max(geometry.size.width - (handleInset * 2), 1)
+- Line 771:                let handleX = handleInset + (usableWidth * fraction)
+- Line 789:                            let localX = min(max(value.location.x - handleInset, 0), usableWidth)
+- Line 790:                            let newFraction = usableWidth <= 0 ? 0 : localX / usableWidth
+- Line 791:                            let newValue = lowerBound + (span * newFraction)
+- Line 803:    func beginEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
+- Line 811:    func endEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
+- Line 819:    func seekPlaybackToActiveEffectHoldPoint(_ holdPoint: ActiveEffectHoldPoint) {
+- Line 829:    func scheduleRealtimeEffectPreviewResume(for holdPoint: ActiveEffectHoldPoint) {
+- Line 839:    func nudgeActiveEffectHoldPoint(by delta: Double) {
+- Line 846:        let currentMarker = viewModel.selectedEffectMarker
+- Line 849:            let currentTime = currentMarker?.holdStartTime ?? viewModel.currentPlaybackTime
+- Line 852:            let currentTime = currentMarker?.holdEndTime ?? viewModel.currentPlaybackTime
+- Line 860:    func setSelectedEffectHoldStartTimeAndFollowPlayback(_ time: Double) {
+- Line 865:        let resolvedTime = viewModel.selectedEffectMarker?.holdStartTime ?? time
+- Line 869:    func setSelectedEffectHoldEndTimeAndFollowPlayback(_ time: Double) {
+- Line 874:        let resolvedTime = viewModel.selectedEffectMarker?.holdEndTime ?? time
+- Line 879:    func effectAmountEditorSection(for marker: EffectPlanItem) -> some View {
+- Line 917:    func distortionEditorSection(for marker: EffectPlanItem) -> some View {
+- Line 918:        let distortion = marker.distortion ?? .defaultConfiguration
+- Line 1003:    func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
+- Line 1024:    func markerTypeSymbol(for zoomType: ZoomType) -> String {
+- Line 1041:    let value: Double
+- Line 1042:    let range: ClosedRange<Double>
+- Line 1043:    let accentRole: FlowTrackAccentRole
+- Line 1044:    let onEditingChanged: (Bool) -> Void
+- Line 1045:    let action: (Double) -> Void
+- Line 1063:    var body: some View {
+- Line 1065:            let dimensions = sliderDimensions(in: geometry.size)
+- Line 1110:    private var accentColor: Color {
+- Line 1114:    private var clampedValue: Double {
+- Line 1118:    private func sliderDimensions(in size: CGSize) -> (trackHeight: CGFloat, thumbSize: CGFloat, thumbCenterX: CGFloat, filledWidth: CGFloat) {
+- Line 1119:        let trackHeight: CGFloat = 4
+- Line 1120:        let thumbSize: CGFloat = 14
+- Line 1121:        let thumbInset = thumbSize / 2
+- Line 1122:        let usableWidth = max(size.width - (thumbInset * 2), 1)
+- Line 1123:        let span = max(range.upperBound - range.lowerBound, 0.0001)
+- Line 1124:        let fraction = min(max((clampedValue - range.lowerBound) / span, 0), 1)
+- Line 1125:        let thumbCenterX = thumbInset + (usableWidth * fraction)
+- Line 1129:    private func value(for locationX: CGFloat, in size: CGSize) -> Double {
+- Line 1130:        let thumbInset: CGFloat = 7
+- Line 1131:        let usableWidth = max(size.width - (thumbInset * 2), 1)
+- Line 1132:        let localX = min(max(locationX - thumbInset, 0), usableWidth)
+- Line 1133:        let fraction = usableWidth <= 0 ? 0 : localX / usableWidth
+- SwiftUI State:
+- Line 1039:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 1047:    @State private var isDragging = false
+- Line 1151:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 1158:    @State private var isPopoverPresented = false
+
+### Views/Review/ReviewPlaybackMainViews.swift
+- Lines: 1371
+- Imports:
+- import AVFoundation
+- import SwiftUI
+- Types:
+- Line 4:extension ContentView {
+- Functions / Vars:
+- Line 5:    func playbackVideoCard(
+- Line 33:        let safeAspectRatio = max(aspectRatio, 0.1)
+- Line 39:                let fittedRect = fittedVideoRect(in: geometry.size, aspectRatio: safeAspectRatio)
+- Line 40:                let isMarkerDragActive = draggedMarkerSourcePoint != nil
+- Line 41:                let isOverflowRegionDrawActive = isDrawingNoZoomOverflowRegion
+- Line 42:                let isEffectRegionDrawActive = isDrawingEffectFocusRegion
+- Line 43:                let isDistortionMapOverlayVisible = viewModel.isShowingDistortionMapOverlay &&
+- Line 46:                let shouldSuppressRealtimeEffectPreview = suppressRealtimeEffectPreviewDuringTimingEdit
+- Line 47:                let previewState = isRenderedPreviewActive
+- Line 62:                let activeEffectState = isRenderedPreviewActive
+- Line 83:                       let selectedEffectMarker,
+- Line 101:                       let overlayImage = viewModel.selectedEffectDistortionOverlayImage {
+- Line 115:                       let overlayRect = overlayRect(
+- Line 138:                       let overlayRect = overlayRect(
+- Line 159:                   let mapping = mappedOverlayPoint(
+- Line 165:                    let ringSize = 22 + max((selectedMarker?.zoomScale ?? 1.0) - 1.0, 0) * 10
+- Line 166:                    let baseHandlePoint = draggedMarkerSourcePoint.flatMap {
+- Line 174:                    let handlePoint = transformedOverlayPoint(
+- Line 283:                                   let overlayRect = overlayRect(
+- Line 289:                                    let cornerRadii = overflowRegionCornerRadii(
+- Line 379:                                   let overlayRect = overlayRect(
+- Line 385:                                    let cornerRadii = overflowRegionCornerRadii(
+- Line 403:                                                    let baseRegion = effectFocusRegionInteractionBase ?? region
+- Line 412:                                                    let deltaX = (value.translation.width / max(fittedRect.width, 1)) * contentCoordinateSize.width
+- Line 413:                                                    let deltaY = (value.translation.height / max(fittedRect.height, 1)) * contentCoordinateSize.height
+- Line 424:                                                    let baseRegion = effectFocusRegionInteractionBase ?? region
+- Line 430:                                                    let deltaX = (value.translation.width / max(fittedRect.width, 1)) * contentCoordinateSize.width
+- Line 431:                                                    let deltaY = (value.translation.height / max(fittedRect.height, 1)) * contentCoordinateSize.height
+- Line 432:                                                    let movedRegion = movedEffectFocusRegion(
+- Line 460:                                        let handlePoint = effectRegionHandlePoint(for: handle, in: overlayRect)
+- Line 473:                                                        let baseRegion = effectFocusRegionInteractionBase ?? region
+- Line 483:                                                        let resizePoint = CGPoint(
+- Line 499:                                                        let baseRegion = effectFocusRegionInteractionBase ?? region
+- Line 500:                                                        let resizePoint = CGPoint(
+- Line 504:                                                        let resizedRegion = resizedEffectFocusRegion(
+- Line 581:                                    let drawnRegion = effectFocusRegion(
+- Line 596:                let focusPoint: CGPoint? = {
+- Line 598:                          let overlayRect = overlayRect(
+- Line 604:                          let activeEffectRegionHandle {
+- Line 611:                   let focusPoint {
+- Line 698:    func playbackTimelineStrip(_ summary: RecordingInspectionSummary) -> some View {
+- Line 699:        let duration = max(summary.duration ?? 0, 0.001)
+- Line 700:        let visibleRange = timelineVisibleRange(for: duration)
+- Line 701:        let segmentLayouts = timelineSegmentLayouts(for: summary.zoomMarkers, duration: duration, visibleRange: visibleRange)
+- Line 702:        let effectLayouts = effectTimelineSegmentLayouts(for: summary.effectMarkers, duration: duration, visibleRange: visibleRange)
+- Line 703:        let trackCenterY: CGFloat = 38
+- Line 704:        let segmentOriginY = trackCenterY
+- Line 705:        let hoveredTooltipEntry = hoveredTimelineTooltipEntry(in: summary)
+- Line 706:        let hoveredEffectTooltipEntry = hoveredEffectTimelineTooltipEntry(in: summary)
+- Line 707:        let timelineInteractionSuppressed = activeTimelineMarkerDragID != nil
+- Line 708:        let selectedMarker = editorMode == .zoomAndClicks ? viewModel.selectedZoomMarker : nil
+- Line 709:        let showsNoZoomFallbackControls = selectedMarker?.zoomType == .noZoom
+- Line 710:        let timelineHorizontalInset: CGFloat = 14
+- Line 838:                let fullWidth = max(geometry.size.width, 1)
+- Line 839:                let timelineWidth = max(fullWidth - (timelineHorizontalInset * 2), 1)
+- Line 852:                let fullWidth = max(geometry.size.width, 1)
+- Line 853:                let timelineWidth = max(fullWidth - (timelineHorizontalInset * 2), 1)
+- Line 854:                let playheadX = visibleRange.contains(viewModel.currentPlaybackTime)
+- Line 895:                            let adjustedAnchor = CGPoint(x: anchor.x + timelineHorizontalInset, y: anchor.y)
+- Line 931:                            let currentX = min(max(value.location.x - timelineHorizontalInset, 0), timelineWidth)
+- Line 932:                            let startX = min(max(value.startLocation.x - timelineHorizontalInset, 0), timelineWidth)
+- Line 933:                            let startPoint = CGPoint(x: startX, y: value.startLocation.y)
+- Line 934:                            let hasMovedEnough = abs(value.translation.width) > 3
+- Line 945:                            let zoomMarkerDragTarget = editorMode == .zoomAndClicks
+- Line 977:                                let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
+- Line 980:                                let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
+- Line 996:                            let endX = min(max(value.location.x - timelineHorizontalInset, 0), timelineWidth)
+- Line 997:                            let endPoint = CGPoint(x: endX, y: value.location.y)
+- Line 1008:                            let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
+- Line 1011:                            let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
+- Line 1014:                            let effectHit = editorMode == .effects
+- Line 1022:                            let targetTime = zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: endX, width: timelineWidth, visibleRange: visibleRange)
+- Line 1140:               let selectedMarker = viewModel.selectedEffectMarker,
+- Line 1142:               let region = pendingEffectFocusRegion ?? selectedMarker.focusRegion {
+- Line 1143:                let nudgeDistance = keyPress.modifiers.contains(.option) ? 10.0 : 1.0
+- Line 1144:                let nudgedRegion: EffectFocusRegion?
+- Line 1167:                    let nudgeAmount = keyPress.modifiers.contains(.command)
+- Line 1198:               let selectedMarker = viewModel.selectedZoomMarker,
+- Line 1199:               let region = pendingNoZoomOverflowRegion ?? selectedMarker.noZoomOverflowRegion {
+- Line 1200:                let nudgeDistance = keyPress.modifiers.contains(.option) ? 10.0 : 1.0
+
+### Views/Review/ReviewPlaybackPreviewViews.swift
+- Lines: 1023
+- Imports:
+- import AppKit
+- import AVFoundation
+- import AVKit
+- import SwiftUI
+- Types:
+- Line 6:extension ContentView {
+- Functions / Vars:
+- Line 7:    func playbackTransitionPlateOpacity(
+- Line 20:    func playbackTransitionPlateAnimationDuration(
+- Line 35:    func activeZoomPreviewState(
+- Line 51:    func activeEffectPreviewState(
+- Line 55:        let eligibleMarkers = effectMarkers
+- Line 65:              let region = marker.focusRegion else {
+- Line 69:        let fadeInDuration = max(marker.holdStartTime - marker.startTime, 0)
+- Line 70:        let fadeOutDuration = max(marker.endTime - marker.holdEndTime, 0)
+- Line 71:        let fadeInProgress: Double
+- Line 78:        let fadeOutProgress: Double
+- Line 89:        let timingIntensity = min(fadeInProgress, fadeOutProgress)
+- Line 90:        let blurIntensity = timingIntensity * min(max(marker.blurAmount, 0), 1)
+- Line 91:        let darkenIntensity = timingIntensity * min(max(marker.darkenAmount, 0), 1)
+- Line 92:        let tintIntensity = timingIntensity * min(max(marker.tintAmount, 0), 1)
+- Line 107:    func effectPreviewOverlay(
+- Line 113:        let overlayColor = effectPreviewOverlayColor(for: effectState)
+- Line 117:        let transformedRect = transformedOverlayRect(
+- Line 122:        let cornerRadii = overflowRegionCornerRadii(
+- Line 127:        let localOverlayRect = CGRect(
+- Line 148:    func effectBlurLayer(
+- Line 155:        let transformedRect = transformedOverlayRect(
+- Line 160:        let cornerRadii = overflowRegionCornerRadii(
+- Line 165:        let localOverlayRect = CGRect(
+- Line 187:    func effectOutsideMask(
+- Line 208:    func effectPreviewOverlayColor(for effectState: EffectPreviewState) -> Color {
+- Line 225:    func color(for tintColor: EffectTintColor) -> Color {
+- Line 235:    func transformedOverlayRect(
+- Line 242:        let topLeft = transformedOverlayPoint(
+- Line 247:        let bottomRight = transformedOverlayPoint(
+- Line 261:    func zoomPreviewOffset(for previewState: ZoomPreviewState?, in fittedRect: CGRect) -> CGSize {
+- Line 274:    func zoomTimeline(for marker: ZoomPlanItem) -> (startTime: Double, peakTime: Double, holdUntil: Double, endTime: Double) {
+- Line 275:        let timeline = SharedMotionEngine.zoomTimeline(for: marker)
+- Line 279:    func overlayPoint(
+- Line 292:        let fittedRect = fittedVideoRect(in: containerSize, aspectRatio: videoAspectRatio)
+- Line 297:        let normalizedX = min(max(sourcePoint.x / contentCoordinateSize.width, 0), 1)
+- Line 298:        let normalizedY = min(max(sourcePoint.y / contentCoordinateSize.height, 0), 1)
+- Line 299:        let x = fittedRect.minX + (normalizedX * fittedRect.width)
+- Line 300:        let y = fittedRect.minY + (normalizedY * fittedRect.height)
+- Line 305:    func sourcePoint(
+- Line 316:        let fittedRect = fittedVideoRect(in: containerSize, aspectRatio: videoAspectRatio)
+- Line 323:        let normalizedX = (overlayPoint.x - fittedRect.minX) / fittedRect.width
+- Line 324:        let normalizedY = (overlayPoint.y - fittedRect.minY) / fittedRect.height
+- Line 331:    func noZoomOverflowRegion(
+- Line 352:    func effectFocusRegion(
+- Line 368:    func aspectLockedSourceRect(
+- Line 377:        let aspectRatio = contentCoordinateSize.width / contentCoordinateSize.height
+- Line 378:        let deltaX = endPoint.x - startPoint.x
+- Line 379:        let deltaY = endPoint.y - startPoint.y
+- Line 380:        let horizontalLimit = deltaX >= 0 ? contentCoordinateSize.width - startPoint.x : startPoint.x
+- Line 381:        let verticalLimit = deltaY >= 0 ? contentCoordinateSize.height - startPoint.y : startPoint.y
+- Line 382:        let maxWidth = min(horizontalLimit, verticalLimit * aspectRatio)
+- Line 387:        let desiredWidth = max(abs(deltaX), abs(deltaY) * aspectRatio)
+- Line 388:        let width = min(max(desiredWidth, 1), maxWidth)
+- Line 389:        let height = width / aspectRatio
+- Line 390:        let originX = deltaX >= 0 ? startPoint.x : startPoint.x - width
+- Line 391:        let originY = deltaY >= 0 ? startPoint.y : startPoint.y - height
+- Line 393:        let rect = CGRect(x: originX, y: originY, width: width, height: height)
+- Line 397:    func freeformSourceRect(
+- Line 406:        let clampedStart = CGPoint(
+- Line 410:        let clampedEnd = CGPoint(
+- Line 414:        let rect = CGRect(
+- Line 426:    func effectFocusSourceRect(
+- Line 438:    func effectFocusRegion(
+- Line 450:    func overlayRect(
+- Line 460:        let sourceRect = CGRect(
+- Line 489:    func overlayRect(
+- Line 499:        let sourceRect = effectFocusSourceRect(for: region, contentCoordinateSize: contentCoordinateSize)
+- Line 523:    func overflowRegionCornerRadii(
+- Line 528:        let canvasCornerRadius: CGFloat = 18
+- Line 529:        let edgeTolerance: CGFloat = 0.5
+- Line 531:        let touchesLeft = abs(overlayRect.minX - fittedRect.minX) <= edgeTolerance
+- Line 532:        let touchesRight = abs(overlayRect.maxX - fittedRect.maxX) <= edgeTolerance
+- Line 533:        let touchesTop = abs(overlayRect.minY - fittedRect.minY) <= edgeTolerance
+- Line 534:        let touchesBottom = abs(overlayRect.maxY - fittedRect.maxY) <= edgeTolerance
+- Line 544:    func nudgedNoZoomOverflowRegion(
+- Line 554:        let normalizedDeltaX = deltaX / contentCoordinateSize.width
+- Line 555:        let normalizedDeltaY = deltaY / contentCoordinateSize.height
+- Line 556:        let halfWidth = region.width / 2
+- Line 557:        let halfHeight = region.height / 2
+- Line 558:        let minCenterX = halfWidth
+
+### Views/Review/ReviewSupportViews.swift
+- Lines: 177
+- Imports:
+- import AppKit
+- import AVKit
+- import SwiftUI
+- Types:
+- Line 5:struct PlaybackVideoSurface: NSViewRepresentable {
+- Line 25:struct PlaybackVideoLayerSurface: NSViewRepresentable {
+- Line 64:struct PrecisionTimeField: NSViewRepresentable {
+- Functions / Vars:
+- Line 6:    let player: AVPlayer
+- Line 8:    func makeNSView(context: Context) -> AVPlayerView {
+- Line 9:        let view = AVPlayerView()
+- Line 16:    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+- Line 26:    let player: AVPlayer
+- Line 28:    func makeNSView(context: Context) -> PlayerLayerHostView {
+- Line 29:        let view = PlayerLayerHostView()
+- Line 34:    func updateNSView(_ nsView: PlayerLayerHostView, context: Context) {
+- Line 40:    private let playerLayer = AVPlayerLayer()
+- Line 42:    var player: AVPlayer? {
+- Line 65:    let value: Double
+- Line 66:    let range: ClosedRange<Double>
+- Line 67:    let action: (Double) -> Void
+- Line 68:    let onBeginEditing: () -> Void
+- Line 69:    let onEndEditing: () -> Void
+- Line 71:    func makeCoordinator() -> Coordinator {
+- Line 75:    func makeNSView(context: Context) -> NSTextField {
+- Line 76:        let textField = NSTextField()
+- Line 89:    func updateNSView(_ nsView: NSTextField, context: Context) {
+- Line 101:        var originalValue: Double
+- Line 102:        var range: ClosedRange<Double>
+- Line 103:        var action: (Double) -> Void
+- Line 104:        var onBeginEditing: () -> Void
+- Line 105:        var onEndEditing: () -> Void
+- Line 106:        var isEditing = false
+- Line 122:        func controlTextDidBeginEditing(_ obj: Notification) {
+- Line 130:        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+- Line 146:        func controlTextDidEndEditing(_ obj: Notification) {
+- Line 153:        private func commit(from control: NSControl) {
+- Line 155:            let parsed = parsedValue(from: textField.stringValue) ?? originalValue
+- Line 156:            let clamped = min(max(parsed, range.lowerBound), range.upperBound)
+- Line 162:        private func cancel(on control: NSControl) {
+- Line 168:        func displayString(for value: Double) -> String {
+- Line 172:        private func parsedValue(from string: String) -> Double? {
+- Line 173:            let cleaned = string.replacingOccurrences(of: "s", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+### Views/Review/ReviewTimelineInteractionViews.swift
+- Lines: 414
+- Imports:
+- import AppKit
+- import SwiftUI
+- Types:
+- Line 78:extension ContentView {
+- Functions / Vars:
+- Line 5:    let startX: CGFloat
+- Line 6:    let endX: CGFloat
+- Line 7:    let trackCenterY: CGFloat
+- Line 8:    let accentColor: Color
+- Line 9:    let pulseToken: Int
+- Line 13:    var body: some View {
+- Line 14:        let rawWidth = max(endX - startX, 1)
+- Line 15:        let bandWidth = max(rawWidth, 12)
+- Line 16:        let bandCenterX = startX + (rawWidth / 2)
+- Line 17:        let bandHeight: CGFloat = 28
+- Line 18:        let bracketHeight: CGFloat = 34
+- Line 19:        let lineOpacity = pulseActive ? 0.95 : 0.72
+- Line 20:        let fillOpacity = pulseActive ? 0.28 : 0.18
+- Line 62:    func path(in rect: CGRect) -> Path {
+- Line 63:        var path = Path()
+- Line 65:        let sideY = rect.height * 0.34
+- Line 66:        let neckY = rect.maxY
+- Line 80:    func timelineToolbar(
+- Line 111:    func timelineCanvasView(
+- Line 183:                    let displayedPhase = displayedPhaseProvider(layout.marker)
+- Line 238:               let hoveredTooltipMarker,
+- Line 239:               let hoveredTooltipMarkerNumber,
+- Line 240:               let hoveredTooltipAnchor {
+- Line 264:    func smartSetupTimelineHighlight(
+- Line 282:    func timelineRulerView(
+- Line 287:        let ticks = timelineRulerTicks(visibleRange: visibleRange, width: width)
+- Line 291:                let x = timelineX(for: tick.time, visibleRange: visibleRange, width: width)
+- Line 299:                    let labelInset: CGFloat = 22
+- Line 300:                    let labelX = min(max(x, labelInset), max(width - labelInset, labelInset))
+- Line 314:    func timelinePlayheadView(
+- Line 320:        let playheadColor = flowTrackTheme.timelinePlayhead
+- Line 321:        let separationColor = Color(nsColor: .controlBackgroundColor)
+- Line 364:    func timelineInstructionText(
+- Line 378:    func timelineInstructionView(
+- Line 394:    func timelineFooterView(
+- SwiftUI State:
+- Line 11:    @State private var pulseActive = false
+
+### Views/Review/ReviewTimelineViews.swift
+- Lines: 467
+- Imports:
+- import AppKit
+- import SwiftUI
+- Types:
+- Line 4:struct TimelineRulerTick: Identifiable {
+- Line 14:struct TimelineVisibleRange: Equatable {
+- Line 58:extension ContentView {
+- Line 385:struct TimelineTrackpadGestureCaptureView: NSViewRepresentable {
+- Functions / Vars:
+- Line 5:    let time: Double
+- Line 6:    let isMajor: Bool
+- Line 7:    let label: String?
+- Line 9:    var id: String {
+- Line 15:    let fullDuration: Double
+- Line 16:    let startTime: Double
+- Line 17:    let duration: Double
+- Line 19:    var endTime: Double {
+- Line 24:        let safeFullDuration = max(fullDuration, 0.001)
+- Line 25:        let safeDuration = min(max(duration ?? safeFullDuration, 0.001), safeFullDuration)
+- Line 26:        let maxStartTime = max(safeFullDuration - safeDuration, 0)
+- Line 27:        let safeStartTime = min(max(startTime, 0), maxStartTime)
+- Line 34:    func contains(_ time: Double) -> Bool {
+- Line 38:    func ratio(for time: Double) -> Double {
+- Line 42:    func clampedRatio(for time: Double) -> Double {
+- Line 46:    func clippedRange(start: Double, end: Double) -> (start: Double, end: Double)? {
+- Line 47:        let clippedStart = max(start, startTime)
+- Line 48:        let clippedEnd = min(max(end, start), endTime)
+- Line 59:    func playbackTransportControls() -> some View {
+- Line 85:    func playbackTransportBar(_ summary: RecordingInspectionSummary) -> some View {
+- Line 93:    func referenceTimelineSegment(
+- Line 103:        let referenceLineY = verticalOrigin + 20
+- Line 104:        let startX = CGFloat(startRatio) * width
+- Line 105:        let endX = CGFloat(endRatio) * width
+- Line 106:        let lineWidth = max(endX - startX, 1)
+- Line 115:    func timelineLane(for startRatio: Double, endRatio: Double, laneEndRatios: inout [Double]) -> Int {
+- Line 116:        let lanePadding = 0.008
+- Line 133:    func timelineVisibleRange(for duration: Double) -> TimelineVisibleRange {
+- Line 134:        let safeDuration = max(duration, 0.001)
+- Line 135:        let safeZoomScale = clampedTimelineZoomScale(timelineZoomScale, duration: safeDuration)
+- Line 143:    func timelineMaximumZoomScale(for duration: Double) -> Double {
+- Line 144:        let minimumVisibleDuration = 2.0
+- Line 145:        let safeDuration = max(duration, 0.001)
+- Line 154:    func clampedTimelineZoomScale(_ zoomScale: Double, duration: Double) -> Double {
+- Line 158:    func clampedTimelineStartTime(_ startTime: Double, visibleDuration: Double, fullDuration: Double) -> Double {
+- Line 159:        let maxStartTime = max(fullDuration - visibleDuration, 0)
+- Line 163:    func zoomTimelineVisibleRange(
+- Line 169:        let safeDuration = max(duration, 0.001)
+- Line 170:        let maximumZoomScale = timelineMaximumZoomScale(for: safeDuration)
+- Line 176:        let safeWidth = max(width, 1)
+- Line 177:        let clampedAnchorX = min(max(anchorX, 0), safeWidth)
+- Line 178:        let anchorRatio = Double(clampedAnchorX / safeWidth)
+- Line 179:        let currentRange = timelineVisibleRange(for: safeDuration)
+- Line 180:        let anchorTime = timelineTime(for: clampedAnchorX, width: safeWidth, visibleRange: currentRange)
+- Line 181:        let scaleFactor = max(0.2, 1 + Double(magnification))
+- Line 182:        let newZoomScale = clampedTimelineZoomScale(timelineZoomScale * scaleFactor, duration: safeDuration)
+- Line 183:        let newVisibleDuration = safeDuration / newZoomScale
+- Line 184:        let newStartTime = clampedTimelineStartTime(
+- Line 195:    func panTimelineVisibleRange(
+- Line 200:        let safeDuration = max(duration, 0.001)
+- Line 201:        let currentRange = timelineVisibleRange(for: safeDuration)
+- Line 207:        let secondsPerPoint = currentRange.duration / Double(max(width, 1))
+- Line 208:        let newStartTime = clampedTimelineStartTime(
+- Line 218:    func timelineTime(for x: CGFloat, width: CGFloat, visibleRange: TimelineVisibleRange) -> Double {
+- Line 219:        let clampedX = min(max(x, 0), max(width, 1))
+- Line 223:    func timelineX(for time: Double, visibleRange: TimelineVisibleRange, width: CGFloat) -> CGFloat {
+- Line 227:    func timelineRulerTicks(visibleRange: TimelineVisibleRange, width: CGFloat) -> [TimelineRulerTick] {
+- Line 228:        let majorInterval = timelineRulerMajorInterval(visibleDuration: visibleRange.duration, width: width)
+- Line 229:        let minorInterval = timelineRulerMinorInterval(for: majorInterval, visibleDuration: visibleRange.duration, width: width)
+- Line 230:        let firstTick = floor(visibleRange.startTime / minorInterval) * minorInterval
+- Line 231:        let lastTick = visibleRange.endTime
+- Line 232:        var ticks: [TimelineRulerTick] = []
+- Line 233:        var time = firstTick
+- Line 234:        var tickCount = 0
+- Line 238:                let majorRatio = time / majorInterval
+- Line 239:                let isMajor = abs(majorRatio.rounded() - majorRatio) < 0.001
+- Line 256:    private func timelineRulerMajorInterval(visibleDuration: Double, width: CGFloat) -> Double {
+- Line 257:        let minimumMajorSpacing: CGFloat = 82
+- Line 258:        let intervals: [Double] = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600]
+- Line 259:        let safeWidth = max(width, 1)
+- Line 266:    private func timelineRulerMinorInterval(for majorInterval: Double, visibleDuration: Double, width: CGFloat) -> Double {
+- Line 267:        let safeWidth = max(width, 1)
+- Line 268:        let candidates = [majorInterval / 10, majorInterval / 8, majorInterval / 5, majorInterval / 4, majorInterval / 2]
+- Line 275:    private func timelineRulerLabel(for time: Double, fullDuration: Double) -> String {
+- Line 276:        let roundedTime = max(Int(time.rounded()), 0)
+- Line 277:        let hours = roundedTime / 3600
+- Line 278:        let minutes = (roundedTime % 3600) / 60
+- Line 279:        let seconds = roundedTime % 60
+- Line 288:    func zoomTimelineMarkerHitTarget(
+- Line 294:        let laneHeight: CGFloat = 9
+
+### Views/Review/SmartSetupViews.swift
+- Lines: 318
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:struct SmartSetupReviewPanel: View {
+- Functions / Vars:
+- Line 7:    var body: some View {
+- Line 34:    private var header: some View {
+- Line 73:    private var suggestionList: some View {
+- Line 98:    let suggestion: SmartSetupSuggestion
+- Line 99:    let isSelected: Bool
+- Line 100:    let onSelect: () -> Void
+- Line 101:    let onDismiss: () -> Void
+- Line 103:    var body: some View {
+- Line 104:        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
+- Line 151:    private func explanationLine(title: String, text: String) -> some View {
+- Line 165:    var displayTitle: String {
+- Line 178:    var displayTitle: String {
+- Line 197:    var headline: String {
+- Line 210:    var reviewStateLabel: String {
+- Line 219:    var whatFlowTrackNoticed: String {
+- Line 238:    var suggestedChange: String {
+- Line 251:    var whyItMayHelp: String {
+- Line 264:    var displayTimeRange: String {
+- Line 269:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
+- Line 273:    var displayMetadata: String {
+- Line 274:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
+- Line 282:    private var zoomScaleText: String? {
+- Line 293:    private var confidenceText: String {
+- Line 297:    private var proposalTime: Double {
+- Line 310:    static func timeString(_ seconds: Double) -> String {
+- Line 311:        let clampedSeconds = max(seconds, 0)
+- Line 312:        let wholeSeconds = Int(clampedSeconds)
+- Line 313:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+- Line 314:        let minutes = wholeSeconds / 60
+- Line 315:        let secondsRemainder = wholeSeconds % 60
+- SwiftUI State:
+- Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 5:    @ObservedObject var viewModel: CaptureSetupViewModel
+- Line 96:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
+### Views/Review/TimelineToolbarControls.swift
+- Lines: 315
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:struct TimelineToolbarView: View {
+- Line 128:struct EffectsTimelineToolbarView: View {
+- Line 237:struct TimelineGadgetButton: View {
+- Functions / Vars:
+- Line 6:    let hasSelectedMarker: Bool
+- Line 7:    let canEditClickFocusMarkers: Bool
+- Line 8:    let isPlacingClickFocus: Bool
+- Line 9:    let selectedMarker: ZoomPlanItem?
+- Line 10:    let showsNoZoomFallbackControls: Bool
+- Line 11:    let isDrawingNoZoomOverflowRegion: Bool
+- Line 12:    let isTimelineScrubSnappingEnabled: Bool
+- Line 13:    let onToggleAddClickFocus: () -> Void
+- Line 14:    let onDeleteSelectedMarker: () -> Void
+- Line 15:    let onSelectNoZoomFallbackMode: (NoZoomFallbackMode) -> Void
+- Line 16:    let onToggleOverflowRegion: () -> Void
+- Line 17:    let onToggleTimelineScrubSnapping: () -> Void
+- Line 19:    var body: some View {
+- Line 131:    let hasSelectedMarker: Bool
+- Line 132:    let selectedMarker: EffectPlanItem?
+- Line 133:    let isDrawingFocusRegion: Bool
+- Line 134:    let showsOverlayToggle: Bool
+- Line 135:    let isShowingOverlay: Bool
+- Line 136:    let isTimelineScrubSnappingEnabled: Bool
+- Line 137:    let onAddMarker: () -> Void
+- Line 138:    let onDeleteSelectedMarker: () -> Void
+- Line 139:    let onToggleFocusRegion: () -> Void
+- Line 140:    let onToggleOverlay: () -> Void
+- Line 141:    let onToggleTimelineScrubSnapping: () -> Void
+- Line 143:    var body: some View {
+- Line 240:    let systemName: String
+- Line 241:    let isActive: Bool
+- Line 242:    let isEnabled: Bool
+- Line 243:    let help: String
+- Line 244:    let role: ButtonRole?
+- Line 245:    let activeColor: Color?
+- Line 246:    let inactiveColor: Color?
+- Line 247:    let action: () -> Void
+- Line 269:    var body: some View {
+- Line 293:private func gadgetForegroundColor(
+- SwiftUI State:
+- Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 129:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 238:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+
+### Views/Review/ZoomAndClicksEditorViews.swift
+- Lines: 624
+- Imports:
+- import AppKit
+- import SwiftUI
+- Types:
+- Line 4:enum MarkerTimingPhase: String {
+- Line 11:struct TimelineSegmentLayout: Identifiable {
+- Functions / Vars:
+- Line 12:    let marker: ZoomPlanItem
+- Line 13:    let markerNumber: Int
+- Line 14:    let lane: Int
+- Line 15:    let startRatio: Double
+- Line 16:    let eventRatio: Double
+- Line 17:    let endRatio: Double
+- Line 19:    var id: String { marker.id }
+- Line 22:func timelineSegmentLayouts(
+- Line 27:    let maxLaneCount = 3
+- Line 28:    var laneEndRatios = Array(repeating: -Double.infinity, count: maxLaneCount)
+- Line 29:    let sortedMarkers = markers.enumerated().sorted { lhs, rhs in
+- Line 30:        let lhsWindow = timelineSegmentWindow(for: lhs.element)
+- Line 31:        let rhsWindow = timelineSegmentWindow(for: rhs.element)
+- Line 41:        let marker = entry.element
+- Line 42:        let window = timelineSegmentWindow(for: marker)
+- Line 47:        let startRatio = visibleRange.clampedRatio(for: clippedWindow.start)
+- Line 48:        let eventRatio = visibleRange.clampedRatio(for: marker.sourceEventTimestamp)
+- Line 49:        let endRatio = max(visibleRange.clampedRatio(for: clippedWindow.end), startRatio)
+- Line 50:        let lane = timelineLane(for: startRatio, endRatio: endRatio, laneEndRatios: &laneEndRatios)
+- Line 71:func timelineSegment(
+- Line 88:    let marker = layout.marker
+- Line 89:    let zoomAccent = FlowTrackAccent.color(for: .zoomAndClicks, theme: theme)
+- Line 90:    let baseColor: Color = isSelected ? zoomAccent : (isEnabled ? zoomAccent.opacity(0.72) : Color.secondary.opacity(0.35))
+- Line 91:    let laneHeight: CGFloat = 9
+- Line 92:    let laneSpacing: CGFloat = 4
+- Line 93:    let laneY = verticalOrigin + (CGFloat(layout.lane) * (laneHeight + laneSpacing))
+- Line 94:    let startX = CGFloat(layout.startRatio) * width
+- Line 95:    let endX = CGFloat(layout.endRatio) * width
+- Line 96:    let eventX = CGFloat(layout.eventRatio) * width
+- Line 97:    let barWidth = max(endX - startX, 10)
+- Line 98:    let emphasisWidth: CGFloat = min(max(barWidth * 0.28, 8), 18)
+- Line 99:    let markerBodyHeight: CGFloat = isSelected ? 18 : 14
+- Line 100:    let markerBodyWidth: CGFloat = isSelected ? 8 : 6
+- Line 101:    let hoverHighlightColor = (isSelected ? zoomAccent : baseColor).opacity(isHovered ? (isEnabled ? 0.22 : 0.12) : 0)
+- Line 102:    let hoverTargetPadding: CGFloat = 7
+- Line 103:    let hoverTargetWidth = max(barWidth + (hoverTargetPadding * 2), 18)
+- Line 104:    let hoverTargetHeight: CGFloat = 28
+- Line 105:    let hoverAnchor = CGPoint(x: startX + (barWidth / 2), y: max(laneY - 20, 10))
+- Line 106:    let localMinX = max(min(startX, eventX - 8) - hoverTargetPadding, 0)
+- Line 107:    let localMaxX = min(max(endX, eventX + 8) + hoverTargetPadding, width)
+- Line 108:    let localWidth = max(localMaxX - localMinX, hoverTargetWidth)
+- Line 109:    let localCenterX = localMinX + (localWidth / 2)
+- Line 110:    let localBarCenterX = (startX + (barWidth / 2)) - localMinX
+- Line 111:    let localEventX = eventX - localMinX
+- Line 112:    let localHoverCenterX = localBarCenterX
+- Line 113:    let localHeight: CGFloat = 34
+- Line 114:    let localCenterY = localHeight / 2
+- Line 115:    let localMarkerCenterY = localCenterY + 0.5
+- Line 116:    let labelY: CGFloat = 6
+- Line 117:    let highlightedBarWidth = barWidth + 10
+- Line 118:    let highlightedBarX = min(
+- Line 159:            let labelX = timelinePhaseCenterX(for: marker, phase: activePhase, visibleRange: visibleRange, width: width) - localMinX
+- Line 221:func timelineMarkerTooltipOverlay(
+- Line 230:    let tooltipWidth: CGFloat = 240
+- Line 231:    let tooltipHalfWidth = tooltipWidth / 2
+- Line 232:    let tooltipX = min(max(anchor.x, tooltipHalfWidth), max(width - tooltipHalfWidth, tooltipHalfWidth))
+- Line 233:    let tooltipY: CGFloat = -120
+- Line 234:    let trimmedMarkerName = marker.markerName?.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 235:    let displayName = trimmedMarkerName?.isEmpty == false ? trimmedMarkerName! : "Unnamed Marker"
+- Line 236:    let clickPulseStatus = marker.clickPulse.map { "Click Pulse: \($0.preset.displayName)" } ?? "Click Pulse: Off"
+- Line 301:private func timelineSegmentBar(
+- Line 315:    let timeline = zoomTimeline(for: marker)
+- Line 316:    let fillOpacity = isEnabled ? 0.82 : 0.34
+- Line 317:    let leadColor = baseColor.opacity(isEnabled ? 0.24 : 0.14)
+- Line 318:    let zoomInColor = baseColor.opacity(fillOpacity)
+- Line 319:    let holdColor = baseColor.opacity(isEnabled ? 0.58 : 0.26)
+- Line 320:    let zoomOutColor = baseColor.opacity(isEnabled ? 0.42 : 0.22)
+- Line 321:    let totalWidth = max(width, 1)
+- Line 322:    let leadWidth = max(phaseWidth(from: timeline.startTime, to: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: totalWidth), marker.zoomType == .outOnly ? 0 : 2)
+- Line 323:    let zoomInWidth = max(phaseWidth(from: max(timeline.peakTime - marker.zoomInDuration, timeline.startTime), to: timeline.peakTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: totalWidth), marker.zoomType == .outOnly ? 0 : 4)
+- Line 324:    let holdWidth = max(phaseWidth(from: timeline.peakTime, to: timeline.holdUntil, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: totalWidth), marker.zoomType == .outOnly ? 0 : 2)
+- Line 325:    let zoomOutWidth = max(phaseWidth(from: timeline.holdUntil, to: timeline.endTime, timelineStart: timeline.startTime, timelineEnd: timeline.endTime, totalWidth: totalWidth), marker.zoomType == .outOnly ? totalWidth : 4)
+- Line 372:private func timelinePhaseBlock(color: Color, width: CGFloat) -> some View {
+- Line 379:private func selectedTimelinePhaseOverlay(
+- Line 390:    let phaseBounds = timelinePhaseBoundsMap(for: marker, timeline: timeline, width: width)
+- Line 391:    let dividerTimes = phaseDividerTimes(for: marker, timeline: timeline)
+- Line 392:    let dividerColor = Color.white.opacity(isEnabled ? 0.38 : 0.22)
+- Line 408:                let phaseAnchor = CGPoint(
+- Line 433:private func phaseWidth(from start: Double, to end: Double, timelineStart: Double, timelineEnd: Double, totalWidth: CGFloat) -> CGFloat {
+- Line 434:    let totalDuration = max(timelineEnd - timelineStart, 0.001)
+

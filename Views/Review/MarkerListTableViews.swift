@@ -252,9 +252,7 @@ private struct MarkerListCellContent: View {
 
     var body: some View {
         let marker = entry.marker
-        let resolvedMarkerName = (marker.markerName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-            ? (marker.markerName ?? "")
-            : "Unnamed Marker"
+        let resolvedMarkerName = marker.resolvedMarkerName
         let isRenaming = renamingMarkerID == entry.id
         let backgroundFill: Color = entry.isPlaybackHighlighted
             ? accentColor.opacity(0.20)

@@ -961,9 +961,20 @@ struct EffectTintColor: Codable, Equatable {
     static let defaultTint = EffectTintColor(red: 0.22, green: 0.48, blue: 0.96, alpha: 1)
 }
 
+enum MarkerNameSource: String, Codable, Equatable {
+    case automatic
+    case manual
+
+    static func defaultSource(for markerName: String?) -> MarkerNameSource {
+        let trimmed = markerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? .automatic : .manual
+    }
+}
+
 struct EffectPlanItem: Codable, Identifiable, Equatable {
     var id: String
     var markerName: String?
+    var markerNameSource: MarkerNameSource
     var sourceEventTimestamp: Double
     var startTime: Double
     var holdStartTime: Double
@@ -985,6 +996,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case id
         case markerName
+        case markerNameSource
         case sourceEventTimestamp
         case startTime
         case holdStartTime
@@ -1009,6 +1021,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
     init(
         id: String,
         markerName: String?,
+        markerNameSource: MarkerNameSource? = nil,
         sourceEventTimestamp: Double,
         startTime: Double,
         holdStartTime: Double,
@@ -1029,6 +1042,7 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
     ) {
         self.id = id
         self.markerName = markerName
+        self.markerNameSource = markerNameSource ?? MarkerNameSource.defaultSource(for: markerName)
         self.sourceEventTimestamp = sourceEventTimestamp
         self.startTime = startTime
         self.holdStartTime = holdStartTime
@@ -1046,12 +1060,15 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         self.tintColor = tintColor
         self.focusRegion = focusRegion
         self.distortion = style == .distortion ? (distortion ?? .defaultConfiguration) : distortion
+        refreshAutomaticMarkerName()
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         markerName = try container.decodeIfPresent(String.self, forKey: .markerName)
+        markerNameSource = try container.decodeIfPresent(MarkerNameSource.self, forKey: .markerNameSource)
+            ?? MarkerNameSource.defaultSource(for: markerName)
         sourceEventTimestamp = try container.decode(Double.self, forKey: .sourceEventTimestamp)
         startTime = try container.decode(Double.self, forKey: .startTime)
         endTime = try container.decode(Double.self, forKey: .endTime)
@@ -1084,12 +1101,14 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
             distortion = decodedDistortion
         }
         normalizeTiming()
+        refreshAutomaticMarkerName()
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encodeIfPresent(markerName, forKey: .markerName)
+        try container.encode(markerNameSource, forKey: .markerNameSource)
         try container.encode(sourceEventTimestamp, forKey: .sourceEventTimestamp)
         try container.encode(startTime, forKey: .startTime)
         try container.encode(holdStartTime, forKey: .holdStartTime)
@@ -1130,12 +1149,41 @@ struct EffectPlanItem: Codable, Identifiable, Equatable {
         return (startTime + endTime) / 2
     }
 
+    var resolvedMarkerName: String {
+        let trimmed = markerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? automaticMarkerName : trimmed
+    }
+
+    var automaticMarkerName: String {
+        "\(automaticMarkerNamePrefix) @ \(MarkerNameFormatter.timecode(sourceEventTimestamp))"
+    }
+
+    mutating func refreshAutomaticMarkerName() {
+        guard markerNameSource == .automatic else { return }
+        markerName = automaticMarkerName
+    }
+
     mutating func normalizeTiming() {
         startTime = max(startTime, 0)
         endTime = max(endTime, 0)
         holdStartTime = min(max(holdStartTime, startTime), endTime)
         holdEndTime = min(max(holdEndTime, holdStartTime), endTime)
         startTime = min(startTime, holdStartTime)
+    }
+
+    private var automaticMarkerNamePrefix: String {
+        switch style {
+        case .blur:
+            return "Blur Focus"
+        case .darken:
+            return "Darken Focus"
+        case .tint:
+            return "Tint Focus"
+        case .distortion, .heatHazeEdge:
+            return "Distortion Focus"
+        case .blurDarken:
+            return "Blur/Darken Focus"
+        }
     }
 }
 
@@ -1193,6 +1241,7 @@ struct ZoomPlanItem: Codable, Identifiable {
     var id: String
     var type: String
     var markerName: String?
+    var markerNameSource: MarkerNameSource
     var markerKind: ZoomMarkerKind
     var sourceEventTimestamp: Double
     var rawX: Double?
@@ -1221,6 +1270,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         case id
         case type
         case markerName
+        case markerNameSource
         case markerKind
         case sourceEventTimestamp
         case rawX
@@ -1250,6 +1300,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         id: String,
         type: String,
         markerName: String? = nil,
+        markerNameSource: MarkerNameSource? = nil,
         markerKind: ZoomMarkerKind = .clickFocus,
         sourceEventTimestamp: Double,
         rawX: Double?,
@@ -1277,6 +1328,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         self.id = id
         self.type = type
         self.markerName = markerName
+        self.markerNameSource = markerNameSource ?? MarkerNameSource.defaultSource(for: markerName)
         self.markerKind = markerKind
         self.sourceEventTimestamp = sourceEventTimestamp
         self.rawX = rawX
@@ -1300,6 +1352,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         self.noZoomFallbackMode = noZoomFallbackMode
         self.noZoomOverflowRegion = noZoomOverflowRegion
         self.displayOrder = displayOrder
+        refreshAutomaticMarkerName()
     }
 
     init(from decoder: Decoder) throws {
@@ -1307,6 +1360,8 @@ struct ZoomPlanItem: Codable, Identifiable {
         id = try container.decode(String.self, forKey: .id)
         type = try container.decode(String.self, forKey: .type)
         markerName = try container.decodeIfPresent(String.self, forKey: .markerName)
+        markerNameSource = try container.decodeIfPresent(MarkerNameSource.self, forKey: .markerNameSource)
+            ?? MarkerNameSource.defaultSource(for: markerName)
         markerKind = try container.decodeIfPresent(ZoomMarkerKind.self, forKey: .markerKind) ?? .clickFocus
         sourceEventTimestamp = try container.decode(Double.self, forKey: .sourceEventTimestamp)
         rawX = try container.decodeIfPresent(Double.self, forKey: .rawX)
@@ -1343,6 +1398,7 @@ struct ZoomPlanItem: Codable, Identifiable {
         case .noZoom:
             duration = max(leadInTime + zoomInDuration + holdDuration, 0.5)
         }
+        refreshAutomaticMarkerName()
     }
 
     var totalSegmentDuration: Double {
@@ -1364,6 +1420,20 @@ struct ZoomPlanItem: Codable, Identifiable {
 
     var isClickPulseEnabled: Bool {
         clickPulse != nil
+    }
+
+    var resolvedMarkerName: String {
+        let trimmed = markerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? automaticMarkerName : trimmed
+    }
+
+    var automaticMarkerName: String {
+        "\(automaticMarkerNamePrefix) @ \(MarkerNameFormatter.timecode(sourceEventTimestamp))"
+    }
+
+    mutating func refreshAutomaticMarkerName() {
+        guard markerNameSource == .automatic else { return }
+        markerName = automaticMarkerName
     }
 
     static func legacyPhaseTiming(totalDuration: Double) -> (leadInTime: Double, zoomInDuration: Double, holdDuration: Double, zoomOutDuration: Double) {
@@ -1395,6 +1465,29 @@ struct ZoomPlanItem: Codable, Identifiable {
             holdDuration: scaledHold,
             zoomOutDuration: scaledZoomOut
         )
+    }
+
+    private var automaticMarkerNamePrefix: String {
+        switch zoomType {
+        case .inOut:
+            return "Click Focus"
+        case .inOnly:
+            return "Zoom In"
+        case .outOnly:
+            return "Zoom Out"
+        case .noZoom:
+            return "No Zoom Hold"
+        }
+    }
+}
+
+enum MarkerNameFormatter {
+    static func timecode(_ seconds: Double) -> String {
+        let totalSeconds = Int(max(seconds, 0).rounded())
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds / 60) % 60
+        let secondsRemainder = totalSeconds % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, secondsRemainder)
     }
 }
 

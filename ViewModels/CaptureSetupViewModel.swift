@@ -1163,6 +1163,7 @@ final class CaptureSetupViewModel: ObservableObject {
         effectMarkers[index].sourceEventTimestamp = targetTimestamp
         effectMarkers[index].startTime = max(0, targetTimestamp + timelineOffsetToStart)
         effectMarkers[index].endTime = max(effectMarkers[index].startTime + 0.05, min(maxDuration, targetTimestamp + timelineOffsetToEnd))
+        effectMarkers[index].refreshAutomaticMarkerName()
 
         manualSelectionSuppressionUntil = Date().addingTimeInterval(0.2)
         saveEffectMarkers(effectMarkers, basedOn: summary)
@@ -1190,7 +1191,13 @@ final class CaptureSetupViewModel: ObservableObject {
     func setMarkerName(_ markerName: String?, for markerID: String) {
         updateMarker(withID: markerID) { marker in
             let trimmed = markerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            marker.markerName = trimmed.isEmpty ? nil : trimmed
+            if trimmed.isEmpty || trimmed == marker.automaticMarkerName {
+                marker.markerNameSource = .automatic
+                marker.refreshAutomaticMarkerName()
+            } else {
+                marker.markerName = trimmed
+                marker.markerNameSource = .manual
+            }
         }
     }
 
@@ -1467,7 +1474,13 @@ final class CaptureSetupViewModel: ObservableObject {
     func setEffectMarkerName(_ markerName: String?, for markerID: String) {
         updateEffectMarker(withID: markerID) { marker in
             let trimmed = markerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            marker.markerName = trimmed.isEmpty ? nil : trimmed
+            if trimmed.isEmpty || trimmed == marker.automaticMarkerName {
+                marker.markerNameSource = .automatic
+                marker.refreshAutomaticMarkerName()
+            } else {
+                marker.markerName = trimmed
+                marker.markerNameSource = .manual
+            }
         }
     }
 
@@ -1757,6 +1770,7 @@ final class CaptureSetupViewModel: ObservableObject {
         var marker = EffectPlanItem(
             id: nextEffectMarkerID(from: effectMarkers),
             markerName: nil,
+            markerNameSource: .automatic,
             sourceEventTimestamp: eventTimestamp,
             startTime: max(0, eventTimestamp - 0.35),
             holdStartTime: max(0, eventTimestamp - 0.35) + 0.18,
@@ -1934,6 +1948,7 @@ final class CaptureSetupViewModel: ObservableObject {
             id: nextZoomMarkerID(from: markers),
             type: "zoom",
             markerName: nil,
+            markerNameSource: .automatic,
             markerKind: .clickFocus,
             sourceEventTimestamp: eventTimestamp,
             rawX: nil,
@@ -2666,6 +2681,7 @@ final class CaptureSetupViewModel: ObservableObject {
         marker.holdEndTime = min(max(marker.holdEndTime, marker.holdStartTime), marker.endTime)
         marker.startTime = min(marker.startTime, marker.holdStartTime)
         marker.normalizeTiming()
+        marker.refreshAutomaticMarkerName()
     }
 
     private func syncMarkerTiming(_ marker: inout ZoomPlanItem) {
@@ -2698,6 +2714,7 @@ final class CaptureSetupViewModel: ObservableObject {
             marker.endTime = marker.holdUntil
             marker.duration = marker.totalSegmentDuration
         }
+        marker.refreshAutomaticMarkerName()
     }
 
     private func nextZoomMarkerID(from markers: [ZoomPlanItem]) -> String {

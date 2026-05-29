@@ -282,7 +282,7 @@ private func effectTimelineTooltipOverlay(
     let tooltipY: CGFloat = -120
 
     return VStack(alignment: .leading, spacing: 4) {
-        Text(marker.markerName?.isEmpty == false ? (marker.markerName ?? "Unnamed Effect") : "Unnamed Effect #\(markerNumber)")
+        Text(marker.resolvedMarkerName)
             .font(.system(size: 11, weight: .semibold))
         Text(timecodeString(for: marker.snapTime))
             .font(.system(size: 11, design: .monospaced))
@@ -594,9 +594,7 @@ private struct EffectListCellContent: View {
 
     var body: some View {
         let marker = entry.marker
-        let resolvedMarkerName = (marker.markerName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-            ? (marker.markerName ?? "")
-            : "Unnamed Effect"
+        let resolvedMarkerName = marker.resolvedMarkerName
         let isRenaming = renamingMarkerID == entry.id
         let backgroundFill: Color = entry.isPlaybackHighlighted
             ? FlowTrackAccent.subtleFill(for: .effects, opacity: 0.20, theme: flowTrackTheme)

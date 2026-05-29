@@ -1,0 +1,396 @@
+# Capture Map
+
+Generated: 2026-05-29 12:01:48
+
+## Files
+
+### App/TutorialCaptureApp.swift
+- Lines: 191
+- Imports:
+- import SwiftUI
+- Types:
+- Line 9:struct TutorialCaptureApp: App {
+- Functions / Vars:
+- Line 10:    private let themeStore = FlowTrackThemeStore()
+- Line 18:    var body: some Scene {
+- Line 52:    private var themeActions: FlowTrackThemeActions {
+- Line 64:    private func loadThemes() {
+- Line 65:        let library = themeStore.loadLibrary()
+- Line 72:           let savedTheme = savedThemes.first(where: { $0.id == selectedThemeID }) {
+- Line 80:    private func persistThemes() {
+- Line 81:        let library = FlowTrackThemeLibrary(
+- Line 90:    private func selectTheme(_ themeID: UUID?) {
+- Line 93:           let savedTheme = savedThemes.first(where: { $0.id == themeID }) {
+- Line 102:    private func selectBuiltInTheme(_ themeID: String) {
+- Line 109:    private func saveBuiltInOverride(id: String, theme: FlowTrackTheme) {
+- Line 118:    private func saveTheme(name: String, theme: FlowTrackTheme) {
+- Line 119:        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 121:        let finalName = uniqueThemeName(startingWith: trimmedName)
+- Line 123:        let now = Date()
+- Line 124:        let savedTheme = FlowTrackSavedTheme(
+- Line 138:    private func updateTheme(id: UUID, name: String, theme: FlowTrackTheme) {
+- Line 139:        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 141:              let index = savedThemes.firstIndex(where: { $0.id == id }) else {
+- Line 154:    private func deleteTheme(id: UUID) {
+- Line 164:    private func resetToBuiltInDefault() {
+- Line 171:    private func uniqueThemeName(startingWith name: String) -> String {
+- Line 172:        let baseName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 175:        let existingNames = Set(savedThemes.map { $0.name.lowercased() })
+- Line 180:        var index = 2
+- Line 187:    private func effectiveBuiltInTheme(withID id: String) -> FlowTrackTheme {
+- SwiftUI State:
+- Line 11:    @State private var activeFlowTrackTheme = FlowTrackThemeDefaults.standard
+- Line 12:    @State private var savedThemes: [FlowTrackSavedTheme] = []
+- Line 13:    @State private var selectedThemeID: UUID?
+- Line 14:    @State private var selectedBuiltInThemeID = flowTrackBuiltInThemeID
+- Line 15:    @State private var builtInThemeOverrides: [String: FlowTrackTheme] = [:]
+- Line 16:    @State private var isColourLabPresented = false
+
+### Managers/CaptureMetadataManager.swift
+- Lines: 43
+- Imports:
+- import Foundation
+- Functions / Vars:
+- Line 9:    private let projectBundleService: ProjectBundleService
+- Line 10:    private var metadataSaveTask: Task<Void, Never>?
+- Line 16:    func scheduleSave(
+- Line 28:                let updatedManifest = try projectBundleService.updateCaptureMetadata(
+- Line 39:    func cancelPendingSave() {
+
+### Managers/CaptureTargetManager.swift
+- Lines: 69
+- Imports:
+- import Foundation
+- Types:
+- Line 8:struct CaptureTargetRefreshResult {
+- Line 16:struct CapturePermissionResult {
+- Line 21:struct CaptureTargetManager {
+- Functions / Vars:
+- Line 9:    let displays: [ShareableCaptureTarget]
+- Line 10:    let windows: [ShareableCaptureTarget]
+- Line 11:    let selectedTargetID: String?
+- Line 12:    let hasScreenRecordingPermission: Bool
+- Line 13:    let statusMessage: String?
+- Line 17:    let hasScreenRecordingPermission: Bool
+- Line 18:    let statusMessage: String
+- Line 22:    private let permissionsService: PermissionsService
+- Line 23:    private let screenCaptureService: ScreenCaptureService
+- Line 33:    func loadTargets(selectedTargetID: String?, silent: Bool) async throws -> CaptureTargetRefreshResult {
+- Line 34:        let hasScreenRecordingPermission = permissionsService.hasScreenRecordingPermission()
+- Line 35:        let targets = try await screenCaptureService.fetchTargets()
+- Line 36:        let allTargets = targets.displays + targets.windows
+- Line 37:        let validatedSelectedTargetID: String?
+- Line 53:    func requestScreenRecordingPermission() -> CapturePermissionResult {
+- Line 55:        let hasScreenRecordingPermission = permissionsService.hasScreenRecordingPermission()
+- Line 64:    private func defaultTargetStatusMessage(hasScreenRecordingPermission: Bool) -> String {
+
+### Services/InputEventCaptureService.swift
+- Lines: 141
+- Imports:
+- import AppKit
+- import CoreMedia
+- import Foundation
+- Functions / Vars:
+- Line 13:        let type: RecordedEventType
+- Line 14:        let uptime: TimeInterval
+- Line 15:        let x: Double
+- Line 16:        let y: Double
+- Line 19:    private let maxCursorSampleRate: TimeInterval = 1.0 / 15.0
+- Line 21:    private var leftMouseDownMonitor: Any?
+- Line 22:    private var leftMouseUpMonitor: Any?
+- Line 23:    private var rightMouseDownMonitor: Any?
+- Line 24:    private var rightMouseUpMonitor: Any?
+- Line 25:    private var cursorTimer: Timer?
+- Line 27:    private var pendingEvents: [PendingEvent] = []
+- Line 28:    private var lastCursorPosition: CGPoint?
+- Line 29:    private var sessionStartUptime: TimeInterval?
+- Line 31:    func start() {
+- Line 60:                let location = NSEvent.mouseLocation
+- Line 61:                let uptime = ProcessInfo.processInfo.systemUptime
+- Line 70:    func setSessionStart(videoTimestamp: CMTime, uptime: TimeInterval) {
+- Line 75:    func stop() {
+- Line 89:    func finish() -> [RecordedEvent] {
+- Line 90:        let events = pendingEvents.compactMap(makeRecordedEvent(from:))
+- Line 100:    func cancel() {
+- Line 107:    private func recordMouseEvent(type: RecordedEventType, event: NSEvent) {
+- Line 111:    private func recordCursorMoveIfNeeded(at location: CGPoint, uptime: TimeInterval) {
+- Line 117:    private func appendPendingEvent(type: RecordedEventType, location: CGPoint, uptime: TimeInterval) {
+- Line 128:    private func makeRecordedEvent(from pendingEvent: PendingEvent) -> RecordedEvent? {
+- Line 131:        let relativeTimestamp = pendingEvent.uptime - sessionStartUptime
+
+### Services/ScreenCaptureService.swift
+- Lines: 191
+- Imports:
+- import AppKit
+- import CoreMedia
+- import ScreenCaptureKit
+- Types:
+- Line 182:extension ScreenCaptureService: SCStreamOutput, SCStreamDelegate {
+- Functions / Vars:
+- Line 11:    private let minimumWindowTargetDimension = 300.0
+- Line 12:    private let ignoredDisplayTitlePatterns: [String] = [
+- Line 15:    private let ignoredWindowTitlePatterns: [String] = [
+- Line 19:    private let sampleQueue = DispatchQueue(label: "TutorialCapture.ScreenCapture")
+- Line 20:    private var stream: SCStream?
+- Line 21:    private var onSampleBuffer: ((CMSampleBuffer) -> Void)?
+- Line 22:    private var onStreamStop: ((Error?) -> Void)?
+- Line 24:    func fetchTargets() async throws -> (displays: [ShareableCaptureTarget], windows: [ShareableCaptureTarget]) {
+- Line 25:        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+- Line 26:        let screensByID = Dictionary(uniqueKeysWithValues: NSScreen.screens.compactMap { screen -> (UInt32, NSScreen)? in
+- Line 33:        let displays = content.displays.compactMap { display -> ShareableCaptureTarget? in
+- Line 34:            let screen = screensByID[display.displayID]
+- Line 35:            let width = screen.map { Int($0.frame.width * $0.backingScaleFactor) } ?? Int(display.width) * 2
+- Line 36:            let height = screen.map { Int($0.frame.height * $0.backingScaleFactor) } ?? Int(display.height) * 2
+- Line 37:            let title = screen?.localizedName ?? "Display \(display.displayID)"
+- Line 38:            let normalizedTitle = normalizedTargetName(title)
+- Line 39:            let shouldInclude = shouldIncludeDisplayTarget(named: title)
+- Line 42:            let frame = screen?.frame ?? .zero
+- Line 43:            let scaleFactor = screen?.backingScaleFactor ?? 2.0
+- Line 65:        let windows = content.windows
+- Line 72:                let rawTitle = window.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+- Line 73:                let title = rawTitle.isEmpty ? "Untitled Window" : rawTitle
+- Line 74:                let ownerName = window.owningApplication?.applicationName
+- Line 75:                let normalizedTitle = normalizedTargetName(title)
+- Line 76:                let shouldInclude = shouldIncludeWindowTarget(named: title, ownerName: ownerName)
+- Line 79:                let owningApplication = window.owningApplication
+- Line 80:                let appName = owningApplication?.applicationName
+- Line 81:                let width = max(Int(window.frame.width * 2), 1)
+- Line 82:                let height = max(Int(window.frame.height * 2), 1)
+- Line 83:                let scaleFactor = window.frame.width > 0 ? Double(width) / Double(window.frame.width) : 2.0
+- Line 108:    func startCapture(
+- Line 113:        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+- Line 114:        let filter = try makeFilter(for: target, content: content)
+- Line 115:        let configuration = SCStreamConfiguration()
+- Line 127:        let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
+- Line 133:    func stopCapture() async throws {
+- Line 141:    private func makeFilter(for target: ShareableCaptureTarget, content: SCShareableContent) throws -> SCContentFilter {
+- Line 157:    private func shouldIncludeDisplayTarget(named title: String) -> Bool {
+- Line 158:        let normalizedTitle = normalizedTargetName(title)
+- Line 162:    private func shouldIncludeWindowTarget(named title: String, ownerName: String?) -> Bool {
+- Line 163:        let normalizedTitle = normalizedTargetName(title)
+- Line 164:        let normalizedOwnerName = normalizedTargetName(ownerName ?? "")
+- Line 177:    private func normalizedTargetName(_ title: String) -> String {
+- Line 183:    func stream(_ stream: SCStream, didStopWithError error: any Error) {
+- Line 187:    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
+
+### ViewModels/CaptureSetupViewModel.swift
+- Lines: 3190
+- Imports:
+- import Combine
+- import AppKit
+- import AVKit
+- import Foundation
+- Types:
+- Line 13:    enum PlaybackPresentationMode {
+- Line 20:    enum PlaybackTransitionPlateState {
+- Line 27:    enum ExportState: Equatable {
+- Functions / Vars:
+- Line 36:        var isInProgress: Bool {
+- Line 104:    private var hasRestoredLastRecording = false
+- Line 105:    private var activePlaybackScopeURL: URL?
+- Line 106:    private var mainPlaybackTimeObserver: Any?
+- Line 107:    private var previewPlaybackTimeObserver: Any?
+- Line 108:    private var manualSelectionSuppressionUntil: Date?
+- Line 109:    private var isEffectMarkerSelectionPinned = false
+- Line 110:    private var previewMarkerID: String?
+- Line 111:    private var previewEndTime: Double?
+- Line 112:    private var previewEffectMarkerID: String?
+- Line 113:    private var previewEffectEndTime: Double?
+- Line 114:    private var wasPlayingBeforeTimelineScrub = false
+- Line 115:    private var isTimelineScrubbing = false
+- Line 116:    private var markerPreviewRenderTask: Task<Void, Never>?
+- Line 117:    private var previewSurfaceTeardownTask: Task<Void, Never>?
+- Line 118:    private var playbackTransitionTask: Task<Void, Never>?
+- Line 119:    private var activeRenderedPreviewURL: URL?
+- Line 120:    private var activeRenderedPreviewShouldDelete = false
+- Line 121:    private var renderedPreviewSourceStartTime: Double?
+- Line 122:    private var renderingPreviewMarkerID: String?
+- Line 123:    private var renderingPreviewEffectMarkerID: String?
+- Line 124:    private var targetRefreshTask: Task<Void, Never>?
+- Line 125:    private var distortionLoupeRenderTask: Task<Void, Never>?
+- Line 126:    private var distortionLoupeRevision = 0
+- Line 127:    private var distortionOverlayImageCache: [String: NSImage] = [:]
+- Line 128:    private let timelineMarkerNudgeInterval = 0.1
+- Line 130:    private let permissionsService = PermissionsService()
+- Line 131:    private let screenCaptureService = ScreenCaptureService()
+- Line 132:    private let mediaWriterService = MediaWriterService()
+- Line 133:    private let projectBundleService = ProjectBundleService()
+- Line 139:    private let captureMetadataManager: CaptureMetadataManager
+- Line 140:    private let playbackTransportManager = PlaybackTransportManager()
+- Line 141:    private let timelineScrubManager = TimelineScrubManager()
+- Line 142:    private let inputEventCaptureService = InputEventCaptureService()
+- Line 143:    private let markerPreviewRenderService = MarkerPreviewRenderService()
+- Line 144:    private let markerPreviewCacheService = MarkerPreviewCacheService()
+- Line 145:    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
+- Line 146:    private let smartSetupSuggestionService = SmartSetupSuggestionService()
+- Line 147:    private let exportManager = ExportManager()
+- Line 148:    private let previewTransitionFadeInDuration: TimeInterval = 0.12
+- Line 149:    private let previewTransitionHoldDuration: TimeInterval = 1.0
+- Line 150:    private let previewTransitionFadeOutDuration: TimeInterval = 0.16
+- Line 151:    private let lastCollectionNameKey = "LastCollectionName"
+- Line 152:    private let lastProjectNameKey = "LastProjectName"
+- Line 153:    private let lastCaptureTypeKey = "LastCaptureType"
+- Line 154:    private let defaultNoZoomFallbackModeKey = "DefaultNoZoomFallbackMode"
+- Line 197:    var selectedTarget: ShareableCaptureTarget? {
+- Line 201:    var canStartRecording: Bool {
+- Line 205:    var canStopRecording: Bool {
+- Line 209:    var selectedZoomMarker: ZoomPlanItem? {
+- Line 213:    var selectedEffectMarker: EffectPlanItem? {
+- Line 217:    var activePreviewMarkerID: String? {
+- Line 221:    var isRenderedPreviewActive: Bool {
+- Line 225:    var canExportRecording: Bool {
+- Line 229:    var isExportSheetPresented: Bool {
+- Line 233:    var canTriggerMarkerPreview: Bool {
+- Line 242:    var canEditClickFocusMarkers: Bool {
+- Line 250:    var canUsePlaybackTransport: Bool {
+- Line 259:    var isSelectedEffectDistortion: Bool {
+- Line 264:    var canShowSelectedDistortionMapOverlay: Bool {
+- Line 274:    var selectedEffectDistortionOverlayImage: NSImage? {
+- Line 283:    var availableDistortionPresetDescriptors: [DistortionPresetDescriptor] {
+- Line 289:    var selectedDistortionPresetDescriptor: DistortionPresetDescriptor? {
+- Line 290:        let preferredID = selectedDistortionPresetLibraryID
+- Line 292:           let descriptor = availableDistortionPresetDescriptors.first(where: { $0.id == preferredID }) {
+- Line 298:    var distortionImportedMapAssets: [DistortionImportedMapAsset] {
+- Line 304:    var selectedCustomDistortionPresetDescriptor: DistortionPresetDescriptor? {
+- Line 309:    func load() async {
+- Line 331:    func activateCaptureTarget(_ target: ShareableCaptureTarget) {
+- Line 335:           let app = NSRunningApplication(processIdentifier: ownerProcessID) {
+- Line 341:            let matchingApps = NSRunningApplication.runningApplications(withBundleIdentifier: ownerBundleIdentifier)
+- Line 349:    func requestPermission() async {
+- Line 350:        let result = captureTargetManager.requestScreenRecordingPermission()
+- Line 355:    func startRecording() async {
+- Line 368:        let outputResolution = projectBundleService.resolveSelectedOutputDirectory()
+- Line 385:    func stopRecording() async {
+- Line 394:    func revealInFinder() {
+- Line 399:    func chooseOutputFolder() {
+- Line 405:    func selectDistortionPresetLibraryPreset(_ presetID: String) {
+- Line 409:    func createDistortionPresetFromImportedMap() {
+- SwiftUI State:
+- Line 46:    @Published var displays: [ShareableCaptureTarget] = []
+- Line 47:    @Published var windows: [ShareableCaptureTarget] = []
+- Line 48:    @Published var selectedTargetID: String?
+- Line 49:    @Published var collectionName: String = "Default Collection" {
+- Line 52:    @Published var projectName: String = "General Project" {
+- Line 55:    @Published var captureType: CaptureType = .tutorial {
+- Line 58:    @Published var captureTitle: String = ""
+- Line 59:    @Published var compositionLayout: CompositionLayout = .default
+- Line 60:    @Published private(set) var libraryItems: [CaptureLibraryItem] = []
+- Line 61:    @Published private(set) var libraryStatusMessage: String?
+- Line 62:    @Published var sessionState: RecordingSessionState = .idle
+- Line 63:    @Published var statusMessage = "Choose one display or one window."
+- Line 64:    @Published var hasScreenRecordingPermission = false
+- Line 65:    @Published var isBusy = false
+- Line 66:    @Published var recordingSummary: RecordingInspectionSummary?
+- Line 67:    @Published var selectedOutputFolderPath: String?
+- Line 68:    @Published var mainPlayer: AVPlayer?
+- Line 69:    @Published var previewPlayer: AVPlayer?
+- Line 70:    @Published var activeRecordingTargetName: String?
+- Line 71:    @Published var recordingStartedAt: Date?
+- Line 72:    @Published var selectedZoomMarkerID: String?
+- Line 73:    @Published var selectedEffectMarkerID: String? {
+- Line 80:    @Published var currentPlaybackTime: Double = 0
+- Line 81:    @Published var isPlaybackActive = false
+- Line 82:    @Published var isRenderingMarkerPreview = false
+- Line 83:    @Published var markerPreviewStatusMessage: String?
+- Line 84:    @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
+- Line 85:    @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
+- Line 86:    @Published private(set) var exportState: ExportState = .idle
+- Line 87:    @Published private(set) var exportProgress: Double = 0
+- Line 88:    @Published private(set) var exportStatusMessage: String?
+- Line 89:    @Published private(set) var exportedRecordingURL: URL?
+- Line 90:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
+- Line 91:    @Published private(set) var distortionPresetLibrary: DistortionPresetLibrary = .empty
+- Line 92:    @Published var selectedDistortionPresetLibraryID: String?
+- Line 93:    @Published var distortionLoupeNormalizedPoint: CGPoint?
+- Line 94:    @Published var distortionLoupeImage: NSImage?
+- Line 95:    @Published var isRenderingDistortionLoupe = false
+- Line 96:    @Published var isShowingDistortionMapOverlay = false
+- Line 97:    @Published private(set) var pendingSmartSetupSuggestions: [SmartSetupSuggestion] = []
+
+### Views/Capture/CaptureSetupViews.swift
+- Lines: 707
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:extension ContentView {
+- Functions / Vars:
+- Line 4:    var captureView: some View {
+- Line 13:                let useVerticalLayout = geometry.size.width < 980
+- Line 49:    var captureTargetCard: some View {
+- Line 85:    var compositionCard: some View {
+- Line 105:    var captureSetupInspectorCard: some View {
+- Line 127:    var compositionContent: some View {
+- Line 207:    var compositionPreviewFrame: some View {
+- Line 221:    var compositionReadout: some View {
+- Line 222:        let layout = viewModel.compositionLayout
+- Line 232:    var compositionNudgeControls: some View {
+- Line 233:        let step = 0.05
+- Line 261:    func nudgeCompositionOffset(x xDelta: Double, y yDelta: Double) {
+- Line 262:        let layout = viewModel.compositionLayout
+- Line 269:    var recordingSetupCard: some View {
+- Line 295:    var recordingSetupContent: some View {
+- Line 415:    var recordingControlButton: some View {
+- Line 445:    var primaryButtonEnabled: Bool {
+- Line 452:    func targetSection(title: String, targets: [ShareableCaptureTarget]) -> some View {
+- Line 470:    func targetRow(_ target: ShareableCaptureTarget) -> some View {
+- Line 471:        let isSelected = viewModel.selectedTargetID == target.id
+- Line 472:        let accentColor = FlowTrackAccent.color(for: .capture, theme: flowTrackTheme)
+- Line 523:    var id: String { rawValue }
+- Line 525:    var displayName: String {
+- Line 536:    let target: ShareableCaptureTarget?
+- Line 537:    let layout: CompositionLayout
+- Line 538:    let onOffsetChange: (Double, Double) -> Void
+- Line 539:    let onResetTransform: () -> Void
+- Line 543:    var body: some View {
+- Line 545:            let maxSize = CGSize(width: geometry.size.width, height: geometry.size.height)
+- Line 546:            let canvasSize = aspectFitSize(
+- Line 586:    private func sourcePreview(target: ShareableCaptureTarget, canvasSize: CGSize) -> some View {
+- Line 587:        let sourceAspectRatio = CGFloat(max(Double(target.width), 1) / max(Double(target.height), 1))
+- Line 588:        let fittedSourceSize = aspectFitSize(aspectRatio: sourceAspectRatio, in: canvasSize)
+- Line 589:        let sourceSize = CGSize(
+- Line 593:        let xOffset = CGFloat(layout.sourceOffsetX) * canvasSize.width * 0.5
+- Line 594:        let yOffset = CGFloat(layout.sourceOffsetY) * canvasSize.height * 0.5
+- Line 619:    private func dragGesture(canvasSize: CGSize) -> some Gesture {
+- Line 622:                let startOffset = dragStartOffset ?? CGPoint(
+- Line 628:                let normalizedXDelta = Double(value.translation.width / max(canvasSize.width * 0.5, 1))
+- Line 629:                let normalizedYDelta = Double(value.translation.height / max(canvasSize.height * 0.5, 1))
+- Line 640:    private func aspectFitSize(aspectRatio: CGFloat, in boundingSize: CGSize) -> CGSize {
+- Line 641:        let safeAspectRatio = max(aspectRatio, 0.001)
+- Line 642:        let boundingAspectRatio = max(boundingSize.width, 1) / max(boundingSize.height, 1)
+- Line 645:            let height = boundingSize.height
+- Line 648:            let width = boundingSize.width
+- Line 657:    let background: Background
+- Line 658:    let composition: Composition
+- Line 659:    let recordingSetup: RecordingSetup
+- Line 660:    let controls: Controls
+- Line 674:    var body: some View {
+- SwiftUI State:
+- Line 541:    @State private var dragStartOffset: CGPoint?
+- Line 655:    @State private var selectedPane: CaptureSetupInspectorPane = .composition
+
+### Views/Review/CaptureInfoInspectorViews.swift
+- Lines: 292
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:extension ContentView {
+- Functions / Vars:
+- Line 4:    func captureInfoInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 145:    func syncCaptureInfoDrafts(from summary: RecordingInspectionSummary, force: Bool = false) {
+- Line 157:    var collectionAutocompleteSuggestions: [String] {
+- Line 166:    var projectAutocompleteSuggestions: [String] {
+- Line 167:        let query = captureInfoProjectDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 169:        let preferredCollection = captureInfoCollectionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 170:        let items = viewModel.libraryItems
+- Line 172:        let preferredProjects = autocompleteSuggestions(
+- Line 184:        let allProjects = autocompleteSuggestions(
+- Line 191:        var combined = preferredProjects
+- Line 201:    func autocompleteSuggestions(from values: [String], matching query: String) -> [String] {
+- Line 202:        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 204:        let uniqueValues = Array(Set(values)).sorted {
+- Line 210:                let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 222:    func selectCollectionSuggestion(_ suggestion: String) {
+- Line 228:    func selectProjectSuggestion(_ suggestion: String) {
+- Line 234:    func autocompleteSuggestionPanel(
+- Line 271:    func captureTypeChips(selectedType: CaptureType) -> some View {
+

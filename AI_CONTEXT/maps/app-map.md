@@ -1,0 +1,235 @@
+# App Map
+
+Generated: 2026-05-29 12:01:48
+
+## Files
+
+### App/ContentView.swift
+- Lines: 1640
+- Imports:
+- import AppKit
+- import AVFoundation
+- import AVKit
+- import SwiftUI
+- import UniformTypeIdentifiers
+- Types:
+- Line 12:struct ContentView: View {
+- Line 97:    struct OverlayMapping {
+- Line 106:    struct ZoomPreviewState {
+- Line 111:    struct EffectPreviewState {
+- Line 122:    struct PrecisionLoupeFrame {
+- Line 127:    enum EffectRegionHandle: Hashable {
+- Line 138:    enum ActiveEffectHoldPoint {
+- Line 143:    struct ZoomStateEvent {
+- Line 149:    enum MotionDirection {
+- Line 154:    struct MotionProgressSample {
+- Line 196:    enum CaptureInfoField: Hashable {
+- Line 202:    enum MotionTuning {
+- Line 210:    struct LibraryFilterOption: Identifiable {
+- Line 1570:struct SharingAnchorView: NSViewRepresentable {
+- Line 1592:enum ReviewHeaderAction {
+- Line 1598:enum AppTab: String, CaseIterable, Identifiable {
+- Line 1633:struct MarkerListEntry: Identifiable {
+- Functions / Vars:
+- Line 98:        let point: CGPoint
+- Line 99:        let fittedRect: CGRect
+- Line 100:        let sourceSize: CGSize
+- Line 101:        let sourcePoint: CGPoint
+- Line 102:        let rawPoint: CGPoint?
+- Line 103:        let captureSourceLabel: String
+- Line 107:        let scale: CGFloat
+- Line 108:        let normalizedPoint: CGPoint
+- Line 112:        let style: EffectStyle
+- Line 113:        let region: EffectFocusRegion
+- Line 114:        let blurIntensity: Double
+- Line 115:        let darkenIntensity: Double
+- Line 116:        let tintIntensity: Double
+- Line 117:        let cornerRadius: CGFloat
+- Line 118:        let feather: CGFloat
+- Line 119:        let tintColor: Color
+- Line 123:        let image: NSImage
+- Line 124:        let playbackTime: Double
+- Line 144:        let marker: ZoomPlanItem
+- Line 145:        let normalizedPoint: CGPoint
+- Line 146:        let scale: CGFloat
+- Line 155:        let scale: Double
+- Line 156:        let pan: Double
+- Line 163:        var time: Double {
+- Line 170:        var zoomMarkerID: String? {
+- Line 179:        var effectMarkerID: String? {
+- Line 188:        var distance: CGFloat {
+- Line 203:        static let bounceApproachFraction = 0.82
+- Line 204:        static let bounceMaxOvershoot = 0.14
+- Line 205:        static let bounceMinOvershoot = 0.04
+- Line 206:        static let bounceOscillationCount = 2.6
+- Line 207:        static let panBounceInfluence = 0.35
+- Line 211:        let label: String
+- Line 212:        let count: Int
+- Line 214:        var id: String { label }
+- Line 217:    var body: some View {
+- Line 239:    private var guidedTourOverlay: some View {
+- Line 242:                let panelSize = guidedTourPanelSize
+- Line 243:                let origin = guidedTourPanelOrigin(in: geometry.size, panelSize: panelSize)
+- Line 269:                            let startOffset = guidedTourPanelDragStartOffset ?? guidedTourPanelOffset
+- Line 274:                            let proposedOffset = CGSize(
+- Line 294:    private var guidedTourPanelSize: CGSize {
+- Line 300:    private func guidedTourDefaultPanelOrigin(in containerSize: CGSize, panelSize: CGSize) -> CGPoint {
+- Line 301:        let margin: CGFloat = 28
+- Line 302:        let preferredX = (containerSize.width * 0.68) - (panelSize.width / 2)
+- Line 303:        let minX = margin
+- Line 304:        let maxX = max(minX, containerSize.width - panelSize.width - margin)
+- Line 311:    private func guidedTourPanelOrigin(in containerSize: CGSize, panelSize: CGSize) -> CGPoint {
+- Line 312:        let defaultOrigin = guidedTourDefaultPanelOrigin(in: containerSize, panelSize: panelSize)
+- Line 319:    private func clampedGuidedTourPanelOffset(
+- Line 324:        let margin: CGFloat = 12
+- Line 325:        let defaultOrigin = guidedTourDefaultPanelOrigin(in: containerSize, panelSize: panelSize)
+- Line 326:        let proposedOrigin = CGPoint(
+- Line 330:        let minX = margin
+- Line 331:        let maxX = max(minX, containerSize.width - panelSize.width - margin)
+- Line 332:        let minY = margin
+- Line 333:        let maxY = max(minY, containerSize.height - panelSize.height - margin)
+- Line 334:        let clampedOrigin = CGPoint(
+- Line 344:    var activeGuidedTourStage: FlowTrackOnboardingStage? {
+- Line 346:              let currentStage = onboardingManager.currentStage else {
+- Line 361:    func isGuidedTourStage(_ stage: FlowTrackOnboardingStage) -> Bool {
+- Line 365:    private var sidebar: some View {
+- Line 388:    private var sidebarBrandHeader: some View {
+- Line 395:    private func sidebarTabRow(_ tab: AppTab) -> some View {
+- Line 396:        let isSelected = (selectedTab ?? .capture) == tab
+- Line 421:    private var helpModeToggle: some View {
+- Line 451:    private var detailContent: some View {
+- Line 470:    private var reviewView: some View {
+- Line 471:        let reviewTitle = viewModel.recordingSummary?.displayTitle ?? "Edit"
+- Line 472:        let reviewSubtitle = viewModel.recordingSummary.map { "\($0.displaySubtitle) • \($0.bundleName)" } ?? "Review your latest capture"
+- Line 535:                    let safeAspectRatio = max(summary.videoAspectRatio, 0.1)
+- Line 536:                    let inspectorWidth: CGFloat = 320
+- Line 537:                    let activeInspectorWidth = isPlaybackInspectorVisible ? inspectorWidth : 0
+- Line 538:                    let contentWidth = max(geometry.size.width - activeInspectorWidth - (isPlaybackInspectorVisible ? 22 : 0), 320)
+- Line 539:                    let reservedBottomHeight: CGFloat = 132
+- Line 540:                    let totalVerticalSpacing: CGFloat = 16
+- Line 541:                    let maxVideoHeight = max(180, min(geometry.size.height - reservedBottomHeight - totalVerticalSpacing, geometry.size.height * 0.7))
+- Line 542:                    let minVideoHeight = min(280, maxVideoHeight)
+- Line 543:                    let defaultVideoHeight = min(max(contentWidth / safeAspectRatio, minVideoHeight), maxVideoHeight)
+- Line 544:                    let videoHeight = min(max(playbackVideoHeightOverride ?? defaultVideoHeight, minVideoHeight), maxVideoHeight)
+- SwiftUI State:
+- Line 13:    @Environment(\.colorScheme) var colorScheme
+- Line 14:    @Environment(\.flowTrackTheme) var flowTrackTheme
+- Line 15:    @Environment(\.flowTrackSavedThemes) var flowTrackSavedThemes
+- Line 16:    @Environment(\.flowTrackSelectedThemeID) var flowTrackSelectedThemeID
+- Line 17:    @Environment(\.flowTrackSelectedBuiltInThemeID) var flowTrackSelectedBuiltInThemeID
+- Line 18:    @Environment(\.flowTrackThemeActions) var flowTrackThemeActions
+- Line 19:    @StateObject var viewModel = CaptureSetupViewModel()
+- Line 20:    @State var onboardingManager = FlowTrackOnboardingManager()
+- Line 21:    @State private var guidedTourPanelOffset = CGSize(width: 0, height: 0)
+- Line 22:    @State private var guidedTourPanelDragStartOffset: CGSize?
+- Line 23:    @State private var isGuidedTourCollapsed = false
+- Line 24:    @State var selectedTab: AppTab? = .capture
+- Line 25:    @State private var playbackVideoHeightOverride: CGFloat?
+- Line 26:    @State var playbackVideoHeightDragOrigin: CGFloat?
+- Line 27:    @State var isPlaybackInspectorVisible = true
+- Line 28:    @State var isHelpModeEnabled = false
+- Line 29:    @State private var isPlaybackInfoPresented = false
+- Line 30:    @State private var playbackScrubTime = 0.0
+- Line 31:    @State private var hoveredReviewHeaderAction: ReviewHeaderAction?
+- Line 32:    @State private var isScrubbingPlayback = false
+- Line 33:    @State var suppressMarkerListAutoScrollUntil: Date?
+- Line 34:    @State private var draggedMarkerListID: String?
+- Line 35:    @State private var markerListDropTargetID: String?
+- Line 36:    @State private var markerListPreviewOrder: [String]?
+- Line 37:    @State var renamingMarkerID: String?
+- Line 38:    @State var markerNameDraft: String = ""
+- Line 39:    @State var renamingEffectMarkerID: String?
+- Line 40:    @State var effectMarkerNameDraft: String = ""
+- Line 41:    @State var hoveredTimelineMarkerID: String?
+- Line 42:    @State var hoveredEffectTimelineMarkerID: String?
+- Line 43:    @State var isDraggingTimeline = false
+- Line 44:    @State var inspectorFocusedTimingPhase: MarkerTimingPhase?
+- Line 45:    @State var hoveredTimelinePhase: MarkerTimingPhase?
+- Line 46:    @State var hoveredTimelineTooltipAnchor: CGPoint?
+- Line 47:    @State var hoveredEffectTimelineTooltipAnchor: CGPoint?
+- Line 48:    @State var exportShareAnchorView: NSView?
+- Line 49:    @State var isPlacingClickFocus = false
+- Line 50:    @State var pendingMarkerDragSourcePoint: CGPoint?
+- Line 51:    @State var activeClickPointPrecisionPoint: CGPoint?
+- Line 52:    @State var activeClickPointLoupeOffset: CGSize = .zero
+
+### App/FlowTrackCommands.swift
+- Lines: 146
+- Imports:
+- import SwiftUI
+- Types:
+- Line 3:struct FlowTrackCommandContext {
+- Line 36:extension FocusedValues {
+- Line 43:struct FlowTrackCommands: Commands {
+- Functions / Vars:
+- Line 4:    var isHelpModeEnabled: Bool
+- Line 5:    var canZoomTimelineIn: Bool
+- Line 6:    var canZoomTimelineOut: Bool
+- Line 7:    var canResetTimelineZoom: Bool
+- Line 8:    var isTimelineScrubSnappingEnabled: Bool
+- Line 9:    var canUsePlayback: Bool
+- Line 10:    var canJumpToStart: Bool
+- Line 11:    var canNudgePlayheadByFrame: Bool
+- Line 12:    var canGoToPreviousMarker: Bool
+- Line 13:    var canGoToNextMarker: Bool
+- Line 14:    var canDeleteSelectedMarker: Bool
+- Line 15:    var canDuplicateSelectedMarker: Bool
+- Line 16:    var startGuidedTour: () -> Void
+- Line 17:    var toggleHelpMode: () -> Void
+- Line 18:    var zoomTimelineIn: () -> Void
+- Line 19:    var zoomTimelineOut: () -> Void
+- Line 20:    var resetTimelineZoom: () -> Void
+- Line 21:    var toggleTimelineScrubSnapping: () -> Void
+- Line 22:    var togglePlayback: () -> Void
+- Line 23:    var jumpToStart: () -> Void
+- Line 24:    var nudgePlayheadBackwardOneFrame: () -> Void
+- Line 25:    var nudgePlayheadForwardOneFrame: () -> Void
+- Line 26:    var goToPreviousMarker: () -> Void
+- Line 27:    var goToNextMarker: () -> Void
+- Line 28:    var deleteSelectedMarker: () -> Void
+- Line 29:    var duplicateSelectedMarker: () -> Void
+- Line 37:    var flowTrackCommandContext: FlowTrackCommandContext? {
+- Line 46:    var body: some Commands {
+
+### App/TutorialCaptureApp.swift
+- Lines: 191
+- Imports:
+- import SwiftUI
+- Types:
+- Line 9:struct TutorialCaptureApp: App {
+- Functions / Vars:
+- Line 10:    private let themeStore = FlowTrackThemeStore()
+- Line 18:    var body: some Scene {
+- Line 52:    private var themeActions: FlowTrackThemeActions {
+- Line 64:    private func loadThemes() {
+- Line 65:        let library = themeStore.loadLibrary()
+- Line 72:           let savedTheme = savedThemes.first(where: { $0.id == selectedThemeID }) {
+- Line 80:    private func persistThemes() {
+- Line 81:        let library = FlowTrackThemeLibrary(
+- Line 90:    private func selectTheme(_ themeID: UUID?) {
+- Line 93:           let savedTheme = savedThemes.first(where: { $0.id == themeID }) {
+- Line 102:    private func selectBuiltInTheme(_ themeID: String) {
+- Line 109:    private func saveBuiltInOverride(id: String, theme: FlowTrackTheme) {
+- Line 118:    private func saveTheme(name: String, theme: FlowTrackTheme) {
+- Line 119:        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 121:        let finalName = uniqueThemeName(startingWith: trimmedName)
+- Line 123:        let now = Date()
+- Line 124:        let savedTheme = FlowTrackSavedTheme(
+- Line 138:    private func updateTheme(id: UUID, name: String, theme: FlowTrackTheme) {
+- Line 139:        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 141:              let index = savedThemes.firstIndex(where: { $0.id == id }) else {
+- Line 154:    private func deleteTheme(id: UUID) {
+- Line 164:    private func resetToBuiltInDefault() {
+- Line 171:    private func uniqueThemeName(startingWith name: String) -> String {
+- Line 172:        let baseName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 175:        let existingNames = Set(savedThemes.map { $0.name.lowercased() })
+- Line 180:        var index = 2
+- Line 187:    private func effectiveBuiltInTheme(withID id: String) -> FlowTrackTheme {
+- SwiftUI State:
+- Line 11:    @State private var activeFlowTrackTheme = FlowTrackThemeDefaults.standard
+- Line 12:    @State private var savedThemes: [FlowTrackSavedTheme] = []
+- Line 13:    @State private var selectedThemeID: UUID?
+- Line 14:    @State private var selectedBuiltInThemeID = flowTrackBuiltInThemeID
+- Line 15:    @State private var builtInThemeOverrides: [String: FlowTrackTheme] = [:]
+- Line 16:    @State private var isColourLabPresented = false
+

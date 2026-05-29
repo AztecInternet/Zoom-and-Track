@@ -1,0 +1,553 @@
+# Services Map
+
+Generated: 2026-05-29 12:01:48
+
+## Files
+
+### Services/CreatorEffectDefaultsService.swift
+- Lines: 64
+- Imports:
+- import Foundation
+- Types:
+- Line 8:struct CreatorEffectDefaultsService {
+- Functions / Vars:
+- Line 9:    private let fileManager: FileManager
+- Line 15:    func loadCreatorEffectDefaults() -> CreatorEffectDefaults {
+- Line 16:        let url: URL
+- Line 24:              let data = try? Data(contentsOf: url),
+- Line 25:              let defaults = try? JSONDecoder().decode(CreatorEffectDefaults.self, from: data) else {
+- Line 32:    func saveCreatorEffectDefaults(_ defaults: CreatorEffectDefaults) throws {
+- Line 33:        let directoryURL = try defaultsDirectoryURL()
+- Line 36:        let data = try JSONEncoder.creatorDefaultsEncoder.encode(defaults)
+- Line 40:    private func defaultsDirectoryURL() throws -> URL {
+- Line 41:        let applicationSupportURL = try fileManager.url(
+- Line 53:    private func defaultsFileURL() throws -> URL {
+- Line 59:    static let creatorDefaultsEncoder: JSONEncoder = {
+- Line 60:        let encoder = JSONEncoder()
+
+### Services/FlowTrackThemeStore.swift
+- Lines: 60
+- Imports:
+- import Foundation
+- Types:
+- Line 3:struct FlowTrackThemeStore {
+- Functions / Vars:
+- Line 4:    private let fileManager: FileManager
+- Line 5:    private let encoder: JSONEncoder
+- Line 6:    private let decoder: JSONDecoder
+- Line 17:    var storageURL: URL {
+- Line 19:            let supportURL = try fileManager.url(
+- Line 25:            let directoryURL = supportURL.appendingPathComponent("FlowTrack Capture", isDirectory: true)
+- Line 31:    func loadLibrary() -> FlowTrackThemeLibrary {
+- Line 33:            let url = try storageURL
+- Line 37:            let data = try Data(contentsOf: url)
+- Line 38:            var library = try decoder.decode(FlowTrackThemeLibrary.self, from: data)
+- Line 47:            let builtInIDs = Set(FlowTrackThemeDefaults.builtInThemes.map(\.id))
+- Line 55:    func saveLibrary(_ library: FlowTrackThemeLibrary) throws {
+- Line 56:        let data = try encoder.encode(library)
+- Line 57:        let url = try storageURL
+
+### Services/InputEventCaptureService.swift
+- Lines: 141
+- Imports:
+- import AppKit
+- import CoreMedia
+- import Foundation
+- Functions / Vars:
+- Line 13:        let type: RecordedEventType
+- Line 14:        let uptime: TimeInterval
+- Line 15:        let x: Double
+- Line 16:        let y: Double
+- Line 19:    private let maxCursorSampleRate: TimeInterval = 1.0 / 15.0
+- Line 21:    private var leftMouseDownMonitor: Any?
+- Line 22:    private var leftMouseUpMonitor: Any?
+- Line 23:    private var rightMouseDownMonitor: Any?
+- Line 24:    private var rightMouseUpMonitor: Any?
+- Line 25:    private var cursorTimer: Timer?
+- Line 27:    private var pendingEvents: [PendingEvent] = []
+- Line 28:    private var lastCursorPosition: CGPoint?
+- Line 29:    private var sessionStartUptime: TimeInterval?
+- Line 31:    func start() {
+- Line 60:                let location = NSEvent.mouseLocation
+- Line 61:                let uptime = ProcessInfo.processInfo.systemUptime
+- Line 70:    func setSessionStart(videoTimestamp: CMTime, uptime: TimeInterval) {
+- Line 75:    func stop() {
+- Line 89:    func finish() -> [RecordedEvent] {
+- Line 90:        let events = pendingEvents.compactMap(makeRecordedEvent(from:))
+- Line 100:    func cancel() {
+- Line 107:    private func recordMouseEvent(type: RecordedEventType, event: NSEvent) {
+- Line 111:    private func recordCursorMoveIfNeeded(at location: CGPoint, uptime: TimeInterval) {
+- Line 117:    private func appendPendingEvent(type: RecordedEventType, location: CGPoint, uptime: TimeInterval) {
+- Line 128:    private func makeRecordedEvent(from pendingEvent: PendingEvent) -> RecordedEvent? {
+- Line 131:        let relativeTimestamp = pendingEvent.uptime - sessionStartUptime
+
+### Services/MarkerPreviewCacheService.swift
+- Lines: 415
+- Imports:
+- import AVFoundation
+- import CryptoKit
+- import Foundation
+- Functions / Vars:
+- Line 6:    private let fileManager = FileManager.default
+- Line 7:    private let cacheLifetime: TimeInterval = 7 * 24 * 60 * 60
+- Line 8:    private let previewRenderVersion = 18
+- Line 10:    func cachedPreview(
+- Line 15:        let cacheURL = try await cacheURL(for: recordingURL, summary: summary, marker: marker)
+- Line 25:        let bounds = previewBounds(for: marker)
+- Line 34:    func cachedEffectPreview(
+- Line 39:        let cacheURL = try await effectCacheURL(for: recordingURL, summary: summary, marker: marker)
+- Line 49:        let bounds = previewBounds(for: marker)
+- Line 58:    func storePreview(
+- Line 64:        let cacheURL = try await cacheURL(for: recordingURL, summary: summary, marker: marker)
+- Line 78:    func storeEffectPreview(
+- Line 84:        let cacheURL = try await effectCacheURL(for: recordingURL, summary: summary, marker: marker)
+- Line 98:    func pruneStaleFiles() {
+- Line 107:        let expirationDate = Date().addingTimeInterval(-cacheLifetime)
+- Line 111:                let resourceValues = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey]),
+- Line 123:    private var cacheDirectoryURL: URL {
+- Line 124:        let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first ?? fileManager.temporaryDirectory
+- Line 130:    private func ensureCacheDirectoryExists() throws {
+- Line 134:    private func cacheURL(
+- Line 140:        let key = try await cacheKey(for: recordingURL, summary: summary, marker: marker)
+- Line 146:    private func effectCacheURL(
+- Line 152:        let key = try await effectCacheKey(for: recordingURL, summary: summary, marker: marker)
+- Line 158:    private func cacheKey(
+- Line 163:        let fileAttributes = try fileManager.attributesOfItem(atPath: recordingURL.path)
+- Line 164:        let fileModificationDate = (fileAttributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+- Line 165:        let fileSize = (fileAttributes[.size] as? NSNumber)?.int64Value ?? 0
+- Line 166:        let renderSize = try await renderSize(for: recordingURL)
+- Line 168:        let keyMaterial = [
+- Line 201:        let digest = SHA256.hash(data: Data(keyMaterial.utf8))
+- Line 205:    private func effectCacheKey(
+- Line 210:        let fileAttributes = try fileManager.attributesOfItem(atPath: recordingURL.path)
+- Line 211:        let fileModificationDate = (fileAttributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+- Line 212:        let fileSize = (fileAttributes[.size] as? NSNumber)?.int64Value ?? 0
+- Line 213:        let renderSize = try await renderSize(for: recordingURL)
+- Line 215:        let keyMaterial = [
+- Line 250:        let digest = SHA256.hash(data: Data(keyMaterial.utf8))
+- Line 254:    private func effectCacheSignature(for effectMarkers: [EffectPlanItem]) -> String {
+- Line 292:    private func distortionSignature(for distortion: DistortionConfiguration?) -> String {
+- Line 294:        let presetReference: String
+- Line 303:        let mapSource: String
+- Line 326:    private func zoomCacheSignature(for zoomMarkers: [ZoomPlanItem]) -> String {
+- Line 361:    private func renderSize(for recordingURL: URL) async throws -> CGSize {
+- Line 362:        let asset = AVURLAsset(url: recordingURL)
+- Line 363:        let tracks = try await asset.loadTracks(withMediaType: .video)
+- Line 371:        let naturalSize = try await track.load(.naturalSize)
+- Line 372:        let preferredTransform = try await track.load(.preferredTransform)
+- Line 373:        let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+- Line 374:        let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+- Line 385:    private func cappedRenderSize(for sourceSize: CGSize, maxWidth: CGFloat) -> CGSize {
+- Line 387:        let scale = maxWidth / sourceSize.width
+- Line 391:    private func previewBounds(for marker: ZoomPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 392:        let startTime = max(0, marker.startTime)
+- Line 401:    private func previewBounds(for marker: EffectPlanItem) -> (startTime: Double, endTime: Double) {
+- Line 408:    private func isPlayablePreview(at url: URL) async throws -> Bool {
+- Line 409:        let asset = AVURLAsset(url: url)
+- Line 410:        let tracks = try await asset.loadTracks(withMediaType: .video)
+- Line 412:        let duration = try await asset.load(.duration)
+
+### Services/MarkerPreviewRenderService.swift
+- Lines: 2364
+- Imports:
+- import AppKit
+- import CoreGraphics
+- import CoreImage
+- import Foundation
+- Types:
+- Line 33:struct RenderedMarkerPreview {
+- Line 636:enum ExportRenderPhase {
+- Line 642:struct ExportRenderResult {
+- Functions / Vars:
+- Line 8:    let red: CIImage?
+- Line 9:    let blue: CIImage?
+- Line 10:    let cyan: CIImage?
+- Line 13:private let distortionColorMaskContext = CIContext()
+- Line 14:private let distortionColorMaskCache = DistortionColorMaskCache()
+- Line 17:    private let lock = NSLock()
+- Line 18:    private var storage: [String: DistortionImportedColorMaskSet] = [:]
+- Line 20:    func value(for key: String) -> DistortionImportedColorMaskSet? {
+- Line 26:    func store(_ value: DistortionImportedColorMaskSet, for key: String) {
+- Line 34:    let outputURL: URL
+- Line 35:    let sourceStartTime: Double
+- Line 36:    let sourceEndTime: Double
+- Line 37:    let deleteWhenFinished: Bool
+- Line 41:    private let ciContext = CIContext()
+- Line 42:    private let previewPaddingBefore: Double = 0.10
+- Line 43:    private let previewPaddingAfter: Double = 0.10
+- Line 44:    private let projectBundleService = ProjectBundleService()
+- Line 45:    private var importedDistortionMapCache: [String: CIImage] = [:]
+- Line 47:    private func importedDistortionMapImage(for mapID: String) -> CIImage? {
+- Line 53:              let image = CIImage(contentsOf: mapURL) else {
+- Line 61:    func renderPreview(
+- Line 66:        let asset = AVURLAsset(url: recordingURL)
+- Line 67:        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+- Line 76:        let audioTrack = try await asset.loadTracks(withMediaType: .audio).first
+- Line 77:        let naturalSize = try await sourceVideoTrack.load(.naturalSize)
+- Line 78:        let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+- Line 79:        let nominalFrameRate = try await sourceVideoTrack.load(.nominalFrameRate)
+- Line 80:        let assetDuration = try await asset.load(.duration).seconds
+- Line 82:        let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+- Line 83:        let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+- Line 92:        let baseOrientationTransform = preferredTransform.concatenating(
+- Line 95:        let outputSize = cappedRenderSize(for: orientedSize, maxWidth: 1440)
+- Line 96:        let previewBounds = SharedMotionEngine.previewBounds(for: selectedMarker)
+- Line 97:        let sourceStartTime = max(0, previewBounds.startTime - previewPaddingBefore)
+- Line 98:        let sourceEndTime = min(
+- Line 102:        let sourceTimeRange = CMTimeRange(
+- Line 107:        let composition = AVMutableComposition()
+- Line 121:           let compositionAudioTrack = composition.addMutableTrack(
+- Line 128:        let frameRate = max(nominalFrameRate.isFinite && nominalFrameRate > 0 ? nominalFrameRate : 30, 30)
+- Line 129:        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(frameRate.rounded()))
+- Line 130:        let outputRect = CGRect(origin: .zero, size: outputSize)
+- Line 131:        let baseScale = outputSize.width / orientedSize.width
+- Line 132:        let markers = summary.zoomMarkers
+- Line 133:        let effectMarkers = summary.effectMarkers
+- Line 134:        let contentCoordinateSize = summary.contentCoordinateSize
+- Line 141:        let videoComposition = try await AVVideoComposition.videoComposition(with: composition) { [weak self] request in
+- Line 147:            let sourceTime = sourceStartTime + request.compositionTime.seconds
+- Line 148:            let previewState = SharedMotionEngine.activeZoomState(
+- Line 155:            var image = request.sourceImage.transformed(by: baseOrientationTransform)
+- Line 158:            let pulseImage = makeClickPulseOverlay(
+- Line 167:                let offset = SharedMotionEngine.previewOffset(for: previewState, outputSize: outputSize)
+- Line 172:            let effectImage = makeEffectOverlay(
+- Line 183:            var outputImage = image.cropped(to: outputRect)
+- Line 194:        let outputURL = FileManager.default.temporaryDirectory
+- Line 228:    func renderEffectPreview(
+- Line 233:        let asset = AVURLAsset(url: recordingURL)
+- Line 234:        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+- Line 243:        let audioTrack = try await asset.loadTracks(withMediaType: .audio).first
+- Line 244:        let naturalSize = try await sourceVideoTrack.load(.naturalSize)
+- Line 245:        let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+- Line 246:        let nominalFrameRate = try await sourceVideoTrack.load(.nominalFrameRate)
+- Line 247:        let assetDuration = try await asset.load(.duration).seconds
+- Line 249:        let orientedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+- Line 250:        let orientedSize = CGSize(width: abs(orientedRect.width), height: abs(orientedRect.height))
+- Line 259:        let baseOrientationTransform = preferredTransform.concatenating(
+- Line 262:        let outputSize = cappedRenderSize(for: orientedSize, maxWidth: 1440)
+- Line 263:        let previewBounds = effectPreviewBounds(for: selectedMarker)
+- Line 264:        let sourceStartTime = max(0, previewBounds.startTime - previewPaddingBefore)
+- Line 265:        let sourceEndTime = min(
+- Line 269:        let sourceTimeRange = CMTimeRange(
+- Line 274:        let composition = AVMutableComposition()
+- Line 288:           let compositionAudioTrack = composition.addMutableTrack(
+- Line 295:        let frameRate = max(nominalFrameRate.isFinite && nominalFrameRate > 0 ? nominalFrameRate : 30, 30)
+- Line 296:        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(frameRate.rounded()))
+- Line 297:        let outputRect = CGRect(origin: .zero, size: outputSize)
+- Line 298:        let baseScale = outputSize.width / orientedSize.width
+- Line 299:        let markers = summary.zoomMarkers
+- Line 300:        let effectMarkers = summary.effectMarkers
+- Line 301:        let contentCoordinateSize = summary.contentCoordinateSize
+- Line 303:        let videoComposition = try await AVVideoComposition.videoComposition(with: composition) { [weak self] request in
+
+### Services/MediaWriterService.swift
+- Lines: 111
+- Imports:
+- import CoreMedia
+- import ScreenCaptureKit
+- Functions / Vars:
+- Line 11:    private var writer: AVAssetWriter?
+- Line 12:    private var writerInput: AVAssetWriterInput?
+- Line 13:    private var adaptor: AVAssetWriterInputPixelBufferAdaptor?
+- Line 14:    private var didStartSession = false
+- Line 16:    var onSessionStart: ((CMTime, TimeInterval) -> Void)?
+- Line 18:    func startWriting(to url: URL, width: Int, height: Int) throws {
+- Line 19:        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+- Line 20:        let outputSettings: [String: Any] = [
+- Line 26:        let writerInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
+- Line 29:        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+- Line 55:    func append(sampleBuffer: CMSampleBuffer) throws {
+- Line 61:        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+- Line 78:    func finishWriting() async throws {
+- Line 88:    func cancelWriting() {
+- Line 99:    private func isCompleteFrame(_ sampleBuffer: CMSampleBuffer) -> Bool {
+- Line 101:              let attachments = attachmentsArray.first,
+- Line 102:              let statusValue = attachments[.status] as? Int,
+- Line 103:              let status = SCFrameStatus(rawValue: statusValue) else {
+
+### Services/PermissionsService.swift
+- Lines: 17
+- Imports:
+- import CoreGraphics
+- import Foundation
+- Types:
+- Line 9:struct PermissionsService {
+- Functions / Vars:
+- Line 10:    func hasScreenRecordingPermission() -> Bool {
+- Line 14:    func requestScreenRecordingPermission() -> Bool {
+
+### Services/ProjectBundleService.swift
+- Lines: 1115
+- Imports:
+- import AppKit
+- import AVFoundation
+- import CryptoKit
+- import CoreGraphics
+- import Foundation
+- import ImageIO
+- import UniformTypeIdentifiers
+- Types:
+- Line 14:struct ProjectBundleService {
+- Line 22:    enum OutputDirectoryResolution {
+- Line 28:    enum RecordingBundleResolution {
+- Functions / Vars:
+- Line 15:    private let fileManager = FileManager.default
+- Line 16:    private let selectedOutputFolderBookmarkKey = "SelectedOutputFolderBookmark"
+- Line 17:    private let lastRecordingBundleBookmarkKey = "LastRecordingBundleBookmark"
+- Line 18:    private let lastRecordingBundlePathKey = "LastRecordingBundlePath"
+- Line 19:    private let libraryIndexFileName = "library-index.json"
+- Line 20:    private let manifestFileNames = ["manifest.json", "project.json"]
+- Line 34:    func createWorkspace(outputDirectory: URL? = nil, captureMetadata: CaptureMetadata) throws -> RecordingWorkspace {
+- Line 35:        let timestamp = Self.bundleTimestampFormatter.string(from: Date())
+- Line 36:        let bundleName = "cap_\(timestamp)_\(UUID().uuidString.prefix(6).lowercased())"
+- Line 37:        let tempRoot = fileManager.temporaryDirectory
+- Line 42:        let finalBase: URL
+- Line 43:        let requiresSecurityScopedAccess: Bool
+- Line 44:        let securityScopedOutputDirectoryURL: URL?
+- Line 63:            let capturesDirectory = try libraryCapturesDirectory(
+- Line 68:            let exportsDirectory = capturesDirectory.deletingLastPathComponent().appendingPathComponent("Exports", isDirectory: true)
+- Line 76:        let capturesDirectory = try libraryCapturesDirectory(
+- Line 81:        let finalProjectURL = uniqueProjectURL(baseDirectory: capturesDirectory, projectName: bundleName)
+- Line 92:    func finalizeWorkspace(_ workspace: RecordingWorkspace, manifest: ProjectManifest, events: [RecordedEvent]) throws -> URL {
+- Line 100:            let finalRecordingURL = workspace.finalProjectURL.appendingPathComponent("recording.mov")
+- Line 103:            let projectData = try JSONEncoder.manifestEncoder.encode(manifest)
+- Line 107:            let envelope = RecordedEventEnvelope(
+- Line 112:            let eventsData = try JSONEncoder.eventsEncoder.encode(envelope)
+- Line 115:            let zoomPlan = generateZoomPlan(from: events, captureSource: manifest.captureSource)
+- Line 116:            let zoomPlanData = try JSONEncoder.zoomPlanEncoder.encode(zoomPlan)
+- Line 126:    func cleanupWorkspace(_ workspace: RecordingWorkspace?) {
+- Line 135:    func chooseOutputDirectory() -> URL? {
+- Line 136:        let panel = NSOpenPanel()
+- Line 155:    func resolvedSelectedOutputDirectory() -> URL? {
+- Line 164:    func resolveSelectedOutputDirectory() -> OutputDirectoryResolution {
+- Line 169:        var isStale = false
+- Line 172:            let url = try URL(
+- Line 199:    func openRecordingBundle() -> URL? {
+- Line 200:        let panel = NSOpenPanel()
+- Line 218:    func loadDistortionPresetLibrary() throws -> DistortionPresetLibrary {
+- Line 219:        let libraryURL = try distortionPresetLibraryFileURL()
+- Line 224:        let data = try Data(contentsOf: libraryURL)
+- Line 228:    func saveDistortionPresetLibrary(_ library: DistortionPresetLibrary) throws {
+- Line 230:        let data = try JSONEncoder.manifestEncoder.encode(library)
+- Line 234:    func chooseDistortionMapImage() -> URL? {
+- Line 235:        let panel = NSOpenPanel()
+- Line 245:    func importDistortionMap(from sourceURL: URL, suggestedName: String? = nil) throws -> DistortionImportedMapAsset {
+- Line 248:        let data = try Data(contentsOf: sourceURL)
+- Line 249:        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+- Line 250:        let mapID = UUID().uuidString.lowercased()
+- Line 251:        let fileExtension = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension.lowercased()
+- Line 252:        let fileName = "\(mapID).\(fileExtension)"
+- Line 253:        let destinationURL = try distortionPresetMapsDirectoryURL().appendingPathComponent(fileName)
+- Line 256:        let trimmedSuggestedName = suggestedName?.trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 257:        let displayName = (trimmedSuggestedName?.isEmpty == false ? trimmedSuggestedName : sourceURL.deletingPathExtension().lastPathComponent) ?? "Imported Map"
+- Line 258:        let dimensions = distortionMapPixelSize(for: destinationURL)
+- Line 270:    func distortionImportedMapURL(for mapID: String, in library: DistortionPresetLibrary? = nil) throws -> URL? {
+- Line 271:        let resolvedLibrary = try library ?? loadDistortionPresetLibrary()
+- Line 275:        let url = try distortionPresetMapsDirectoryURL().appendingPathComponent(asset.fileName)
+- Line 279:    func loadRecordingInspection(from bundleURL: URL) async throws -> RecordingInspectionSummary {
+- Line 280:        let accessURL = try beginPlaybackAccess(for: bundleURL)
+- Line 289:        let manifestURL = try resolveManifestURL(in: bundleURL)
+- Line 294:        let manifestData = try Data(contentsOf: manifestURL)
+- Line 295:        let manifest = try JSONDecoder.manifestDecoder.decode(ProjectManifest.self, from: manifestData)
+- Line 297:        let recordingURL = bundleURL.appendingPathComponent(manifest.recordingFileName)
+- Line 302:        let eventsURL = bundleURL.appendingPathComponent(manifest.eventFileName)
+- Line 303:        let envelope = loadEventsEnvelope(from: eventsURL)
+- Line 304:        let zoomPlanURL = bundleURL.appendingPathComponent("zoomPlan.json")
+- Line 305:        let zoomPlan = try loadOrCreateZoomPlan(from: zoomPlanURL, events: envelope.events, captureSource: manifest.captureSource)
+- Line 307:        let asset = AVURLAsset(url: recordingURL)
+- Line 308:        let durationTime = try await asset.load(.duration)
+- Line 309:        let videoPixelSize = try await loadVideoPixelSize(from: asset)
+- Line 310:        let videoAspectRatio = try await loadVideoAspectRatio(from: asset)
+- Line 311:        let durationSeconds = CMTimeGetSeconds(durationTime)
+- Line 312:        let duration = durationSeconds.isFinite ? durationSeconds : nil
+- Line 344:    func loadRecordedEventEnvelope(from bundleURL: URL) throws -> RecordedEventEnvelope {
+- Line 345:        let accessURL = try beginPlaybackAccess(for: bundleURL)
+- Line 354:        let manifestURL = try resolveManifestURL(in: bundleURL)
+- Line 359:        let manifestData = try Data(contentsOf: manifestURL)
+- Line 360:        let manifest = try JSONDecoder.manifestDecoder.decode(ProjectManifest.self, from: manifestData)
+- Line 361:        let eventsURL = bundleURL.appendingPathComponent(manifest.eventFileName)
+- Line 365:    func loadRecordedEvents(from bundleURL: URL) throws -> [RecordedEvent] {
+- Line 369:    func persistLastRecordingBundle(_ url: URL) -> Bool {
+- Line 377:    func resolveLastRecordingBundle() -> RecordingBundleResolution {
+- Line 390:            let url = URL(fileURLWithPath: path)
+- Line 399:    func beginPlaybackAccess(for bundleURL: URL) throws -> URL? {
+
+### Services/RecordingCoordinator.swift
+- Lines: 199
+- Imports:
+- import Foundation
+- Functions / Vars:
+- Line 10:    var onStateChange: ((RecordingSessionState, String) -> Void)?
+- Line 11:    var onSummaryAvailable: ((RecordingInspectionSummary) -> Void)?
+- Line 12:    var onPlaybackLoadFailure: ((String) -> Void)?
+- Line 14:    private let screenCaptureService: ScreenCaptureService
+- Line 15:    private let mediaWriterService: MediaWriterService
+- Line 16:    private let projectBundleService: ProjectBundleService
+- Line 17:    private let inputEventCaptureService: InputEventCaptureService
+- Line 19:    private var workspace: RecordingWorkspace?
+- Line 20:    private var currentTarget: ShareableCaptureTarget?
+- Line 21:    private var currentCaptureMetadata: CaptureMetadata?
+- Line 22:    private var currentCompositionLayout: CompositionLayout?
+- Line 23:    private var isStopping = false
+- Line 37:    func startRecording(
+- Line 47:            let workspace = try projectBundleService.createWorkspace(
+- Line 92:    func stopRecording() async {
+- Line 106:            let finalURL = try await finalizeProject()
+- Line 113:    private func finalizeProject() async throws -> URL {
+- Line 118:        let now = Date()
+- Line 120:        let manifest = ProjectManifest(
+- Line 147:        let events = inputEventCaptureService.finish()
+- Line 148:        let finalURL = try projectBundleService.finalizeWorkspace(workspace, manifest: manifest, events: events)
+- Line 151:            let summary = try await projectBundleService.loadRecordingInspection(from: finalURL)
+- Line 154:            let recordingURL = finalURL.appendingPathComponent("recording.mov")
+- Line 161:    private func handleStreamError(_ error: Error) async {
+- Line 165:            let message = "Selected window is no longer available."
+- Line 172:    private func handleFailure(_ error: Error, overrideMessage: String? = nil) async {
+- Line 182:        let message = overrideMessage ?? error.localizedDescription
+- Line 187:    private func reset() {
+- Line 196:    private func update(_ state: RecordingSessionState, message: String) {
+
+### Services/ScreenCaptureService.swift
+- Lines: 191
+- Imports:
+- import AppKit
+- import CoreMedia
+- import ScreenCaptureKit
+- Types:
+- Line 182:extension ScreenCaptureService: SCStreamOutput, SCStreamDelegate {
+- Functions / Vars:
+- Line 11:    private let minimumWindowTargetDimension = 300.0
+- Line 12:    private let ignoredDisplayTitlePatterns: [String] = [
+- Line 15:    private let ignoredWindowTitlePatterns: [String] = [
+- Line 19:    private let sampleQueue = DispatchQueue(label: "TutorialCapture.ScreenCapture")
+- Line 20:    private var stream: SCStream?
+- Line 21:    private var onSampleBuffer: ((CMSampleBuffer) -> Void)?
+- Line 22:    private var onStreamStop: ((Error?) -> Void)?
+- Line 24:    func fetchTargets() async throws -> (displays: [ShareableCaptureTarget], windows: [ShareableCaptureTarget]) {
+- Line 25:        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+- Line 26:        let screensByID = Dictionary(uniqueKeysWithValues: NSScreen.screens.compactMap { screen -> (UInt32, NSScreen)? in
+- Line 33:        let displays = content.displays.compactMap { display -> ShareableCaptureTarget? in
+- Line 34:            let screen = screensByID[display.displayID]
+- Line 35:            let width = screen.map { Int($0.frame.width * $0.backingScaleFactor) } ?? Int(display.width) * 2
+- Line 36:            let height = screen.map { Int($0.frame.height * $0.backingScaleFactor) } ?? Int(display.height) * 2
+- Line 37:            let title = screen?.localizedName ?? "Display \(display.displayID)"
+- Line 38:            let normalizedTitle = normalizedTargetName(title)
+- Line 39:            let shouldInclude = shouldIncludeDisplayTarget(named: title)
+- Line 42:            let frame = screen?.frame ?? .zero
+- Line 43:            let scaleFactor = screen?.backingScaleFactor ?? 2.0
+- Line 65:        let windows = content.windows
+- Line 72:                let rawTitle = window.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+- Line 73:                let title = rawTitle.isEmpty ? "Untitled Window" : rawTitle
+- Line 74:                let ownerName = window.owningApplication?.applicationName
+- Line 75:                let normalizedTitle = normalizedTargetName(title)
+- Line 76:                let shouldInclude = shouldIncludeWindowTarget(named: title, ownerName: ownerName)
+- Line 79:                let owningApplication = window.owningApplication
+- Line 80:                let appName = owningApplication?.applicationName
+- Line 81:                let width = max(Int(window.frame.width * 2), 1)
+- Line 82:                let height = max(Int(window.frame.height * 2), 1)
+- Line 83:                let scaleFactor = window.frame.width > 0 ? Double(width) / Double(window.frame.width) : 2.0
+- Line 108:    func startCapture(
+- Line 113:        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+- Line 114:        let filter = try makeFilter(for: target, content: content)
+- Line 115:        let configuration = SCStreamConfiguration()
+- Line 127:        let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
+- Line 133:    func stopCapture() async throws {
+- Line 141:    private func makeFilter(for target: ShareableCaptureTarget, content: SCShareableContent) throws -> SCContentFilter {
+- Line 157:    private func shouldIncludeDisplayTarget(named title: String) -> Bool {
+- Line 158:        let normalizedTitle = normalizedTargetName(title)
+- Line 162:    private func shouldIncludeWindowTarget(named title: String, ownerName: String?) -> Bool {
+- Line 163:        let normalizedTitle = normalizedTargetName(title)
+- Line 164:        let normalizedOwnerName = normalizedTargetName(ownerName ?? "")
+- Line 177:    private func normalizedTargetName(_ title: String) -> String {
+- Line 183:    func stream(_ stream: SCStream, didStopWithError error: any Error) {
+- Line 187:    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
+
+### Services/SmartSetupSuggestionService.swift
+- Lines: 444
+- Imports:
+- import CoreGraphics
+- import Foundation
+- Types:
+- Line 4:struct SmartSetupSuggestionService {
+- Functions / Vars:
+- Line 6:        static let maxZoomAdjustmentSuggestions = 8
+- Line 7:        static let maxPauseSuggestions = 18
+- Line 8:        static let maxRepeatedZoneSuggestions = 6
+- Line 9:        static let zoomSequenceMinimumMarkers = 3
+- Line 10:        static let zoomSequenceMaximumGap = 4.0
+- Line 11:        static let zoomSequenceAreaTolerance = 0.12
+- Line 12:        static let existingZoomTimeTolerance = 0.65
+- Line 13:        static let existingEffectTimeTolerance = 0.80
+- Line 14:        static let minimumCursorPauseDuration = 0.85
+- Line 15:        static let maximumCursorPauseDuration = 6.0
+- Line 16:        static let pauseMovementTolerance: Double = 28
+- Line 17:        static let pauseEffectLeadIn = 0.20
+- Line 18:        static let pauseEffectTail = 0.35
+- Line 19:        static let repeatedZoneMinimumEvents = 3
+- Line 20:        static let repeatedZoneMinimumDuration = 2.0
+- Line 21:        static let repeatedZoneCellSize: CGFloat = 180
+- Line 22:        static let repeatedZoneMaximumDuration = 7.0
+- Line 25:    func generateSuggestions(
+- Line 32:        let safeDuration = max(duration, 0)
+- Line 33:        let safeContentSize = CGSize(
+- Line 37:        let sortedEvents = events.sorted { lhs, rhs in
+- Line 44:        var suggestions: [SmartSetupSuggestion] = []
+- Line 64:            let lhsTime = lhs.sourceTimeRange?.startTime ?? lhs.sourceEvents.first?.timestamp ?? 0
+- Line 65:            let rhsTime = rhs.sourceTimeRange?.startTime ?? rhs.sourceEvents.first?.timestamp ?? 0
+- Line 73:    private func zoomMarkerAdjustmentSuggestions(
+- Line 77:        let clickMarkers = existingZoomMarkers
+- Line 82:        var suggestions: [SmartSetupSuggestion] = []
+- Line 83:        var currentGroup: [ZoomPlanItem] = []
+- Line 85:        func flushCurrentGroup() {
+- Line 87:                  let first = currentGroup.first,
+- Line 88:                  let last = currentGroup.last else {
+- Line 93:            let proposal = SmartSetupZoomMarkerAdjustmentProposal(
+- Line 103:            let scoreValue = min(0.92, 0.52 + (Double(currentGroup.count) * 0.09))
+- Line 104:            let center = averagePoint(for: currentGroup, contentCoordinateSize: contentCoordinateSize)
+- Line 141:            let timeGap = marker.sourceEventTimestamp - previous.sourceEventTimestamp
+- Line 142:            let areaDistance = normalizedDistance(from: previous, to: marker, contentCoordinateSize: contentCoordinateSize)
+- Line 159:    private func cursorPauseSuggestions(
+- Line 165:        let cursorEvents = events.filter { $0.type == .cursorMoved }
+- Line 168:        var suggestions: [SmartSetupSuggestion] = []
+- Line 171:            let previous = pair.0
+- Line 172:            let next = pair.1
+- Line 173:            let pauseDuration = next.timestamp - previous.timestamp
+- Line 181:            let point = clampedContentPoint(for: previous, contentCoordinateSize: contentCoordinateSize)
+- Line 182:            let proposal = effectProposal(
+- Line 190:            let scoreValue = min(0.92, 0.52 + (pauseDuration / 5.0))
+- Line 191:            let score = SmartSetupCandidateScore(
+- Line 222:    private func repeatedActivityZoneSuggestions(
+- Line 229:        let activityEvents = events.filter { event in
+- Line 234:        let groupedEvents = Dictionary(grouping: activityEvents) { event in
+- Line 238:        var candidates: [(key: String, events: [RecordedEvent])] = groupedEvents.compactMap { key, events in
+- Line 239:            let sorted = events.sorted { $0.timestamp < $1.timestamp }
+- Line 241:                  let first = sorted.first,
+- Line 242:                  let last = sorted.last,
+- Line 255:        var suggestions: [SmartSetupSuggestion] = []
+- Line 259:            let startTime = first.timestamp
+- Line 260:            let endTime = min(last.timestamp, startTime + Tuning.repeatedZoneMaximumDuration)
+- Line 264:            let center = averagePoint(for: candidate.events, contentCoordinateSize: contentCoordinateSize)
+- Line 265:            let proposal = effectProposal(
+- Line 273:            let scoreValue = min(0.88, 0.48 + (Double(candidate.events.count) * 0.08))
+- Line 274:            let score = SmartSetupCandidateScore(
+- Line 305:    private func effectProposal(
+- Line 313:        let normalizedCenter = normalizedPoint(center, contentCoordinateSize: contentCoordinateSize)
+- Line 314:        let safeEndTime = max(endTime, startTime + 0.40)
+- Line 315:        let safeHoldStart = min(max(startTime + 0.18, startTime), safeEndTime)
+- Line 316:        let safeHoldEnd = min(max(holdEndTime, safeHoldStart), safeEndTime)
+- Line 342:    private func hasNearbyZoomMarker(at time: Double, existingZoomMarkers: [ZoomPlanItem]) -> Bool {
+- Line 348:    private func hasNearbyEffectMarker(at time: Double, existingEffectMarkers: [EffectPlanItem]) -> Bool {
+- Line 355:    private func hasNearbySuggestion(at time: Double, in suggestions: [SmartSetupSuggestion]) -> Bool {
+- Line 358:            let suggestionTime = suggestion.sourceTimeRange?.startTime ?? suggestion.sourceEvents.first?.timestamp ?? 0
+- Line 363:    private func clampedContentPoint(for event: RecordedEvent, contentCoordinateSize: CGSize) -> CGPoint {
+- Line 370:    private func averagePoint(for events: [RecordedEvent], contentCoordinateSize: CGSize) -> CGPoint {
+- Line 372:        let total = events.reduce(CGPoint.zero) { partialResult, event in
+- Line 373:            let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
+- Line 379:    private func averagePoint(for markers: [ZoomPlanItem], contentCoordinateSize: CGSize) -> CGPoint {
+- Line 381:        let total = markers.reduce(CGPoint.zero) { partialResult, marker in
+- Line 382:            let point = contentPoint(for: marker, contentCoordinateSize: contentCoordinateSize)
+- Line 388:    private func normalizedDistance(from lhs: ZoomPlanItem, to rhs: ZoomPlanItem, contentCoordinateSize: CGSize) -> Double {
+- Line 389:        let lhsPoint = normalizedPoint(contentPoint(for: lhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
+- Line 390:        let rhsPoint = normalizedPoint(contentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
+- Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
+
