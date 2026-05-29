@@ -32,6 +32,88 @@ struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
             existingZoomMarkers: context.existingZoomMarkers,
             existingEffectMarkers: context.existingEffectMarkers
         )
+        .map { suggestion in
+            var markedSuggestion = suggestion
+            markedSuggestion.providerID = providerID
+            return markedSuggestion
+        }
+    }
+}
+
+struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
+    let providerID = "templates"
+
+    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+        guard context.duration > 2.0,
+              context.existingZoomMarkers.isEmpty,
+              context.existingEffectMarkers.isEmpty else {
+            return []
+        }
+
+        let safeContentSize = CGSize(
+            width: max(context.contentCoordinateSize.width, 1),
+            height: max(context.contentCoordinateSize.height, 1)
+        )
+        let sourceTime = min(max(context.duration * 0.15, 1.0), max(context.duration - 0.5, 1.0))
+        let centerX = safeContentSize.width / 2
+        let centerY = safeContentSize.height / 2
+        let proposal = SmartSetupZoomMarkerProposal(
+            sourceEventTimestamp: sourceTime,
+            rawX: nil,
+            rawY: nil,
+            centerX: centerX,
+            centerY: centerY,
+            zoomScale: 1.5,
+            leadInTime: 0.35,
+            zoomInDuration: 0.45,
+            holdDuration: 0.75,
+            zoomOutDuration: 0.45,
+            easeStyle: .smooth,
+            zoomType: .inOut,
+            bounceAmount: 0,
+            clickPulse: nil,
+            noZoomFallbackMode: .pan,
+            noZoomOverflowRegion: nil
+        )
+
+        return [
+            SmartSetupSuggestion(
+                suggestionID: stableID(time: sourceTime, x: centerX, y: centerY),
+                providerID: providerID,
+                kind: .zoomMarker,
+                sourceTimeRange: SmartSetupSourceTimeRange(
+                    startTime: max(sourceTime - 0.5, 0),
+                    endTime: min(sourceTime + 1.5, max(context.duration, sourceTime))
+                ),
+                sourceEvents: [
+                    SmartSetupSourceEventReference(
+                        type: .cursorMoved,
+                        timestamp: sourceTime,
+                        x: centerX,
+                        y: centerY
+                    )
+                ],
+                proposal: .zoom(proposal),
+                score: SmartSetupCandidateScore(
+                    value: 0.45,
+                    components: [
+                        SmartSetupScoreComponent(
+                            reason: .timelineGap,
+                            weight: 0.45,
+                            detail: "This capture has no focus markers yet."
+                        )
+                    ]
+                ),
+                reasons: [.timelineGap]
+            )
+        ]
+    }
+
+    private func stableID(time: Double, x: Double, y: Double) -> String {
+        let timeKey = Int((time * 100).rounded())
+        let xKey = Int(x.rounded())
+        let yKey = Int(y.rounded())
+        return "template-first-focus-\(timeKey)-\(xKey)-\(yKey)"
     }
 }
 
@@ -44,6 +126,13 @@ struct SmartSuggestionAggregator {
 
     static func rulesOnly() -> SmartSuggestionAggregator {
         SmartSuggestionAggregator(providers: [RuleSmartSuggestionProvider()])
+    }
+
+    static func defaultAggregator() -> SmartSuggestionAggregator {
+        SmartSuggestionAggregator(providers: [
+            RuleSmartSuggestionProvider(),
+            TemplateSmartSuggestionProvider()
+        ])
     }
 
     func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {

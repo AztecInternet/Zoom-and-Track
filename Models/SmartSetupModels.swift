@@ -21,6 +21,7 @@ struct SmartSetupSuggestionEnvelope: Codable, Equatable {
 
 struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     var suggestionID: String
+    var providerID: String
     var kind: SmartSetupSuggestionKind
     var sourceTimeRange: SmartSetupSourceTimeRange?
     var sourceEvents: [SmartSetupSourceEventReference]
@@ -29,6 +30,49 @@ struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     var reasons: [SmartSetupSuggestionReason]
 
     var id: String { suggestionID }
+
+    init(
+        suggestionID: String,
+        providerID: String = "unknown",
+        kind: SmartSetupSuggestionKind,
+        sourceTimeRange: SmartSetupSourceTimeRange?,
+        sourceEvents: [SmartSetupSourceEventReference],
+        proposal: SmartSetupMarkerProposal,
+        score: SmartSetupCandidateScore,
+        reasons: [SmartSetupSuggestionReason]
+    ) {
+        self.suggestionID = suggestionID
+        self.providerID = providerID
+        self.kind = kind
+        self.sourceTimeRange = sourceTimeRange
+        self.sourceEvents = sourceEvents
+        self.proposal = proposal
+        self.score = score
+        self.reasons = reasons
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case suggestionID
+        case providerID
+        case kind
+        case sourceTimeRange
+        case sourceEvents
+        case proposal
+        case score
+        case reasons
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        suggestionID = try container.decode(String.self, forKey: .suggestionID)
+        providerID = try container.decodeIfPresent(String.self, forKey: .providerID) ?? "unknown"
+        kind = try container.decode(SmartSetupSuggestionKind.self, forKey: .kind)
+        sourceTimeRange = try container.decodeIfPresent(SmartSetupSourceTimeRange.self, forKey: .sourceTimeRange)
+        sourceEvents = try container.decode([SmartSetupSourceEventReference].self, forKey: .sourceEvents)
+        proposal = try container.decode(SmartSetupMarkerProposal.self, forKey: .proposal)
+        score = try container.decode(SmartSetupCandidateScore.self, forKey: .score)
+        reasons = try container.decode([SmartSetupSuggestionReason].self, forKey: .reasons)
+    }
 }
 
 enum SmartSetupSuggestionKind: String, Codable, CaseIterable {

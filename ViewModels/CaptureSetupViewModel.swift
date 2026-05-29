@@ -143,7 +143,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private let markerPreviewRenderService = MarkerPreviewRenderService()
     private let markerPreviewCacheService = MarkerPreviewCacheService()
     private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
-    private let smartSuggestionAggregator = SmartSuggestionAggregator.rulesOnly()
+    private let smartSuggestionAggregator = SmartSuggestionAggregator.defaultAggregator()
     private let exportManager = ExportManager()
     private let previewTransitionFadeInDuration: TimeInterval = 0.12
     private let previewTransitionHoldDuration: TimeInterval = 1.0
@@ -549,15 +549,24 @@ final class CaptureSetupViewModel: ObservableObject {
             pendingSmartSetupSuggestions = suggestions
             selectedSmartSetupSuggestionID = suggestions.first?.suggestionID
             activeSmartSuggestionPreviewEndTime = nil
+            let providerSummary = smartSuggestionProviderSummary(for: suggestions)
             smartSetupStatusMessage = suggestions.isEmpty
                 ? "Smart Suggestions did not find any useful suggestions."
-                : "Smart Suggestions found \(suggestions.count) suggestion\(suggestions.count == 1 ? "" : "s")."
+                : "Smart Suggestions found \(suggestions.count) suggestion\(suggestions.count == 1 ? "" : "s"). \(providerSummary)"
         } catch {
             pendingSmartSetupSuggestions = []
             selectedSmartSetupSuggestionID = nil
             activeSmartSuggestionPreviewEndTime = nil
             smartSetupStatusMessage = "Smart Suggestions could not load recorded events: \(error.localizedDescription)"
         }
+    }
+
+    private func smartSuggestionProviderSummary(for suggestions: [SmartSetupSuggestion]) -> String {
+        let counts = Dictionary(grouping: suggestions, by: \.providerID)
+            .mapValues(\.count)
+        let rulesCount = counts["rules"] ?? 0
+        let templateCount = counts["templates"] ?? 0
+        return "Smart Suggestions: \(rulesCount) rules, \(templateCount) template\(templateCount == 1 ? "" : "s")."
     }
 
     func acceptSmartSetupSuggestion(_ suggestionID: String) {

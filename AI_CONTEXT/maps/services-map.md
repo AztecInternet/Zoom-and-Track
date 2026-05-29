@@ -1,6 +1,6 @@
 # Services Map
 
-Generated: 2026-05-29 22:18:32
+Generated: 2026-05-29 22:39:07
 
 ## Files
 
@@ -552,7 +552,7 @@ Generated: 2026-05-29 22:18:32
 - Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
 
 ### Services/SmartSuggestionProviders.swift
-- Lines: 73
+- Lines: 162
 - Imports:
 - import CoreGraphics
 - import Foundation
@@ -560,7 +560,8 @@ Generated: 2026-05-29 22:18:32
 - Line 4:struct SmartSuggestionContext {
 - Line 12:protocol SmartSuggestionProvider {
 - Line 18:struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 38:struct SmartSuggestionAggregator {
+- Line 43:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 120:struct SmartSuggestionAggregator {
 - Functions / Vars:
 - Line 5:    let events: [RecordedEvent]
 - Line 6:    let duration: Double
@@ -572,12 +573,25 @@ Generated: 2026-05-29 22:18:32
 - Line 19:    let providerID = "rules"
 - Line 21:    private let service: SmartSetupSuggestionService
 - Line 27:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
-- Line 39:    let providers: [any SmartSuggestionProvider]
-- Line 45:    static func rulesOnly() -> SmartSuggestionAggregator {
-- Line 49:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
-- Line 50:        var seenSuggestionIDs = Set<String>()
-- Line 51:        var mergedSuggestions: [SmartSetupSuggestion] = []
-- Line 61:            let lhsTime = sortTime(for: lhs)
-- Line 62:            let rhsTime = sortTime(for: rhs)
-- Line 70:    private func sortTime(for suggestion: SmartSetupSuggestion) -> Double {
+- Line 36:            var markedSuggestion = suggestion
+- Line 44:    let providerID = "templates"
+- Line 46:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 53:        let safeContentSize = CGSize(
+- Line 57:        let sourceTime = min(max(context.duration * 0.15, 1.0), max(context.duration - 0.5, 1.0))
+- Line 58:        let centerX = safeContentSize.width / 2
+- Line 59:        let centerY = safeContentSize.height / 2
+- Line 60:        let proposal = SmartSetupZoomMarkerProposal(
+- Line 112:    private func stableID(time: Double, x: Double, y: Double) -> String {
+- Line 113:        let timeKey = Int((time * 100).rounded())
+- Line 114:        let xKey = Int(x.rounded())
+- Line 115:        let yKey = Int(y.rounded())
+- Line 121:    let providers: [any SmartSuggestionProvider]
+- Line 127:    static func rulesOnly() -> SmartSuggestionAggregator {
+- Line 131:    static func defaultAggregator() -> SmartSuggestionAggregator {
+- Line 138:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 139:        var seenSuggestionIDs = Set<String>()
+- Line 140:        var mergedSuggestions: [SmartSetupSuggestion] = []
+- Line 150:            let lhsTime = sortTime(for: lhs)
+- Line 151:            let rhsTime = sortTime(for: rhs)
+- Line 159:    private func sortTime(for suggestion: SmartSetupSuggestion) -> Double {
 

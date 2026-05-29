@@ -1,94 +1,96 @@
 # Smart Suggestions Map
 
-Generated: 2026-05-29 22:18:32
+Generated: 2026-05-29 22:39:07
 
 ## Files
 
 ### Models/SmartSetupModels.swift
-- Lines: 168
+- Lines: 212
 - Imports:
 - import Foundation
 - Types:
 - Line 3:struct SmartSetupSuggestionEnvelope: Codable, Equatable {
 - Line 22:struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
-- Line 34:enum SmartSetupSuggestionKind: String, Codable, CaseIterable {
-- Line 40:enum SmartSetupSuggestionReason: String, Codable, CaseIterable {
-- Line 49:struct SmartSetupCandidateScore: Codable, Equatable {
-- Line 59:struct SmartSetupScoreComponent: Codable, Equatable {
-- Line 65:struct SmartSetupSourceTimeRange: Codable, Equatable {
-- Line 75:struct SmartSetupSourceEventReference: Codable, Equatable {
-- Line 96:enum SmartSetupMarkerProposal: Codable, Equatable {
-- Line 103:struct SmartSetupZoomMarkerAdjustmentProposal: Codable, Equatable {
-- Line 114:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
-- Line 133:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
-- Line 151:struct SmartSetupRegionTightenProposal: Codable, Equatable {
+- Line 78:enum SmartSetupSuggestionKind: String, Codable, CaseIterable {
+- Line 84:enum SmartSetupSuggestionReason: String, Codable, CaseIterable {
+- Line 93:struct SmartSetupCandidateScore: Codable, Equatable {
+- Line 103:struct SmartSetupScoreComponent: Codable, Equatable {
+- Line 109:struct SmartSetupSourceTimeRange: Codable, Equatable {
+- Line 119:struct SmartSetupSourceEventReference: Codable, Equatable {
+- Line 140:enum SmartSetupMarkerProposal: Codable, Equatable {
+- Line 147:struct SmartSetupZoomMarkerAdjustmentProposal: Codable, Equatable {
+- Line 158:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
+- Line 177:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
+- Line 195:struct SmartSetupRegionTightenProposal: Codable, Equatable {
 - Functions / Vars:
 - Line 4:    var schemaVersion: Int
 - Line 5:    var source: String
 - Line 6:    var generatedAt: Date
 - Line 7:    var suggestions: [SmartSetupSuggestion]
 - Line 23:    var suggestionID: String
-- Line 24:    var kind: SmartSetupSuggestionKind
-- Line 25:    var sourceTimeRange: SmartSetupSourceTimeRange?
-- Line 26:    var sourceEvents: [SmartSetupSourceEventReference]
-- Line 27:    var proposal: SmartSetupMarkerProposal
-- Line 28:    var score: SmartSetupCandidateScore
-- Line 29:    var reasons: [SmartSetupSuggestionReason]
-- Line 31:    var id: String { suggestionID }
-- Line 50:    var value: Double
-- Line 51:    var components: [SmartSetupScoreComponent]
-- Line 60:    var reason: SmartSetupSuggestionReason
-- Line 61:    var weight: Double
-- Line 62:    var detail: String?
-- Line 66:    var startTime: Double
-- Line 67:    var endTime: Double
-- Line 76:    var type: RecordedEventType
-- Line 77:    var timestamp: Double
-- Line 78:    var x: Double
-- Line 79:    var y: Double
-- Line 104:    var targetMarkerIDs: [String]
-- Line 105:    var startTime: Double
-- Line 106:    var endTime: Double
-- Line 107:    var suggestedFirstZoomType: ZoomType
-- Line 108:    var suggestedMiddleZoomType: ZoomType
-- Line 109:    var suggestedFinalZoomType: ZoomType
-- Line 110:    var suggestedHoldDuration: Double?
-- Line 111:    var markerCount: Int
-- Line 115:    var sourceEventTimestamp: Double
-- Line 116:    var rawX: Double?
-- Line 117:    var rawY: Double?
-- Line 118:    var centerX: Double
-- Line 119:    var centerY: Double
-- Line 120:    var zoomScale: Double
-- Line 121:    var leadInTime: Double
-- Line 122:    var zoomInDuration: Double
-- Line 123:    var holdDuration: Double
-- Line 124:    var zoomOutDuration: Double
-- Line 125:    var easeStyle: ZoomEaseStyle
-- Line 126:    var zoomType: ZoomType
-- Line 127:    var bounceAmount: Double
-- Line 128:    var clickPulse: ClickPulseConfiguration?
-- Line 129:    var noZoomFallbackMode: NoZoomFallbackMode
-- Line 130:    var noZoomOverflowRegion: NoZoomOverflowRegion?
-- Line 134:    var sourceEventTimestamp: Double
-- Line 135:    var startTime: Double
-- Line 136:    var holdStartTime: Double
-- Line 137:    var holdEndTime: Double
-- Line 138:    var endTime: Double
-- Line 139:    var style: EffectStyle
-- Line 140:    var amount: Double
-- Line 141:    var blurAmount: Double
-- Line 142:    var darkenAmount: Double
-- Line 143:    var tintAmount: Double
-- Line 144:    var cornerRadius: Double
-- Line 145:    var feather: Double
-- Line 146:    var tintColor: EffectTintColor
-- Line 147:    var focusRegion: EffectFocusRegion?
-- Line 148:    var distortion: DistortionConfiguration?
-- Line 152:    var sourceTime: Double
-- Line 153:    var originalRegion: EffectFocusRegion
-- Line 154:    var proposedRegion: EffectFocusRegion
-- Line 155:    var confidence: Double
+- Line 24:    var providerID: String
+- Line 25:    var kind: SmartSetupSuggestionKind
+- Line 26:    var sourceTimeRange: SmartSetupSourceTimeRange?
+- Line 27:    var sourceEvents: [SmartSetupSourceEventReference]
+- Line 28:    var proposal: SmartSetupMarkerProposal
+- Line 29:    var score: SmartSetupCandidateScore
+- Line 30:    var reasons: [SmartSetupSuggestionReason]
+- Line 32:    var id: String { suggestionID }
+- Line 66:        let container = try decoder.container(keyedBy: CodingKeys.self)
+- Line 94:    var value: Double
+- Line 95:    var components: [SmartSetupScoreComponent]
+- Line 104:    var reason: SmartSetupSuggestionReason
+- Line 105:    var weight: Double
+- Line 106:    var detail: String?
+- Line 110:    var startTime: Double
+- Line 111:    var endTime: Double
+- Line 120:    var type: RecordedEventType
+- Line 121:    var timestamp: Double
+- Line 122:    var x: Double
+- Line 123:    var y: Double
+- Line 148:    var targetMarkerIDs: [String]
+- Line 149:    var startTime: Double
+- Line 150:    var endTime: Double
+- Line 151:    var suggestedFirstZoomType: ZoomType
+- Line 152:    var suggestedMiddleZoomType: ZoomType
+- Line 153:    var suggestedFinalZoomType: ZoomType
+- Line 154:    var suggestedHoldDuration: Double?
+- Line 155:    var markerCount: Int
+- Line 159:    var sourceEventTimestamp: Double
+- Line 160:    var rawX: Double?
+- Line 161:    var rawY: Double?
+- Line 162:    var centerX: Double
+- Line 163:    var centerY: Double
+- Line 164:    var zoomScale: Double
+- Line 165:    var leadInTime: Double
+- Line 166:    var zoomInDuration: Double
+- Line 167:    var holdDuration: Double
+- Line 168:    var zoomOutDuration: Double
+- Line 169:    var easeStyle: ZoomEaseStyle
+- Line 170:    var zoomType: ZoomType
+- Line 171:    var bounceAmount: Double
+- Line 172:    var clickPulse: ClickPulseConfiguration?
+- Line 173:    var noZoomFallbackMode: NoZoomFallbackMode
+- Line 174:    var noZoomOverflowRegion: NoZoomOverflowRegion?
+- Line 178:    var sourceEventTimestamp: Double
+- Line 179:    var startTime: Double
+- Line 180:    var holdStartTime: Double
+- Line 181:    var holdEndTime: Double
+- Line 182:    var endTime: Double
+- Line 183:    var style: EffectStyle
+- Line 184:    var amount: Double
+- Line 185:    var blurAmount: Double
+- Line 186:    var darkenAmount: Double
+- Line 187:    var tintAmount: Double
+- Line 188:    var cornerRadius: Double
+- Line 189:    var feather: Double
+- Line 190:    var tintColor: EffectTintColor
+- Line 191:    var focusRegion: EffectFocusRegion?
+- Line 192:    var distortion: DistortionConfiguration?
+- Line 196:    var sourceTime: Double
+- Line 197:    var originalRegion: EffectFocusRegion
+- Line 198:    var proposedRegion: EffectFocusRegion
+- Line 199:    var confidence: Double
 
 ### Services/SmartSetupSuggestionService.swift
 - Lines: 444
