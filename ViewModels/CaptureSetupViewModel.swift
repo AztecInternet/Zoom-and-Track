@@ -143,7 +143,7 @@ final class CaptureSetupViewModel: ObservableObject {
     private let markerPreviewRenderService = MarkerPreviewRenderService()
     private let markerPreviewCacheService = MarkerPreviewCacheService()
     private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
-    private let smartSetupSuggestionService = SmartSetupSuggestionService()
+    private let smartSuggestionAggregator = SmartSuggestionAggregator.rulesOnly()
     private let exportManager = ExportManager()
     private let previewTransitionFadeInDuration: TimeInterval = 0.12
     private let previewTransitionHoldDuration: TimeInterval = 1.0
@@ -538,13 +538,14 @@ final class CaptureSetupViewModel: ObservableObject {
 
         do {
             let events = try projectBundleService.loadRecordedEvents(from: summary.bundleURL)
-            let suggestions = smartSetupSuggestionService.generateSuggestions(
+            let context = SmartSuggestionContext(
                 events: events,
                 duration: summary.duration ?? summary.lastEventTimestamp ?? 0,
                 contentCoordinateSize: summary.contentCoordinateSize,
                 existingZoomMarkers: summary.zoomMarkers,
                 existingEffectMarkers: summary.effectMarkers
             )
+            let suggestions = smartSuggestionAggregator.generateSuggestions(context: context)
             pendingSmartSetupSuggestions = suggestions
             selectedSmartSetupSuggestionID = suggestions.first?.suggestionID
             activeSmartSuggestionPreviewEndTime = nil

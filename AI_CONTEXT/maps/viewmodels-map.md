@@ -1,11 +1,11 @@
 # ViewModels Map
 
-Generated: 2026-05-29 12:01:48
+Generated: 2026-05-29 22:18:32
 
 ## Files
 
 ### ViewModels/CaptureSetupViewModel.swift
-- Lines: 3190
+- Lines: 3191
 - Imports:
 - import Combine
 - import AppKit
@@ -53,7 +53,7 @@ Generated: 2026-05-29 12:01:48
 - Line 143:    private let markerPreviewRenderService = MarkerPreviewRenderService()
 - Line 144:    private let markerPreviewCacheService = MarkerPreviewCacheService()
 - Line 145:    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
-- Line 146:    private let smartSetupSuggestionService = SmartSetupSuggestionService()
+- Line 146:    private let smartSuggestionAggregator = SmartSuggestionAggregator.rulesOnly()
 - Line 147:    private let exportManager = ExportManager()
 - Line 148:    private let previewTransitionFadeInDuration: TimeInterval = 0.12
 - Line 149:    private let previewTransitionHoldDuration: TimeInterval = 1.0

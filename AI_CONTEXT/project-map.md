@@ -1,6 +1,6 @@
 # Project Map
 
-Generated: 2026-05-29 12:01:48
+Generated: 2026-05-29 22:18:32
 
 ## Swift Files
 
@@ -1198,8 +1198,38 @@ Generated: 2026-05-29 12:01:48
 - Line 390:        let rhsPoint = normalizedPoint(contentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
 - Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
 
+### Services/SmartSuggestionProviders.swift
+- Lines: 73
+- Imports:
+- import CoreGraphics
+- import Foundation
+- Types:
+- Line 4:struct SmartSuggestionContext {
+- Line 12:protocol SmartSuggestionProvider {
+- Line 18:struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 38:struct SmartSuggestionAggregator {
+- Functions / Vars:
+- Line 5:    let events: [RecordedEvent]
+- Line 6:    let duration: Double
+- Line 7:    let contentCoordinateSize: CGSize
+- Line 8:    let existingZoomMarkers: [ZoomPlanItem]
+- Line 9:    let existingEffectMarkers: [EffectPlanItem]
+- Line 13:    var providerID: String { get }
+- Line 15:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion]
+- Line 19:    let providerID = "rules"
+- Line 21:    private let service: SmartSetupSuggestionService
+- Line 27:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 39:    let providers: [any SmartSuggestionProvider]
+- Line 45:    static func rulesOnly() -> SmartSuggestionAggregator {
+- Line 49:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 50:        var seenSuggestionIDs = Set<String>()
+- Line 51:        var mergedSuggestions: [SmartSetupSuggestion] = []
+- Line 61:            let lhsTime = sortTime(for: lhs)
+- Line 62:            let rhsTime = sortTime(for: rhs)
+- Line 70:    private func sortTime(for suggestion: SmartSetupSuggestion) -> Double {
+
 ### ViewModels/CaptureSetupViewModel.swift
-- Lines: 3190
+- Lines: 3191
 - Imports:
 - import Combine
 - import AppKit
@@ -1247,7 +1277,7 @@ Generated: 2026-05-29 12:01:48
 - Line 143:    private let markerPreviewRenderService = MarkerPreviewRenderService()
 - Line 144:    private let markerPreviewCacheService = MarkerPreviewCacheService()
 - Line 145:    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
-- Line 146:    private let smartSetupSuggestionService = SmartSetupSuggestionService()
+- Line 146:    private let smartSuggestionAggregator = SmartSuggestionAggregator.rulesOnly()
 - Line 147:    private let exportManager = ExportManager()
 - Line 148:    private let previewTransitionFadeInDuration: TimeInterval = 0.12
 - Line 149:    private let previewTransitionHoldDuration: TimeInterval = 1.0
