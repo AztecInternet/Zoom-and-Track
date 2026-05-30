@@ -577,6 +577,10 @@ struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
 struct SmartSuggestionAggregator {
     let providers: [any SmartSuggestionProvider]
 
+    private let zoomTimeConflictTolerance = 0.65
+    private let effectTimeConflictTolerance = 0.80
+    private let substantialOverlapRatio = 0.50
+
     init(providers: [any SmartSuggestionProvider]) {
         self.providers = providers
     }
@@ -600,15 +604,12 @@ struct SmartSuggestionAggregator {
 
         for provider in providers {
             for suggestion in provider.generateSuggestions(context: context) where !seenSuggestionIDs.contains(suggestion.suggestionID) {
-                guard !isIndividualClickSuggestionCoveredByCluster(suggestion, mergedSuggestions: mergedSuggestions) else {
-                    continue
-                }
                 seenSuggestionIDs.insert(suggestion.suggestionID)
                 mergedSuggestions.append(suggestion)
             }
         }
 
-        return mergedSuggestions.sorted { lhs, rhs in
+        return conflictFilteredSuggestions(from: mergedSuggestions).sorted { lhs, rhs in
             let lhsTime = sortTime(for: lhs)
             let rhsTime = sortTime(for: rhs)
             if lhsTime != rhsTime {
@@ -622,18 +623,58 @@ struct SmartSuggestionAggregator {
         suggestion.sourceTimeRange?.startTime ?? suggestion.sourceEvents.first?.timestamp ?? 0
     }
 
-    private func isIndividualClickSuggestionCoveredByCluster(_ suggestion: SmartSetupSuggestion, mergedSuggestions: [SmartSetupSuggestion]) -> Bool {
-        guard suggestion.providerID == "clicks",
-              let clickTime = suggestion.sourceEvents.first?.timestamp else {
+    private func conflictFilteredSuggestions(from suggestions: [SmartSetupSuggestion]) -> [SmartSetupSuggestion] {
+        var acceptedSuggestions: [SmartSetupSuggestion] = []
+
+        for suggestion in suggestions {
+            guard !acceptedSuggestions.contains(where: { conflicts($0, with: suggestion) }) else {
+                continue
+            }
+            acceptedSuggestions.append(suggestion)
+        }
+
+        return acceptedSuggestions
+    }
+
+    private func conflicts(_ acceptedSuggestion: SmartSetupSuggestion, with candidate: SmartSetupSuggestion) -> Bool {
+        guard acceptedSuggestion.providerID != candidate.providerID else {
             return false
         }
 
-        return mergedSuggestions.contains { mergedSuggestion in
-            guard mergedSuggestion.providerID == "click-clusters",
-                  let sourceTimeRange = mergedSuggestion.sourceTimeRange else {
-                return false
-            }
-            return clickTime >= sourceTimeRange.startTime && clickTime <= sourceTimeRange.endTime
+        switch (acceptedSuggestion.kind, candidate.kind) {
+        case (.zoomMarker, .zoomMarker):
+            return zoomSuggestionsConflict(acceptedSuggestion, candidate)
+        case (.effectMarker, .effectMarker):
+            return effectSuggestionsConflict(acceptedSuggestion, candidate)
+        default:
+            return false
         }
+    }
+
+    private func zoomSuggestionsConflict(_ lhs: SmartSetupSuggestion, _ rhs: SmartSetupSuggestion) -> Bool {
+        if abs(sortTime(for: lhs) - sortTime(for: rhs)) <= zoomTimeConflictTolerance {
+            return true
+        }
+        return rangesOverlapSubstantially(lhs.sourceTimeRange, rhs.sourceTimeRange)
+    }
+
+    private func effectSuggestionsConflict(_ lhs: SmartSetupSuggestion, _ rhs: SmartSetupSuggestion) -> Bool {
+        if abs(sortTime(for: lhs) - sortTime(for: rhs)) <= effectTimeConflictTolerance {
+            return true
+        }
+        return rangesOverlapSubstantially(lhs.sourceTimeRange, rhs.sourceTimeRange)
+    }
+
+    private func rangesOverlapSubstantially(_ lhs: SmartSetupSourceTimeRange?, _ rhs: SmartSetupSourceTimeRange?) -> Bool {
+        guard let lhs, let rhs else { return false }
+
+        let overlapStart = max(lhs.startTime, rhs.startTime)
+        let overlapEnd = min(lhs.endTime, rhs.endTime)
+        let overlapDuration = max(overlapEnd - overlapStart, 0)
+        guard overlapDuration > 0 else { return false }
+
+        let lhsDuration = max(lhs.endTime - lhs.startTime, 0.001)
+        let rhsDuration = max(rhs.endTime - rhs.startTime, 0.001)
+        return overlapDuration / min(lhsDuration, rhsDuration) >= substantialOverlapRatio
     }
 }
