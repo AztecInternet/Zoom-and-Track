@@ -82,7 +82,7 @@ struct ContentView: View {
     @State private var playheadTimeNudgeFlashTask: Task<Void, Never>?
     @State var librarySearchText = ""
     @State var editorMode: ReviewEditorMode = .zoomAndClicks
-    @State var inspectorMode: EditInspectorMode = .markers
+    @State var inspectorMode: EditInspectorMode = .suggestions
     @State var selectedLibraryCollectionFilter: String?
     @State var selectedLibraryProjectFilter: String?
     @State var selectedLibraryTypeFilter: CaptureType?
@@ -607,13 +607,9 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
                         if isPlaybackInspectorVisible {
-                            VStack(alignment: .leading, spacing: 10) {
-                                SmartSetupReviewPanel(viewModel: viewModel)
-                                markerInspectorCard(summary)
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            }
-                            .frame(width: inspectorWidth)
-                            .frame(maxHeight: .infinity, alignment: .topLeading)
+                            markerInspectorCard(summary)
+                                .frame(width: inspectorWidth)
+                                .frame(maxHeight: .infinity, alignment: .topLeading)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -879,6 +875,28 @@ struct ContentView: View {
         }
 
         return SmartSetupSourceTimeRange(startTime: startTime, endTime: max(endTime, startTime))
+    }
+
+    func selectedSmartSetupTimelineEventTimes() -> [Double] {
+        guard let selectedID = viewModel.selectedSmartSetupSuggestionID,
+              let suggestion = viewModel.pendingSmartSetupSuggestions.first(where: { $0.suggestionID == selectedID }) else {
+            return []
+        }
+
+        let duration = max(viewModel.recordingSummary?.duration ?? viewModel.recordingSummary?.lastEventTimestamp ?? 0, 0)
+        var seenEventTimes = Set<Int>()
+        return suggestion.sourceEvents
+            .map(\.timestamp)
+            .filter { timestamp in
+                timestamp >= 0 && (duration == 0 || timestamp <= duration)
+            }
+            .sorted()
+            .filter { timestamp in
+                let timeKey = Int((timestamp * 1000).rounded())
+                guard !seenEventTimes.contains(timeKey) else { return false }
+                seenEventTimes.insert(timeKey)
+                return true
+            }
     }
 
     private func fallbackSmartSetupTimelineRange(for suggestion: SmartSetupSuggestion, duration: Double) -> SmartSetupSourceTimeRange {

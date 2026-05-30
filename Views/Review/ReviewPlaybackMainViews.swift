@@ -866,6 +866,7 @@ extension ContentView {
                         segmentLayouts: segmentLayouts,
                         effectLayouts: effectLayouts,
                         smartSetupHighlightRange: selectedSmartSetupTimelineRange(),
+                        smartSetupHighlightEventTimes: selectedSmartSetupTimelineEventTimes(),
                         smartSetupHighlightPulseToken: viewModel.smartSetupSelectionPulseToken,
                         timelineInteractionSuppressed: timelineInteractionSuppressed,
                         selectedZoomMarkerID: viewModel.selectedZoomMarkerID,

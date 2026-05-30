@@ -16,6 +16,8 @@ extension ContentView {
         ) {
             Group {
                 switch inspectorMode {
+                case .suggestions:
+                    SmartSetupReviewPanel(viewModel: viewModel, isEmbeddedInInspector: true)
                 case .captureInfo:
                     captureInfoInspector(summary)
                 case .markers:

@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 enum EditInspectorMode: String, CaseIterable, Identifiable {
+    case suggestions = "Suggestions"
     case captureInfo = "Capture Info"
     case markers = "Markers"
 
@@ -746,6 +747,8 @@ struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
             : (accentRole ?? (editorMode == .effects ? .effects : .zoomAndClicks))
         let headerText: (title: String, subtitle: String?) = {
             switch inspectorMode {
+            case .suggestions:
+                return ("Suggestions", "Review local editing opportunities")
             case .captureInfo:
                 return ("Capture Info", nil)
             case .markers:
@@ -783,7 +786,7 @@ struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
                 .frame(maxWidth: .infinity)
             }
 
-            if inspectorMode == .captureInfo {
+            if inspectorMode == .suggestions || inspectorMode == .captureInfo {
                 primaryContent
             } else if editorMode == .effects {
                 effectsContent

@@ -122,7 +122,7 @@ struct SmartSetupSuggestionService {
                             SmartSetupScoreComponent(
                                 reason: .repeatedActivityZone,
                                 weight: scoreValue,
-                                detail: "\(currentGroup.count) existing click markers close together"
+                                detail: "\(currentGroup.count) actions happened close together"
                             )
                         ]
                     ),
@@ -194,7 +194,7 @@ struct SmartSetupSuggestionService {
                     SmartSetupScoreComponent(
                         reason: .cursorPause,
                         weight: scoreValue,
-                        detail: "Cursor held near one point for \(formatTime(pauseDuration))s"
+                        detail: "Attention stayed in one area for \(formatTime(pauseDuration))s"
                     )
                 ]
             )
@@ -277,7 +277,7 @@ struct SmartSetupSuggestionService {
                     SmartSetupScoreComponent(
                         reason: .repeatedActivityZone,
                         weight: scoreValue,
-                        detail: "\(candidate.events.count) clicks recorded in one area"
+                        detail: "\(candidate.events.count) actions happened in one area"
                     )
                 ]
             )

@@ -1,11 +1,11 @@
 # Project Map
 
-Generated: 2026-05-30 14:12:34
+Generated: 2026-05-30 21:12:39
 
 ## Swift Files
 
 ### App/ContentView.swift
-- Lines: 1640
+- Lines: 1658
 - Imports:
 - import AppKit
 - import AVFoundation
@@ -26,10 +26,10 @@ Generated: 2026-05-30 14:12:34
 - Line 196:    enum CaptureInfoField: Hashable {
 - Line 202:    enum MotionTuning {
 - Line 210:    struct LibraryFilterOption: Identifiable {
-- Line 1570:struct SharingAnchorView: NSViewRepresentable {
-- Line 1592:enum ReviewHeaderAction {
-- Line 1598:enum AppTab: String, CaseIterable, Identifiable {
-- Line 1633:struct MarkerListEntry: Identifiable {
+- Line 1588:struct SharingAnchorView: NSViewRepresentable {
+- Line 1610:enum ReviewHeaderAction {
+- Line 1616:enum AppTab: String, CaseIterable, Identifiable {
+- Line 1651:struct MarkerListEntry: Identifiable {
 - Functions / Vars:
 - Line 98:        let point: CGPoint
 - Line 99:        let fittedRect: CGRect
@@ -1202,8 +1202,96 @@ Generated: 2026-05-30 14:12:34
 - Line 390:        let rhsPoint = normalizedPoint(contentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
 - Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
 
+### Services/SmartSuggestionFrameSamplerService.swift
+- Lines: 405
+- Imports:
+- import AVFoundation
+- import CoreGraphics
+- import Foundation
+- Types:
+- Line 5:struct ActivityRegion: Identifiable {
+- Line 6:    enum Kind: String {
+- Line 24:struct ActivityRegionFrameSample {
+- Line 31:struct ActivityRegionFrameSamplingDiagnostics {
+- Line 38:struct ActivityRegionFrameSamplingResult {
+- Line 43:struct ActivityRegionBuilder {
+- Functions / Vars:
+- Line 14:    let id: String
+- Line 15:    let kind: Kind
+- Line 16:    let startTime: Double
+- Line 17:    let endTime: Double
+- Line 18:    let sourceEvents: [SmartSetupSourceEventReference]
+- Line 19:    let representativeTime: Double
+- Line 20:    let sourceSuggestionIDs: [String]
+- Line 21:    let normalizedArea: CGRect?
+- Line 25:    let regionID: String
+- Line 26:    let requestedTime: Double
+- Line 27:    let actualTime: Double
+- Line 28:    let image: CGImage
+- Line 32:    let regionCount: Int
+- Line 33:    let sampledFrameCount: Int
+- Line 34:    let failedSampleCount: Int
+- Line 35:    let elapsedSeconds: Double
+- Line 39:    let samples: [ActivityRegionFrameSample]
+- Line 40:    let diagnostics: ActivityRegionFrameSamplingDiagnostics
+- Line 44:    private static let clickPaddingBefore = 0.35
+- Line 45:    private static let clickPaddingAfter = 0.50
+- Line 46:    private static let defaultPadding = 0.35
+- Line 47:    private static let maximumFallbackClickRegions = 20
+- Line 49:    static func activityRegions(
+- Line 55:        let suggestionRegions = suggestions.map { suggestion in
+- Line 74:    private static func activityRegion(
+- Line 79:        let sourceEvents = suggestion.sourceEvents.sorted { lhs, rhs in
+- Line 85:        let kind = regionKind(for: suggestion, sourceEvents: sourceEvents)
+- Line 86:        let bounds = timeBounds(for: suggestion, sourceEvents: sourceEvents, duration: duration)
+- Line 87:        let representativeTime = representativeTime(
+- Line 110:    private static func fallbackClickRegions(
+- Line 115:        let clickEvents = events
+- Line 126:            let sourceEvent = SmartSetupSourceEventReference(event: event)
+- Line 143:    private static func regionKind(
+- Line 147:        let clickCount = sourceEvents.filter { $0.type == .leftMouseDown || $0.type == .rightMouseDown }.count
+- Line 163:    private static func timeBounds(
+- Line 182:        let time = clamp(proposalTime(for: suggestion), duration: duration)
+- Line 189:    private static func representativeTime(
+- Line 205:    private static func proposalTime(for suggestion: SmartSetupSuggestion) -> Double {
+- Line 218:    private static func normalizedArea(
+- Line 222:        let safeWidth = max(contentCoordinateSize.width, 1)
+- Line 223:        let safeHeight = max(contentCoordinateSize.height, 1)
+- Line 226:        let normalizedPoints = sourceEvents.map { event in
+- Line 234:        let bounds = normalizedPoints.reduce(
+- Line 242:    private static func clamp(_ time: Double, duration: Double) -> Double {
+- Line 246:    private static func stableTimeKey(_ time: Double) -> Int {
+- Line 250:    private static func stablePointKey(_ point: Double) -> Int {
+- Line 256:    private let lock = NSLock()
+- Line 257:    private var storedValue: (image: CGImage, actualTime: Double)?
+- Line 259:    var value: (image: CGImage, actualTime: Double)? {
+- Line 265:    func store(image: CGImage, actualTime: Double) {
+- Line 273:    private let maximumRegions = 20
+- Line 274:    private let maximumFramesPerRegion = 5
+- Line 275:    private let maximumFrameSize = CGSize(width: 1600, height: 1600)
+- Line 276:    private var sampleCache: [String: ActivityRegionFrameSample] = [:]
+- Line 278:    func sampleFrames(
+- Line 283:        let startDate = Date()
+- Line 296:        let asset = AVURLAsset(url: recordingURL)
+- Line 297:        let imageGenerator = AVAssetImageGenerator(asset: asset)
+- Line 303:        var samples: [ActivityRegionFrameSample] = []
+- Line 304:        var failedSampleCount = 0
+- Line 305:        let sampledRegions = Array(regions.prefix(maximumRegions))
+- Line 311:                let cacheKey = cacheKey(recordingURL: recordingURL, regionID: region.id, requestedTime: requestedTime)
+- Line 321:                    let sample = ActivityRegionFrameSample(
+- Line 346:    private func generateImage(
+- Line 369:    private func sampleTimes(for region: ActivityRegion, duration: Double) -> [Double] {
+- Line 370:        let midpoint = (region.startTime + region.endTime) / 2
+- Line 371:        let rawTimes: [Double]
+- Line 386:    private func uniqueTimes(_ times: [Double]) -> [Double] {
+- Line 387:        var seenKeys = Set<Int>()
+- Line 388:        var unique: [Double] = []
+- Line 390:            let key = Int((time * 100).rounded())
+- Line 398:    private func clamp(_ time: Double, duration: Double) -> Double {
+- Line 402:    private func cacheKey(recordingURL: URL, regionID: String, requestedTime: Double) -> String {
+
 ### Services/SmartSuggestionProviders.swift
-- Lines: 754
+- Lines: 1206
 - Imports:
 - import CoreGraphics
 - import Foundation
@@ -1211,10 +1299,10 @@ Generated: 2026-05-30 14:12:34
 - Line 4:struct SmartSuggestionContext {
 - Line 12:protocol SmartSuggestionProvider {
 - Line 18:struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 56:struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 399:struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 526:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 605:struct SmartSuggestionAggregator {
+- Line 91:struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 450:struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 585:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 672:struct SmartSuggestionAggregator {
 - Functions / Vars:
 - Line 5:    let events: [RecordedEvent]
 - Line 6:    let duration: Double
@@ -1228,208 +1316,303 @@ Generated: 2026-05-30 14:12:34
 - Line 27:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
 - Line 36:            var markedSuggestion = suggestion
 - Line 44:    private func title(for suggestion: SmartSetupSuggestion) -> String {
-- Line 57:    let providerID = "click-clusters"
-- Line 59:    private let maxClusters = 5
-- Line 60:    private let maxEmittedSuggestions = 8
-- Line 61:    private let maximumTimeGap = 4.0
-- Line 62:    private let maximumNormalizedDistance = 0.12
-- Line 63:    private let existingZoomTimeTolerance = 0.65
-- Line 64:    private let clusterLeadInTime = 0.35
-- Line 65:    private let clusterZoomDuration = 0.35
-- Line 66:    private let minimumClusterHold = 0.45
-- Line 67:    private let finalClusterTail = 0.65
-- Line 69:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
-- Line 72:        let clickEvents = sortedClickEvents(from: context.events)
-- Line 75:        let safeContentSize = CGSize(
-- Line 79:        let clusters = clickClusters(from: clickEvents, contentCoordinateSize: safeContentSize)
-- Line 80:        var suggestions: [SmartSetupSuggestion] = []
-- Line 81:        var acceptedClusterCount = 0
-- Line 88:            let remainingSuggestionSlots = maxEmittedSuggestions - suggestions.count
-- Line 107:    private func sortedClickEvents(from events: [RecordedEvent]) -> [RecordedEvent] {
-- Line 120:    private func clickClusters(from events: [RecordedEvent], contentCoordinateSize: CGSize) -> [[RecordedEvent]] {
-- Line 121:        var clusters: [[RecordedEvent]] = []
-- Line 122:        var currentCluster: [RecordedEvent] = []
-- Line 124:        func flushCurrentCluster() {
-- Line 137:            let timeGap = event.timestamp - previous.timestamp
-- Line 138:            let distance = normalizedDistance(from: previous, to: event, contentCoordinateSize: contentCoordinateSize)
-- Line 151:    private func clusterSuggestions(for cluster: [RecordedEvent], contentCoordinateSize: CGSize, duration: Double, limit: Int) -> [SmartSetupSuggestion] {
-- Line 152:        let selectedEvents = selectedEventsForSequence(from: cluster, limit: limit)
-- Line 165:    private func selectedEventsForSequence(from cluster: [RecordedEvent], limit: Int) -> [RecordedEvent] {
-- Line 170:        let middleLimit = max(limit - 2, 0)
-- Line 171:        let middleEvents = cluster.dropFirst().dropLast().prefix(middleLimit)
-- Line 175:    private func suggestion(
-- Line 183:        let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
-- Line 184:        let zoomType = zoomType(for: index, count: sequenceCount)
-- Line 185:        let timing = markerTiming(
-- Line 192:        let proposal = SmartSetupZoomMarkerProposal(
-- Line 242:    private func markerTiming(
-- Line 249:        let zoomType = zoomType(for: index, count: sequenceCount)
-- Line 250:        let nextTimestamp = nextClusterTimestamp(after: event, in: cluster)
-- Line 251:        let previousTimestamp = previousClusterTimestamp(before: event, in: cluster)
-- Line 255:            let holdUntil = min(nextTimestamp ?? event.timestamp + minimumClusterHold, duration)
-- Line 256:            let holdDuration = max(holdUntil - event.timestamp, minimumClusterHold)
-- Line 266:            let previousGap = previousTimestamp.map { max(event.timestamp - $0, 0) } ?? minimumClusterHold
-- Line 267:            let nextGap = nextTimestamp.map { max($0 - event.timestamp, 0) } ?? minimumClusterHold
-- Line 268:            let localWindow = min(previousGap, nextGap, 1.0)
-- Line 298:    private func timing(
-- Line 306:        let timelineEnd = max(duration, 0)
-- Line 307:        let safeEventTimestamp = min(max(eventTimestamp, 0), timelineEnd)
-- Line 308:        let safeLeadIn = max(min(leadInTime, safeEventTimestamp), 0)
-- Line 309:        let safeZoomInDuration = max(zoomInDuration, 0)
-- Line 310:        let requestedZoomOutDuration = max(zoomOutDuration, 0)
-- Line 311:        let requestedHoldDuration = max(holdDuration, minimumClusterHold)
-- Line 312:        let availableAfterEvent = max(timelineEnd - safeEventTimestamp, 0)
-- Line 313:        let safeHoldDuration = min(requestedHoldDuration, availableAfterEvent)
-- Line 314:        let safeZoomOutDuration = min(requestedZoomOutDuration, max(availableAfterEvent - safeHoldDuration, 0))
-- Line 315:        let endTime = safeEventTimestamp + safeHoldDuration + safeZoomOutDuration
-- Line 326:    private func zoomType(for index: Int, count: Int) -> ZoomType {
-- Line 336:    private func previousClusterTimestamp(before event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
-- Line 342:    private func nextClusterTimestamp(after event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
-- Line 348:    private func isCoveredByExistingZoomMarker(_ cluster: [RecordedEvent], existingZoomMarkers: [ZoomPlanItem]) -> Bool {
-- Line 350:        let startTime = first.timestamp - existingZoomTimeTolerance
-- Line 351:        let endTime = last.timestamp + existingZoomTimeTolerance
-- Line 359:    private func averagePoint(for events: [RecordedEvent], contentCoordinateSize: CGSize) -> CGPoint {
-- Line 361:        let total = events.reduce(CGPoint.zero) { partialResult, event in
-- Line 362:            let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
-- Line 368:    private func normalizedDistance(from lhs: RecordedEvent, to rhs: RecordedEvent, contentCoordinateSize: CGSize) -> Double {
-- Line 369:        let lhsPoint = normalizedPoint(clampedContentPoint(for: lhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
-- Line 370:        let rhsPoint = normalizedPoint(clampedContentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
-- Line 371:        let deltaX = lhsPoint.x - rhsPoint.x
-- Line 372:        let deltaY = lhsPoint.y - rhsPoint.y
+- Line 67:    private func reason(for suggestion: SmartSetupSuggestion) -> String {
+- Line 92:    let providerID = "click-clusters"
+- Line 94:    private let maxClusters = 5
+- Line 95:    private let maxEmittedSuggestions = 8
+- Line 96:    private let maximumTimeGap = 4.0
+- Line 97:    private let maximumNormalizedDistance = 0.12
+- Line 98:    private let existingZoomTimeTolerance = 0.65
+- Line 99:    private let clusterLeadInTime = 0.35
+- Line 100:    private let clusterZoomDuration = 0.35
+- Line 101:    private let minimumClusterHold = 0.45
+- Line 102:    private let finalClusterTail = 0.65
+- Line 104:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 107:        let clickEvents = sortedClickEvents(from: context.events)
+- Line 110:        let safeContentSize = CGSize(
+- Line 114:        let clusters = clickClusters(from: clickEvents, contentCoordinateSize: safeContentSize)
+- Line 115:        var suggestions: [SmartSetupSuggestion] = []
+- Line 116:        var acceptedClusterCount = 0
+- Line 123:            let remainingSuggestionSlots = maxEmittedSuggestions - suggestions.count
+- Line 142:    private func sortedClickEvents(from events: [RecordedEvent]) -> [RecordedEvent] {
+- Line 155:    private func clickClusters(from events: [RecordedEvent], contentCoordinateSize: CGSize) -> [[RecordedEvent]] {
+- Line 156:        var clusters: [[RecordedEvent]] = []
+- Line 157:        var currentCluster: [RecordedEvent] = []
+- Line 159:        func flushCurrentCluster() {
+- Line 172:            let timeGap = event.timestamp - previous.timestamp
+- Line 173:            let distance = normalizedDistance(from: previous, to: event, contentCoordinateSize: contentCoordinateSize)
+- Line 186:    private func clusterSuggestions(for cluster: [RecordedEvent], contentCoordinateSize: CGSize, duration: Double, limit: Int) -> [SmartSetupSuggestion] {
+- Line 187:        let selectedEvents = selectedEventsForSequence(from: cluster, limit: limit)
+- Line 200:    private func selectedEventsForSequence(from cluster: [RecordedEvent], limit: Int) -> [RecordedEvent] {
+- Line 205:        let middleLimit = max(limit - 2, 0)
+- Line 206:        let middleEvents = cluster.dropFirst().dropLast().prefix(middleLimit)
+- Line 210:    private func suggestion(
+- Line 218:        let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
+- Line 219:        let zoomType = zoomType(for: index, count: sequenceCount)
+- Line 220:        let timing = markerTiming(
+- Line 227:        let proposal = SmartSetupZoomMarkerProposal(
+- Line 277:    private func markerTiming(
+- Line 284:        let zoomType = zoomType(for: index, count: sequenceCount)
+- Line 285:        let nextTimestamp = nextClusterTimestamp(after: event, in: cluster)
+- Line 286:        let previousTimestamp = previousClusterTimestamp(before: event, in: cluster)
+- Line 290:            let holdUntil = min(nextTimestamp ?? event.timestamp + minimumClusterHold, duration)
+- Line 291:            let holdDuration = max(holdUntil - event.timestamp, minimumClusterHold)
+- Line 301:            let previousGap = previousTimestamp.map { max(event.timestamp - $0, 0) } ?? minimumClusterHold
+- Line 302:            let nextGap = nextTimestamp.map { max($0 - event.timestamp, 0) } ?? minimumClusterHold
+- Line 303:            let localWindow = min(previousGap, nextGap, 1.0)
+- Line 333:    private func timing(
+- Line 341:        let timelineEnd = max(duration, 0)
+- Line 342:        let safeEventTimestamp = min(max(eventTimestamp, 0), timelineEnd)
+- Line 343:        let safeLeadIn = max(min(leadInTime, safeEventTimestamp), 0)
+- Line 344:        let safeZoomInDuration = max(zoomInDuration, 0)
+- Line 345:        let requestedZoomOutDuration = max(zoomOutDuration, 0)
+- Line 346:        let requestedHoldDuration = max(holdDuration, minimumClusterHold)
+- Line 347:        let availableAfterEvent = max(timelineEnd - safeEventTimestamp, 0)
+- Line 348:        let safeHoldDuration = min(requestedHoldDuration, availableAfterEvent)
+- Line 349:        let safeZoomOutDuration = min(requestedZoomOutDuration, max(availableAfterEvent - safeHoldDuration, 0))
+- Line 350:        let endTime = safeEventTimestamp + safeHoldDuration + safeZoomOutDuration
+- Line 361:    private func zoomType(for index: Int, count: Int) -> ZoomType {
+- Line 371:    private func previousClusterTimestamp(before event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
+- Line 377:    private func nextClusterTimestamp(after event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
+- Line 383:    private func isCoveredByExistingZoomMarker(_ cluster: [RecordedEvent], existingZoomMarkers: [ZoomPlanItem]) -> Bool {
+- Line 385:        let startTime = first.timestamp - existingZoomTimeTolerance
+- Line 386:        let endTime = last.timestamp + existingZoomTimeTolerance
+- Line 394:    private func averagePoint(for events: [RecordedEvent], contentCoordinateSize: CGSize) -> CGPoint {
+- Line 396:        let total = events.reduce(CGPoint.zero) { partialResult, event in
+- Line 397:            let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
+- Line 403:    private func normalizedDistance(from lhs: RecordedEvent, to rhs: RecordedEvent, contentCoordinateSize: CGSize) -> Double {
+- Line 404:        let lhsPoint = normalizedPoint(clampedContentPoint(for: lhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
+- Line 405:        let rhsPoint = normalizedPoint(clampedContentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
+- Line 406:        let deltaX = lhsPoint.x - rhsPoint.x
+
+### Services/SmartSuggestionVisionAnalysisService.swift
+- Lines: 1132
+- Imports:
+- import CoreGraphics
+- import Foundation
+- import Vision
+- Types:
+- Line 5:struct SmartSuggestionOCRTextObservation {
+- Line 13:struct SmartSuggestionOCRDiagnostics {
+- Line 25:struct SmartSuggestionOCRAnalysisResult {
+- Line 30:enum SmartSuggestionUIContext: String, CaseIterable {
+- Line 68:struct SmartSuggestionOCRRegionMetadata {
+- Line 88:struct SmartSuggestionVisionAnalysisService {
+- Functions / Vars:
+- Line 6:    let regionID: String
+- Line 7:    let frameTimestamp: Double
+- Line 8:    let text: String
+- Line 9:    let confidence: Float
+- Line 10:    let boundingBox: CGRect
+- Line 14:    let analyzedFrameCount: Int
+- Line 15:    let textObservationCount: Int
+- Line 16:    let cropFrameCount: Int
+- Line 17:    let cropTextObservationCount: Int
+- Line 18:    let fullFrameFallbackFrameCount: Int
+- Line 19:    let fullFrameFallbackTextObservationCount: Int
+- Line 20:    let failedOCRCount: Int
+- Line 21:    let elapsedSeconds: Double
+- Line 22:    let previewStrings: [String]
+- Line 26:    let observations: [SmartSuggestionOCRTextObservation]
+- Line 27:    let diagnostics: SmartSuggestionOCRDiagnostics
+- Line 42:    var displayName: String {
+- Line 69:    let regionID: String
+- Line 70:    let textCount: Int
+- Line 71:    let uniqueTextSnippets: [String]
+- Line 72:    let hasTextNearSourceEvent: Bool
+- Line 73:    let hasTextChange: Bool
+- Line 74:    let uiContext: SmartSuggestionUIContext
+- Line 75:    let uiContextConfidence: Double
+- Line 76:    let supportingText: String?
+- Line 77:    let supportingTextConfidence: Float?
+- Line 79:    var appearsVisuallyMeaningful: Bool {
+- Line 83:    var hasUsefulUIContext: Bool {
+- Line 89:    private let maximumFramesToAnalyze = 60
+- Line 90:    private let maximumPreviewStrings = 4
+- Line 91:    private let minimumTextHeight: Float = 0.018
+- Line 92:    private let nearbyTextDistance: CGFloat = 0.18
+- Line 93:    private let cropPadding: CGFloat = 0.16
+- Line 95:    private static let textRecognitionQueue = DispatchQueue(
+- Line 100:    func analyzeText(
+- Line 104:        let startDate = Date()
+- Line 122:        var observations: [SmartSuggestionOCRTextObservation] = []
+- Line 123:        var cropFrameCount = 0
+- Line 124:        var cropTextObservationCount = 0
+- Line 125:        var fullFrameFallbackFrameCount = 0
+- Line 126:        var fullFrameFallbackTextObservationCount = 0
+- Line 127:        var failedOCRCount = 0
+- Line 128:        let sampledFrames = Array(samples.prefix(maximumFramesToAnalyze))
+- Line 129:        let regionsByID = Dictionary(uniqueKeysWithValues: regions.map { ($0.id, $0) })
+- Line 134:                let cropObservations = try await cropTextObservations(
+- Line 143:                    let fallbackObservations = try await recognizedTextObservations(
+- Line 173:    func regionMetadata(
+- Line 178:        let observationsByRegionID = Dictionary(grouping: analysisResult.observations, by: \.regionID)
+- Line 180:            let observations = observationsByRegionID[region.id] ?? []
+- Line 189:    func visionTunedSuggestions(
+- Line 194:            let metadata = regionMetadataByID["suggestion-\(suggestion.suggestionID)"]
+- Line 201:            let lhsTime = lhs.sourceTimeRange?.startTime ?? lhs.sourceEvents.first?.timestamp ?? 0
+- Line 202:            let rhsTime = rhs.sourceTimeRange?.startTime ?? rhs.sourceEvents.first?.timestamp ?? 0
+- Line 210:    private func metadata(
+- Line 215:        let uniqueSnippets = uniqueTextSnippets(from: observations)
+- Line 216:        let classification = uiContextClassification(
+- Line 242:    private func visionTunedSuggestion(
+- Line 248:        var tunedSuggestion = suggestion
+- Line 249:        let baseScore = tunedSuggestion.score.value
+- Line 250:        var scoreAdjustment = 0.0
+- Line 266:        let tunedScore = min(max(baseScore + scoreAdjustment, 0), 1)
+- Line 287:    private func shouldSoftlyDowngrade(
+- Line 299:    private func shouldSuppress(
+- Line 310:    private func visionSupportedReason(
+- Line 321:        let supportText = screenContextSupportText(for: metadata)
+- Line 325:    private func contextSupportedTitle(
+- Line 331:        let label = safeSupportingLabel(from: metadata)
+- Line 388:                let fieldLabel = formFieldLabelPhrase(label)
+- Line 457:    private func fallbackTitle(for suggestion: SmartSetupSuggestion) -> String {
+- Line 470:    private func contextSupportedReason(_ metadata: SmartSuggestionOCRRegionMetadata) -> String {
+- Line 471:        let label = safeSupportingLabel(from: metadata)
+- Line 515:                let fieldLabel = formFieldLabelPhrase(label)
+- Line 564:    private func uiContextClassification(
+- Line 574:        var scores: [SmartSuggestionUIContext: Double] = [:]
+- Line 575:        var supportingTextByContext: [SmartSuggestionUIContext: String] = [:]
+- Line 576:        let sourcePoints = normalizedSourcePoints(
+- Line 580:        let nearbyText = nearbyTextSnippet(
+- Line 584:        let averageSourcePoint = averagePoint(sourcePoints)
+- Line 585:        let changedText = hasTextChange(in: observations)
+- Line 587:        func addScore(_ context: SmartSuggestionUIContext, _ amount: Double, supportingText: String? = nil) {
 
 ### ViewModels/CaptureSetupViewModel.swift
-- Lines: 3202
+- Lines: 3501
 - Imports:
 - import Combine
 - import AppKit
 - import AVKit
 - import Foundation
 - Types:
-- Line 13:    enum PlaybackPresentationMode {
-- Line 20:    enum PlaybackTransitionPlateState {
-- Line 27:    enum ExportState: Equatable {
+- Line 21:    enum PlaybackPresentationMode {
+- Line 28:    enum PlaybackTransitionPlateState {
+- Line 35:    enum ExportState: Equatable {
 - Functions / Vars:
-- Line 36:        var isInProgress: Bool {
-- Line 104:    private var hasRestoredLastRecording = false
-- Line 105:    private var activePlaybackScopeURL: URL?
-- Line 106:    private var mainPlaybackTimeObserver: Any?
-- Line 107:    private var previewPlaybackTimeObserver: Any?
-- Line 108:    private var manualSelectionSuppressionUntil: Date?
-- Line 109:    private var isEffectMarkerSelectionPinned = false
-- Line 110:    private var previewMarkerID: String?
-- Line 111:    private var previewEndTime: Double?
-- Line 112:    private var previewEffectMarkerID: String?
-- Line 113:    private var previewEffectEndTime: Double?
-- Line 114:    private var wasPlayingBeforeTimelineScrub = false
-- Line 115:    private var isTimelineScrubbing = false
-- Line 116:    private var markerPreviewRenderTask: Task<Void, Never>?
-- Line 117:    private var previewSurfaceTeardownTask: Task<Void, Never>?
-- Line 118:    private var playbackTransitionTask: Task<Void, Never>?
-- Line 119:    private var activeRenderedPreviewURL: URL?
-- Line 120:    private var activeRenderedPreviewShouldDelete = false
-- Line 121:    private var renderedPreviewSourceStartTime: Double?
-- Line 122:    private var renderingPreviewMarkerID: String?
-- Line 123:    private var renderingPreviewEffectMarkerID: String?
-- Line 124:    private var targetRefreshTask: Task<Void, Never>?
-- Line 125:    private var distortionLoupeRenderTask: Task<Void, Never>?
-- Line 126:    private var distortionLoupeRevision = 0
-- Line 127:    private var distortionOverlayImageCache: [String: NSImage] = [:]
-- Line 128:    private let timelineMarkerNudgeInterval = 0.1
-- Line 130:    private let permissionsService = PermissionsService()
-- Line 131:    private let screenCaptureService = ScreenCaptureService()
-- Line 132:    private let mediaWriterService = MediaWriterService()
-- Line 133:    private let projectBundleService = ProjectBundleService()
-- Line 139:    private let captureMetadataManager: CaptureMetadataManager
-- Line 140:    private let playbackTransportManager = PlaybackTransportManager()
-- Line 141:    private let timelineScrubManager = TimelineScrubManager()
-- Line 142:    private let inputEventCaptureService = InputEventCaptureService()
-- Line 143:    private let markerPreviewRenderService = MarkerPreviewRenderService()
-- Line 144:    private let markerPreviewCacheService = MarkerPreviewCacheService()
-- Line 145:    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
-- Line 146:    private let smartSuggestionAggregator = SmartSuggestionAggregator.defaultAggregator()
-- Line 147:    private let exportManager = ExportManager()
-- Line 148:    private let previewTransitionFadeInDuration: TimeInterval = 0.12
-- Line 149:    private let previewTransitionHoldDuration: TimeInterval = 1.0
-- Line 150:    private let previewTransitionFadeOutDuration: TimeInterval = 0.16
-- Line 151:    private let lastCollectionNameKey = "LastCollectionName"
-- Line 152:    private let lastProjectNameKey = "LastProjectName"
-- Line 153:    private let lastCaptureTypeKey = "LastCaptureType"
-- Line 154:    private let defaultNoZoomFallbackModeKey = "DefaultNoZoomFallbackMode"
-- Line 197:    var selectedTarget: ShareableCaptureTarget? {
-- Line 201:    var canStartRecording: Bool {
-- Line 205:    var canStopRecording: Bool {
-- Line 209:    var selectedZoomMarker: ZoomPlanItem? {
-- Line 213:    var selectedEffectMarker: EffectPlanItem? {
-- Line 217:    var activePreviewMarkerID: String? {
-- Line 221:    var isRenderedPreviewActive: Bool {
-- Line 225:    var canExportRecording: Bool {
-- Line 229:    var isExportSheetPresented: Bool {
-- Line 233:    var canTriggerMarkerPreview: Bool {
-- Line 242:    var canEditClickFocusMarkers: Bool {
-- Line 250:    var canUsePlaybackTransport: Bool {
-- Line 259:    var isSelectedEffectDistortion: Bool {
-- Line 264:    var canShowSelectedDistortionMapOverlay: Bool {
-- Line 274:    var selectedEffectDistortionOverlayImage: NSImage? {
-- Line 283:    var availableDistortionPresetDescriptors: [DistortionPresetDescriptor] {
-- Line 289:    var selectedDistortionPresetDescriptor: DistortionPresetDescriptor? {
-- Line 290:        let preferredID = selectedDistortionPresetLibraryID
-- Line 292:           let descriptor = availableDistortionPresetDescriptors.first(where: { $0.id == preferredID }) {
-- Line 298:    var distortionImportedMapAssets: [DistortionImportedMapAsset] {
-- Line 304:    var selectedCustomDistortionPresetDescriptor: DistortionPresetDescriptor? {
-- Line 309:    func load() async {
-- Line 331:    func activateCaptureTarget(_ target: ShareableCaptureTarget) {
-- Line 335:           let app = NSRunningApplication(processIdentifier: ownerProcessID) {
-- Line 341:            let matchingApps = NSRunningApplication.runningApplications(withBundleIdentifier: ownerBundleIdentifier)
-- Line 349:    func requestPermission() async {
-- Line 350:        let result = captureTargetManager.requestScreenRecordingPermission()
-- Line 355:    func startRecording() async {
-- Line 368:        let outputResolution = projectBundleService.resolveSelectedOutputDirectory()
-- Line 385:    func stopRecording() async {
-- Line 394:    func revealInFinder() {
-- Line 399:    func chooseOutputFolder() {
-- Line 405:    func selectDistortionPresetLibraryPreset(_ presetID: String) {
-- Line 409:    func createDistortionPresetFromImportedMap() {
+- Line 12:    let heuristicSuggestions: [SmartSetupSuggestion]
+- Line 13:    let suggestions: [SmartSetupSuggestion]
+- Line 14:    let frameDiagnostics: ActivityRegionFrameSamplingDiagnostics
+- Line 15:    let ocrDiagnostics: SmartSuggestionOCRDiagnostics
+- Line 16:    let regionMetadata: [String: SmartSuggestionOCRRegionMetadata]
+- Line 44:        var isInProgress: Bool {
+- Line 55:        let suggestionID: String
+- Line 56:        let title: String
+- Line 57:        let timeRange: String
+- Line 58:        let uiContext: SmartSuggestionUIContext
+- Line 59:        let uiContextConfidence: Double
+- Line 60:        let supportingText: String?
+- Line 61:        let contextSpecificWordingEligible: Bool
+- Line 62:        let contextSpecificWordingApplied: Bool
+- Line 63:        let fallbackReason: String?
+- Line 124:    private var latestSmartSuggestionContextDebug: [SmartSuggestionContextDebugItem] = []
+- Line 125:    private var smartSetupRunTask: Task<Void, Never>?
+- Line 126:    private var smartSetupRunRevision = 0
+- Line 127:    private var hasRestoredLastRecording = false
+- Line 128:    private var activePlaybackScopeURL: URL?
+- Line 129:    private var mainPlaybackTimeObserver: Any?
+- Line 130:    private var previewPlaybackTimeObserver: Any?
+- Line 131:    private var manualSelectionSuppressionUntil: Date?
+- Line 132:    private var isEffectMarkerSelectionPinned = false
+- Line 133:    private var previewMarkerID: String?
+- Line 134:    private var previewEndTime: Double?
+- Line 135:    private var previewEffectMarkerID: String?
+- Line 136:    private var previewEffectEndTime: Double?
+- Line 137:    private var wasPlayingBeforeTimelineScrub = false
+- Line 138:    private var isTimelineScrubbing = false
+- Line 139:    private var markerPreviewRenderTask: Task<Void, Never>?
+- Line 140:    private var previewSurfaceTeardownTask: Task<Void, Never>?
+- Line 141:    private var playbackTransitionTask: Task<Void, Never>?
+- Line 142:    private var activeRenderedPreviewURL: URL?
+- Line 143:    private var activeRenderedPreviewShouldDelete = false
+- Line 144:    private var renderedPreviewSourceStartTime: Double?
+- Line 145:    private var renderingPreviewMarkerID: String?
+- Line 146:    private var renderingPreviewEffectMarkerID: String?
+- Line 147:    private var targetRefreshTask: Task<Void, Never>?
+- Line 148:    private var distortionLoupeRenderTask: Task<Void, Never>?
+- Line 149:    private var distortionLoupeRevision = 0
+- Line 150:    private var distortionOverlayImageCache: [String: NSImage] = [:]
+- Line 151:    private let timelineMarkerNudgeInterval = 0.1
+- Line 153:    private let permissionsService = PermissionsService()
+- Line 154:    private let screenCaptureService = ScreenCaptureService()
+- Line 155:    private let mediaWriterService = MediaWriterService()
+- Line 156:    private let projectBundleService = ProjectBundleService()
+- Line 162:    private let captureMetadataManager: CaptureMetadataManager
+- Line 163:    private let playbackTransportManager = PlaybackTransportManager()
+- Line 164:    private let timelineScrubManager = TimelineScrubManager()
+- Line 165:    private let inputEventCaptureService = InputEventCaptureService()
+- Line 166:    private let markerPreviewRenderService = MarkerPreviewRenderService()
+- Line 167:    private let markerPreviewCacheService = MarkerPreviewCacheService()
+- Line 168:    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
+- Line 169:    private let smartSuggestionAggregator = SmartSuggestionAggregator.defaultAggregator()
+- Line 170:    private let smartSuggestionFrameSampler = SmartSuggestionFrameSamplerService()
+- Line 171:    private let smartSuggestionVisionAnalysisService = SmartSuggestionVisionAnalysisService()
+- Line 172:    private let exportManager = ExportManager()
+- Line 173:    private let previewTransitionFadeInDuration: TimeInterval = 0.12
+- Line 174:    private let previewTransitionHoldDuration: TimeInterval = 1.0
+- Line 175:    private let previewTransitionFadeOutDuration: TimeInterval = 0.16
+- Line 176:    private let lastCollectionNameKey = "LastCollectionName"
+- Line 177:    private let lastProjectNameKey = "LastProjectName"
+- Line 178:    private let lastCaptureTypeKey = "LastCaptureType"
+- Line 179:    private let defaultNoZoomFallbackModeKey = "DefaultNoZoomFallbackMode"
+- Line 222:    var selectedTarget: ShareableCaptureTarget? {
+- Line 226:    var canStartRecording: Bool {
+- Line 230:    var canStopRecording: Bool {
+- Line 234:    var selectedZoomMarker: ZoomPlanItem? {
+- Line 238:    var selectedEffectMarker: EffectPlanItem? {
+- Line 242:    var activePreviewMarkerID: String? {
+- Line 246:    var isRenderedPreviewActive: Bool {
+- Line 250:    var canExportRecording: Bool {
+- Line 254:    var isExportSheetPresented: Bool {
+- Line 258:    var canTriggerMarkerPreview: Bool {
+- Line 267:    var canEditClickFocusMarkers: Bool {
+- Line 275:    var canUsePlaybackTransport: Bool {
+- Line 284:    var isSelectedEffectDistortion: Bool {
+- Line 289:    var canShowSelectedDistortionMapOverlay: Bool {
+- Line 299:    var selectedEffectDistortionOverlayImage: NSImage? {
 - SwiftUI State:
-- Line 46:    @Published var displays: [ShareableCaptureTarget] = []
-- Line 47:    @Published var windows: [ShareableCaptureTarget] = []
-- Line 48:    @Published var selectedTargetID: String?
-- Line 49:    @Published var collectionName: String = "Default Collection" {
-- Line 52:    @Published var projectName: String = "General Project" {
-- Line 55:    @Published var captureType: CaptureType = .tutorial {
-- Line 58:    @Published var captureTitle: String = ""
-- Line 59:    @Published var compositionLayout: CompositionLayout = .default
-- Line 60:    @Published private(set) var libraryItems: [CaptureLibraryItem] = []
-- Line 61:    @Published private(set) var libraryStatusMessage: String?
-- Line 62:    @Published var sessionState: RecordingSessionState = .idle
-- Line 63:    @Published var statusMessage = "Choose one display or one window."
-- Line 64:    @Published var hasScreenRecordingPermission = false
-- Line 65:    @Published var isBusy = false
-- Line 66:    @Published var recordingSummary: RecordingInspectionSummary?
-- Line 67:    @Published var selectedOutputFolderPath: String?
-- Line 68:    @Published var mainPlayer: AVPlayer?
-- Line 69:    @Published var previewPlayer: AVPlayer?
-- Line 70:    @Published var activeRecordingTargetName: String?
-- Line 71:    @Published var recordingStartedAt: Date?
-- Line 72:    @Published var selectedZoomMarkerID: String?
-- Line 73:    @Published var selectedEffectMarkerID: String? {
-- Line 80:    @Published var currentPlaybackTime: Double = 0
-- Line 81:    @Published var isPlaybackActive = false
-- Line 82:    @Published var isRenderingMarkerPreview = false
-- Line 83:    @Published var markerPreviewStatusMessage: String?
-- Line 84:    @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
-- Line 85:    @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
-- Line 86:    @Published private(set) var exportState: ExportState = .idle
-- Line 87:    @Published private(set) var exportProgress: Double = 0
-- Line 88:    @Published private(set) var exportStatusMessage: String?
-- Line 89:    @Published private(set) var exportedRecordingURL: URL?
-- Line 90:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
-- Line 91:    @Published private(set) var distortionPresetLibrary: DistortionPresetLibrary = .empty
-- Line 92:    @Published var selectedDistortionPresetLibraryID: String?
-- Line 93:    @Published var distortionLoupeNormalizedPoint: CGPoint?
-- Line 94:    @Published var distortionLoupeImage: NSImage?
-- Line 95:    @Published var isRenderingDistortionLoupe = false
-- Line 96:    @Published var isShowingDistortionMapOverlay = false
-- Line 97:    @Published private(set) var pendingSmartSetupSuggestions: [SmartSetupSuggestion] = []
+- Line 66:    @Published var displays: [ShareableCaptureTarget] = []
+- Line 67:    @Published var windows: [ShareableCaptureTarget] = []
+- Line 68:    @Published var selectedTargetID: String?
+- Line 69:    @Published var collectionName: String = "Default Collection" {
+- Line 72:    @Published var projectName: String = "General Project" {
+- Line 75:    @Published var captureType: CaptureType = .tutorial {
+- Line 78:    @Published var captureTitle: String = ""
+- Line 79:    @Published var compositionLayout: CompositionLayout = .default
+- Line 80:    @Published private(set) var libraryItems: [CaptureLibraryItem] = []
+- Line 81:    @Published private(set) var libraryStatusMessage: String?
+- Line 82:    @Published var sessionState: RecordingSessionState = .idle
+- Line 83:    @Published var statusMessage = "Choose one display or one window."
+- Line 84:    @Published var hasScreenRecordingPermission = false
+- Line 85:    @Published var isBusy = false
+- Line 86:    @Published var recordingSummary: RecordingInspectionSummary?
+- Line 87:    @Published var selectedOutputFolderPath: String?
+- Line 88:    @Published var mainPlayer: AVPlayer?
+- Line 89:    @Published var previewPlayer: AVPlayer?
+- Line 90:    @Published var activeRecordingTargetName: String?
+- Line 91:    @Published var recordingStartedAt: Date?
+- Line 92:    @Published var selectedZoomMarkerID: String?
+- Line 93:    @Published var selectedEffectMarkerID: String? {
+- Line 100:    @Published var currentPlaybackTime: Double = 0
+- Line 101:    @Published var isPlaybackActive = false
+- Line 102:    @Published var isRenderingMarkerPreview = false
+- Line 103:    @Published var markerPreviewStatusMessage: String?
+- Line 104:    @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
+- Line 105:    @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
+- Line 106:    @Published private(set) var exportState: ExportState = .idle
+- Line 107:    @Published private(set) var exportProgress: Double = 0
+- Line 108:    @Published private(set) var exportStatusMessage: String?
+- Line 109:    @Published private(set) var exportedRecordingURL: URL?
+- Line 110:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
+- Line 111:    @Published private(set) var distortionPresetLibrary: DistortionPresetLibrary = .empty
+- Line 112:    @Published var selectedDistortionPresetLibraryID: String?
+- Line 113:    @Published var distortionLoupeNormalizedPoint: CGPoint?
+- Line 114:    @Published var distortionLoupeImage: NSImage?
+- Line 115:    @Published var isRenderingDistortionLoupe = false
+- Line 116:    @Published var isShowingDistortionMapOverlay = false
+- Line 117:    @Published private(set) var pendingSmartSetupSuggestions: [SmartSetupSuggestion] = []
 
 ### Views/Capture/CaptureSetupViews.swift
 - Lines: 707
@@ -1844,107 +2027,107 @@ Generated: 2026-05-30 14:12:34
 - Line 66:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 
 ### Views/Review/ReviewInspectorViews.swift
-- Lines: 795
+- Lines: 798
 - Imports:
 - import AppKit
 - import SwiftUI
 - Types:
 - Line 4:enum EditInspectorMode: String, CaseIterable, Identifiable {
-- Line 11:struct InspectorSectionHeaderView: View {
-- Line 28:struct EffectsInspectorPlaceholderView: View {
-- Line 74:struct InspectorOverflowHintView: View {
-- Line 118:struct ResizableInspectorSplitView<TopContent: View, BottomContent: View>: View {
-- Line 719:struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
+- Line 12:struct InspectorSectionHeaderView: View {
+- Line 29:struct EffectsInspectorPlaceholderView: View {
+- Line 75:struct InspectorOverflowHintView: View {
+- Line 119:struct ResizableInspectorSplitView<TopContent: View, BottomContent: View>: View {
+- Line 720:struct ReviewInspectorCard<PrimaryContent: View, EffectsContent: View>: View {
 - Functions / Vars:
-- Line 8:    var id: String { rawValue }
-- Line 12:    let title: String
-- Line 13:    let accentRole: FlowTrackAccentRole?
-- Line 20:    var body: some View {
-- Line 29:    let effectMarkerCount: Int
-- Line 30:    let accentRole: FlowTrackAccentRole?
-- Line 37:    var body: some View {
-- Line 67:    var body: some View {
-- Line 75:    var body: some View {
-- Line 91:    var contentHeight: CGFloat
-- Line 92:    var contentOffset: CGFloat
-- Line 93:    var viewportHeight: CGFloat
-- Line 103:    var body: some View {
-- Line 111:    static var defaultValue: CGFloat = 0
-- Line 113:    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-- Line 122:    let minTopHeight: CGFloat
-- Line 123:    let minBottomHeight: CGFloat
-- Line 139:    var body: some View {
-- Line 172:    private var measuredBottomMaximumHeight: CGFloat? {
-- Line 179:    let content: Content
-- Line 181:    func makeCoordinator() -> Coordinator { Coordinator() }
-- Line 183:    func makeNSView(context: Context) -> NSScrollView {
-- Line 187:    func updateNSView(_ nsView: NSScrollView, context: Context) {
-- Line 192:        private let documentView = InspectorScrollDocumentView()
-- Line 193:        private var boundsObserver: NSObjectProtocol?
-- Line 201:        func makeScrollView(rootView: AnyView) -> NSScrollView {
-- Line 202:            let scrollView = InspectorOverflowHintingScrollView()
-- Line 222:        func update(scrollView: NSScrollView, rootView: AnyView) {
-- Line 230:        private func installBoundsObserver(for scrollView: NSScrollView) {
-- Line 241:        private func updateLayout(for scrollView: NSScrollView) {
-- Line 242:            let viewportHeight = scrollView.contentView.bounds.height
-- Line 243:            let viewportWidth = scrollView.contentView.bounds.width
-- Line 248:            let contentHeight = documentView.contentFittingHeight
-- Line 255:        private func publishMetrics(for scrollView: NSScrollView) {
-- Line 262:    private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
-- Line 263:    private var currentWidth: CGFloat = 0
-- Line 278:    var contentFittingHeight: CGFloat {
-- Line 285:    func update(rootView: AnyView) {
-- Line 289:    func updateWidth(_ width: CGFloat) {
-- Line 300:    private let hintHostingView = InspectorOverflowHintHostingView(rootView: AnyView(InspectorOverflowHintView()))
-- Line 301:    private var boundsObserver: NSObjectProtocol?
-- Line 302:    private var documentFrameObserver: NSObjectProtocol?
-- Line 304:    private var isHintVisible = false
-- Line 305:    private var hadHiddenContentBelow = false
-- Line 306:    private var hideWorkItem: DispatchWorkItem?
-- Line 307:    private var suppressTriggersUntil = Date.distantPast
-- Line 308:    private var lastObservedContentOffset: CGFloat = 0
-- Line 310:    private let hintVisibleDuration: TimeInterval = 2.0
-- Line 311:    private let hintFadeDuration: TimeInterval = 0.5
-- Line 312:    private let retriggerSuppressionDuration: TimeInterval = 30.0
-- Line 334:    private func setupOverflowHint() {
-- Line 351:    func observeDocumentView(_ documentView: NSView?) {
-- Line 384:    private func layoutHintView() {
-- Line 385:        let fittingSize = hintHostingView.fittingSize
-- Line 386:        let x = floor((bounds.width - fittingSize.width) / 2)
-- Line 387:        let y = 6.0
-- Line 397:    func updateOverflowHintVisibility(animated: Bool = true) {
-- Line 411:        let remainingContentBelow = documentView.frame.height - contentView.documentVisibleRect.maxY
-- Line 412:        let hasHiddenContentBelow = remainingContentBelow > 2
-- Line 426:    private func handleBoundsChanged() {
-- Line 427:        let newOffset = contentView.bounds.origin.y
-- Line 428:        let didScroll = abs(newOffset - lastObservedContentOffset) > 0.5
-- Line 438:    private func triggerHintIfAllowed(animated: Bool) {
-- Line 443:    private func showHint(animated: Bool) {
-- Line 458:        let workItem = DispatchWorkItem { [weak self] in
-- Line 465:    private func hideHint(animated: Bool) {
-- Line 494:    let minTopHeight: CGFloat
-- Line 495:    let minBottomHeight: CGFloat
-- Line 496:    let maxBottomHeight: CGFloat?
-- Line 497:    let topContent: TopPane
-- Line 498:    let bottomContent: BottomPane
-- Line 516:    func makeCoordinator() -> Coordinator {
-- Line 520:    func makeNSView(context: Context) -> InspectorSplitView {
-- Line 530:    func updateNSView(_ nsView: InspectorSplitView, context: Context) {
-- Line 544:        private let topHostingView = NSHostingView(rootView: AnyView(EmptyView()))
-- Line 545:        private let bottomHostingView = NSHostingView(rootView: AnyView(EmptyView()))
-- Line 546:        private var isApplyingProgrammaticLayout = false
-- Line 547:        private var pendingTopSectionFraction: CGFloat?
-- Line 548:        private var minTopHeight: CGFloat = 180
-- Line 549:        private var minBottomHeight: CGFloat = 220
+- Line 9:    var id: String { rawValue }
+- Line 13:    let title: String
+- Line 14:    let accentRole: FlowTrackAccentRole?
+- Line 21:    var body: some View {
+- Line 30:    let effectMarkerCount: Int
+- Line 31:    let accentRole: FlowTrackAccentRole?
+- Line 38:    var body: some View {
+- Line 68:    var body: some View {
+- Line 76:    var body: some View {
+- Line 92:    var contentHeight: CGFloat
+- Line 93:    var contentOffset: CGFloat
+- Line 94:    var viewportHeight: CGFloat
+- Line 104:    var body: some View {
+- Line 112:    static var defaultValue: CGFloat = 0
+- Line 114:    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+- Line 123:    let minTopHeight: CGFloat
+- Line 124:    let minBottomHeight: CGFloat
+- Line 140:    var body: some View {
+- Line 173:    private var measuredBottomMaximumHeight: CGFloat? {
+- Line 180:    let content: Content
+- Line 182:    func makeCoordinator() -> Coordinator { Coordinator() }
+- Line 184:    func makeNSView(context: Context) -> NSScrollView {
+- Line 188:    func updateNSView(_ nsView: NSScrollView, context: Context) {
+- Line 193:        private let documentView = InspectorScrollDocumentView()
+- Line 194:        private var boundsObserver: NSObjectProtocol?
+- Line 202:        func makeScrollView(rootView: AnyView) -> NSScrollView {
+- Line 203:            let scrollView = InspectorOverflowHintingScrollView()
+- Line 223:        func update(scrollView: NSScrollView, rootView: AnyView) {
+- Line 231:        private func installBoundsObserver(for scrollView: NSScrollView) {
+- Line 242:        private func updateLayout(for scrollView: NSScrollView) {
+- Line 243:            let viewportHeight = scrollView.contentView.bounds.height
+- Line 244:            let viewportWidth = scrollView.contentView.bounds.width
+- Line 249:            let contentHeight = documentView.contentFittingHeight
+- Line 256:        private func publishMetrics(for scrollView: NSScrollView) {
+- Line 263:    private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
+- Line 264:    private var currentWidth: CGFloat = 0
+- Line 279:    var contentFittingHeight: CGFloat {
+- Line 286:    func update(rootView: AnyView) {
+- Line 290:    func updateWidth(_ width: CGFloat) {
+- Line 301:    private let hintHostingView = InspectorOverflowHintHostingView(rootView: AnyView(InspectorOverflowHintView()))
+- Line 302:    private var boundsObserver: NSObjectProtocol?
+- Line 303:    private var documentFrameObserver: NSObjectProtocol?
+- Line 305:    private var isHintVisible = false
+- Line 306:    private var hadHiddenContentBelow = false
+- Line 307:    private var hideWorkItem: DispatchWorkItem?
+- Line 308:    private var suppressTriggersUntil = Date.distantPast
+- Line 309:    private var lastObservedContentOffset: CGFloat = 0
+- Line 311:    private let hintVisibleDuration: TimeInterval = 2.0
+- Line 312:    private let hintFadeDuration: TimeInterval = 0.5
+- Line 313:    private let retriggerSuppressionDuration: TimeInterval = 30.0
+- Line 335:    private func setupOverflowHint() {
+- Line 352:    func observeDocumentView(_ documentView: NSView?) {
+- Line 385:    private func layoutHintView() {
+- Line 386:        let fittingSize = hintHostingView.fittingSize
+- Line 387:        let x = floor((bounds.width - fittingSize.width) / 2)
+- Line 388:        let y = 6.0
+- Line 398:    func updateOverflowHintVisibility(animated: Bool = true) {
+- Line 412:        let remainingContentBelow = documentView.frame.height - contentView.documentVisibleRect.maxY
+- Line 413:        let hasHiddenContentBelow = remainingContentBelow > 2
+- Line 427:    private func handleBoundsChanged() {
+- Line 428:        let newOffset = contentView.bounds.origin.y
+- Line 429:        let didScroll = abs(newOffset - lastObservedContentOffset) > 0.5
+- Line 439:    private func triggerHintIfAllowed(animated: Bool) {
+- Line 444:    private func showHint(animated: Bool) {
+- Line 459:        let workItem = DispatchWorkItem { [weak self] in
+- Line 466:    private func hideHint(animated: Bool) {
+- Line 495:    let minTopHeight: CGFloat
+- Line 496:    let minBottomHeight: CGFloat
+- Line 497:    let maxBottomHeight: CGFloat?
+- Line 498:    let topContent: TopPane
+- Line 499:    let bottomContent: BottomPane
+- Line 517:    func makeCoordinator() -> Coordinator {
+- Line 521:    func makeNSView(context: Context) -> InspectorSplitView {
+- Line 531:    func updateNSView(_ nsView: InspectorSplitView, context: Context) {
+- Line 545:        private let topHostingView = NSHostingView(rootView: AnyView(EmptyView()))
+- Line 546:        private let bottomHostingView = NSHostingView(rootView: AnyView(EmptyView()))
+- Line 547:        private var isApplyingProgrammaticLayout = false
+- Line 548:        private var pendingTopSectionFraction: CGFloat?
+- Line 549:        private var minTopHeight: CGFloat = 180
+- Line 550:        private var minBottomHeight: CGFloat = 220
 - SwiftUI State:
-- Line 119:    @State private var topSectionFraction: CGFloat = 0.42
-- Line 120:    @State private var bottomContentHeight: CGFloat = 0
-- Line 493:    @Binding var topSectionFraction: CGFloat
-- Line 543:        @Binding private var topSectionFraction: CGFloat
-- Line 721:    @Binding var inspectorMode: EditInspectorMode
+- Line 120:    @State private var topSectionFraction: CGFloat = 0.42
+- Line 121:    @State private var bottomContentHeight: CGFloat = 0
+- Line 494:    @Binding var topSectionFraction: CGFloat
+- Line 544:        @Binding private var topSectionFraction: CGFloat
+- Line 722:    @Binding var inspectorMode: EditInspectorMode
 
 ### Views/Review/ReviewMarkerInspectorViews.swift
-- Lines: 1240
+- Lines: 1242
 - Imports:
 - import AppKit
 - import SwiftUI
@@ -1954,91 +2137,91 @@ Generated: 2026-05-30 14:12:34
 - Line 5:    private var inspectorAccentRole: FlowTrackAccentRole {
 - Line 9:    func markerInspectorCard(_ summary: RecordingInspectionSummary) -> some View {
 - Line 10:        let accentRole = inspectorAccentRole
-- Line 53:    private func inspectorCardBackground(accentRole: FlowTrackAccentRole?) -> some View {
-- Line 69:    func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
-- Line 70:        let accentRole = inspectorAccentRole
-- Line 71:        let displayedMarkers = displayedEffectMarkerList(summary.effectMarkers)
-- Line 72:        let entries = displayedMarkers.enumerated().map { index, marker in
-- Line 126:    func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
-- Line 127:        let accentRole = inspectorAccentRole
-- Line 128:        let displayedMarkers = displayedMarkerList(summary.zoomMarkers)
-- Line 129:        let entries = displayedMarkers.enumerated().map { index, marker in
-- Line 184:    func markerListRow(
-- Line 195:        let selectionColor = FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
-- Line 196:        let backgroundFill: Color = isPlaybackHighlighted
-- Line 201:        let strokeColor: Color = isPlaybackHighlighted
-- Line 316:    func markerListDragPreview(
-- Line 322:        let accentRole = inspectorAccentRole
-- Line 338:    var markerEditorSection: some View {
-- Line 339:        let accentRole = inspectorAccentRole
-- Line 534:    var effectEditorSection: some View {
-- Line 535:        let accentRole = inspectorAccentRole
-- Line 598:                    let maxTimelineTime = max(viewModel.recordingSummary?.duration ?? marker.endTime, marker.holdEndTime)
-- Line 599:                    let maxFadeInDuration = max(min(3.0, marker.holdStartTime), 0)
-- Line 600:                    let maxFadeOutDuration = max(min(3.0, maxTimelineTime - marker.holdEndTime), 0)
-- Line 680:    func supportsCreatorDefaults(_ style: EffectStyle) -> Bool {
-- Line 689:    func markerDisplayNumber(for marker: ZoomPlanItem) -> Int {
-- Line 691:              let index = summary.zoomMarkers.firstIndex(where: { $0.id == marker.id }) else {
-- Line 697:    func timingSliderRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
-- Line 732:    func pointTimingRow(
-- Line 764:                let lowerBound = range.lowerBound
-- Line 765:                let upperBound = range.upperBound
-- Line 766:                let span = max(upperBound - lowerBound, 0.0001)
-- Line 767:                let clampedValue = min(max(value, lowerBound), upperBound)
-- Line 768:                let fraction = min(max((clampedValue - lowerBound) / span, 0), 1)
-- Line 769:                let handleInset: CGFloat = 3
-- Line 770:                let usableWidth = max(geometry.size.width - (handleInset * 2), 1)
-- Line 771:                let handleX = handleInset + (usableWidth * fraction)
-- Line 789:                            let localX = min(max(value.location.x - handleInset, 0), usableWidth)
-- Line 790:                            let newFraction = usableWidth <= 0 ? 0 : localX / usableWidth
-- Line 791:                            let newValue = lowerBound + (span * newFraction)
-- Line 803:    func beginEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
-- Line 811:    func endEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
-- Line 819:    func seekPlaybackToActiveEffectHoldPoint(_ holdPoint: ActiveEffectHoldPoint) {
-- Line 829:    func scheduleRealtimeEffectPreviewResume(for holdPoint: ActiveEffectHoldPoint) {
-- Line 839:    func nudgeActiveEffectHoldPoint(by delta: Double) {
-- Line 846:        let currentMarker = viewModel.selectedEffectMarker
-- Line 849:            let currentTime = currentMarker?.holdStartTime ?? viewModel.currentPlaybackTime
-- Line 852:            let currentTime = currentMarker?.holdEndTime ?? viewModel.currentPlaybackTime
-- Line 860:    func setSelectedEffectHoldStartTimeAndFollowPlayback(_ time: Double) {
-- Line 865:        let resolvedTime = viewModel.selectedEffectMarker?.holdStartTime ?? time
-- Line 869:    func setSelectedEffectHoldEndTimeAndFollowPlayback(_ time: Double) {
-- Line 874:        let resolvedTime = viewModel.selectedEffectMarker?.holdEndTime ?? time
-- Line 879:    func effectAmountEditorSection(for marker: EffectPlanItem) -> some View {
-- Line 917:    func distortionEditorSection(for marker: EffectPlanItem) -> some View {
-- Line 918:        let distortion = marker.distortion ?? .defaultConfiguration
-- Line 1003:    func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
-- Line 1024:    func markerTypeSymbol(for zoomType: ZoomType) -> String {
-- Line 1041:    let value: Double
-- Line 1042:    let range: ClosedRange<Double>
-- Line 1043:    let accentRole: FlowTrackAccentRole
-- Line 1044:    let onEditingChanged: (Bool) -> Void
-- Line 1045:    let action: (Double) -> Void
-- Line 1063:    var body: some View {
-- Line 1065:            let dimensions = sliderDimensions(in: geometry.size)
-- Line 1110:    private var accentColor: Color {
-- Line 1114:    private var clampedValue: Double {
-- Line 1118:    private func sliderDimensions(in size: CGSize) -> (trackHeight: CGFloat, thumbSize: CGFloat, thumbCenterX: CGFloat, filledWidth: CGFloat) {
-- Line 1119:        let trackHeight: CGFloat = 4
-- Line 1120:        let thumbSize: CGFloat = 14
-- Line 1121:        let thumbInset = thumbSize / 2
-- Line 1122:        let usableWidth = max(size.width - (thumbInset * 2), 1)
-- Line 1123:        let span = max(range.upperBound - range.lowerBound, 0.0001)
-- Line 1124:        let fraction = min(max((clampedValue - range.lowerBound) / span, 0), 1)
-- Line 1125:        let thumbCenterX = thumbInset + (usableWidth * fraction)
-- Line 1129:    private func value(for locationX: CGFloat, in size: CGSize) -> Double {
-- Line 1130:        let thumbInset: CGFloat = 7
-- Line 1131:        let usableWidth = max(size.width - (thumbInset * 2), 1)
-- Line 1132:        let localX = min(max(locationX - thumbInset, 0), usableWidth)
-- Line 1133:        let fraction = usableWidth <= 0 ? 0 : localX / usableWidth
+- Line 55:    private func inspectorCardBackground(accentRole: FlowTrackAccentRole?) -> some View {
+- Line 71:    func effectsInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 72:        let accentRole = inspectorAccentRole
+- Line 73:        let displayedMarkers = displayedEffectMarkerList(summary.effectMarkers)
+- Line 74:        let entries = displayedMarkers.enumerated().map { index, marker in
+- Line 128:    func markersInspector(_ summary: RecordingInspectionSummary) -> some View {
+- Line 129:        let accentRole = inspectorAccentRole
+- Line 130:        let displayedMarkers = displayedMarkerList(summary.zoomMarkers)
+- Line 131:        let entries = displayedMarkers.enumerated().map { index, marker in
+- Line 186:    func markerListRow(
+- Line 197:        let selectionColor = FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
+- Line 198:        let backgroundFill: Color = isPlaybackHighlighted
+- Line 203:        let strokeColor: Color = isPlaybackHighlighted
+- Line 318:    func markerListDragPreview(
+- Line 324:        let accentRole = inspectorAccentRole
+- Line 340:    var markerEditorSection: some View {
+- Line 341:        let accentRole = inspectorAccentRole
+- Line 536:    var effectEditorSection: some View {
+- Line 537:        let accentRole = inspectorAccentRole
+- Line 600:                    let maxTimelineTime = max(viewModel.recordingSummary?.duration ?? marker.endTime, marker.holdEndTime)
+- Line 601:                    let maxFadeInDuration = max(min(3.0, marker.holdStartTime), 0)
+- Line 602:                    let maxFadeOutDuration = max(min(3.0, maxTimelineTime - marker.holdEndTime), 0)
+- Line 682:    func supportsCreatorDefaults(_ style: EffectStyle) -> Bool {
+- Line 691:    func markerDisplayNumber(for marker: ZoomPlanItem) -> Int {
+- Line 693:              let index = summary.zoomMarkers.firstIndex(where: { $0.id == marker.id }) else {
+- Line 699:    func timingSliderRow(title: String, value: Double, range: ClosedRange<Double>, phase: MarkerTimingPhase, action: @escaping (Double) -> Void) -> some View {
+- Line 734:    func pointTimingRow(
+- Line 766:                let lowerBound = range.lowerBound
+- Line 767:                let upperBound = range.upperBound
+- Line 768:                let span = max(upperBound - lowerBound, 0.0001)
+- Line 769:                let clampedValue = min(max(value, lowerBound), upperBound)
+- Line 770:                let fraction = min(max((clampedValue - lowerBound) / span, 0), 1)
+- Line 771:                let handleInset: CGFloat = 3
+- Line 772:                let usableWidth = max(geometry.size.width - (handleInset * 2), 1)
+- Line 773:                let handleX = handleInset + (usableWidth * fraction)
+- Line 791:                            let localX = min(max(value.location.x - handleInset, 0), usableWidth)
+- Line 792:                            let newFraction = usableWidth <= 0 ? 0 : localX / usableWidth
+- Line 793:                            let newValue = lowerBound + (span * newFraction)
+- Line 805:    func beginEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
+- Line 813:    func endEffectHoldTimingEdit(_ holdPoint: ActiveEffectHoldPoint, _ phase: MarkerTimingPhase) {
+- Line 821:    func seekPlaybackToActiveEffectHoldPoint(_ holdPoint: ActiveEffectHoldPoint) {
+- Line 831:    func scheduleRealtimeEffectPreviewResume(for holdPoint: ActiveEffectHoldPoint) {
+- Line 841:    func nudgeActiveEffectHoldPoint(by delta: Double) {
+- Line 848:        let currentMarker = viewModel.selectedEffectMarker
+- Line 851:            let currentTime = currentMarker?.holdStartTime ?? viewModel.currentPlaybackTime
+- Line 854:            let currentTime = currentMarker?.holdEndTime ?? viewModel.currentPlaybackTime
+- Line 862:    func setSelectedEffectHoldStartTimeAndFollowPlayback(_ time: Double) {
+- Line 867:        let resolvedTime = viewModel.selectedEffectMarker?.holdStartTime ?? time
+- Line 871:    func setSelectedEffectHoldEndTimeAndFollowPlayback(_ time: Double) {
+- Line 876:        let resolvedTime = viewModel.selectedEffectMarker?.holdEndTime ?? time
+- Line 881:    func effectAmountEditorSection(for marker: EffectPlanItem) -> some View {
+- Line 919:    func distortionEditorSection(for marker: EffectPlanItem) -> some View {
+- Line 920:        let distortion = marker.distortion ?? .defaultConfiguration
+- Line 1005:    func effectAmountSliderRow(title: String, value: Double, action: @escaping (Double) -> Void) -> some View {
+- Line 1026:    func markerTypeSymbol(for zoomType: ZoomType) -> String {
+- Line 1043:    let value: Double
+- Line 1044:    let range: ClosedRange<Double>
+- Line 1045:    let accentRole: FlowTrackAccentRole
+- Line 1046:    let onEditingChanged: (Bool) -> Void
+- Line 1047:    let action: (Double) -> Void
+- Line 1065:    var body: some View {
+- Line 1067:            let dimensions = sliderDimensions(in: geometry.size)
+- Line 1112:    private var accentColor: Color {
+- Line 1116:    private var clampedValue: Double {
+- Line 1120:    private func sliderDimensions(in size: CGSize) -> (trackHeight: CGFloat, thumbSize: CGFloat, thumbCenterX: CGFloat, filledWidth: CGFloat) {
+- Line 1121:        let trackHeight: CGFloat = 4
+- Line 1122:        let thumbSize: CGFloat = 14
+- Line 1123:        let thumbInset = thumbSize / 2
+- Line 1124:        let usableWidth = max(size.width - (thumbInset * 2), 1)
+- Line 1125:        let span = max(range.upperBound - range.lowerBound, 0.0001)
+- Line 1126:        let fraction = min(max((clampedValue - range.lowerBound) / span, 0), 1)
+- Line 1127:        let thumbCenterX = thumbInset + (usableWidth * fraction)
+- Line 1131:    private func value(for locationX: CGFloat, in size: CGSize) -> Double {
+- Line 1132:        let thumbInset: CGFloat = 7
+- Line 1133:        let usableWidth = max(size.width - (thumbInset * 2), 1)
+- Line 1134:        let localX = min(max(locationX - thumbInset, 0), usableWidth)
+- Line 1135:        let fraction = usableWidth <= 0 ? 0 : localX / usableWidth
 - SwiftUI State:
-- Line 1039:    @Environment(\.flowTrackTheme) private var flowTrackTheme
-- Line 1047:    @State private var isDragging = false
-- Line 1151:    @Environment(\.flowTrackTheme) private var flowTrackTheme
-- Line 1158:    @State private var isPopoverPresented = false
+- Line 1041:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 1049:    @State private var isDragging = false
+- Line 1153:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 1160:    @State private var isPopoverPresented = false
 
 ### Views/Review/ReviewPlaybackMainViews.swift
-- Lines: 1371
+- Lines: 1372
 - Imports:
 - import AVFoundation
 - import SwiftUI
@@ -2103,28 +2286,28 @@ Generated: 2026-05-30 14:12:34
 - Line 852:                let fullWidth = max(geometry.size.width, 1)
 - Line 853:                let timelineWidth = max(fullWidth - (timelineHorizontalInset * 2), 1)
 - Line 854:                let playheadX = visibleRange.contains(viewModel.currentPlaybackTime)
-- Line 895:                            let adjustedAnchor = CGPoint(x: anchor.x + timelineHorizontalInset, y: anchor.y)
-- Line 931:                            let currentX = min(max(value.location.x - timelineHorizontalInset, 0), timelineWidth)
-- Line 932:                            let startX = min(max(value.startLocation.x - timelineHorizontalInset, 0), timelineWidth)
-- Line 933:                            let startPoint = CGPoint(x: startX, y: value.startLocation.y)
-- Line 934:                            let hasMovedEnough = abs(value.translation.width) > 3
-- Line 945:                            let zoomMarkerDragTarget = editorMode == .zoomAndClicks
-- Line 977:                                let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
-- Line 980:                                let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
-- Line 996:                            let endX = min(max(value.location.x - timelineHorizontalInset, 0), timelineWidth)
-- Line 997:                            let endPoint = CGPoint(x: endX, y: value.location.y)
-- Line 1008:                            let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
-- Line 1011:                            let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
-- Line 1014:                            let effectHit = editorMode == .effects
-- Line 1022:                            let targetTime = zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: endX, width: timelineWidth, visibleRange: visibleRange)
-- Line 1140:               let selectedMarker = viewModel.selectedEffectMarker,
-- Line 1142:               let region = pendingEffectFocusRegion ?? selectedMarker.focusRegion {
-- Line 1143:                let nudgeDistance = keyPress.modifiers.contains(.option) ? 10.0 : 1.0
-- Line 1144:                let nudgedRegion: EffectFocusRegion?
-- Line 1167:                    let nudgeAmount = keyPress.modifiers.contains(.command)
-- Line 1198:               let selectedMarker = viewModel.selectedZoomMarker,
-- Line 1199:               let region = pendingNoZoomOverflowRegion ?? selectedMarker.noZoomOverflowRegion {
-- Line 1200:                let nudgeDistance = keyPress.modifiers.contains(.option) ? 10.0 : 1.0
+- Line 896:                            let adjustedAnchor = CGPoint(x: anchor.x + timelineHorizontalInset, y: anchor.y)
+- Line 932:                            let currentX = min(max(value.location.x - timelineHorizontalInset, 0), timelineWidth)
+- Line 933:                            let startX = min(max(value.startLocation.x - timelineHorizontalInset, 0), timelineWidth)
+- Line 934:                            let startPoint = CGPoint(x: startX, y: value.startLocation.y)
+- Line 935:                            let hasMovedEnough = abs(value.translation.width) > 3
+- Line 946:                            let zoomMarkerDragTarget = editorMode == .zoomAndClicks
+- Line 978:                                let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
+- Line 981:                                let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
+- Line 997:                            let endX = min(max(value.location.x - timelineHorizontalInset, 0), timelineWidth)
+- Line 998:                            let endPoint = CGPoint(x: endX, y: value.location.y)
+- Line 1009:                            let zoomSnap = isTimelineScrubSnappingEnabled && editorMode == .zoomAndClicks
+- Line 1012:                            let effectSnap = isTimelineScrubSnappingEnabled && editorMode == .effects
+- Line 1015:                            let effectHit = editorMode == .effects
+- Line 1023:                            let targetTime = zoomSnap?.time ?? effectSnap?.time ?? timelineTime(for: endX, width: timelineWidth, visibleRange: visibleRange)
+- Line 1141:               let selectedMarker = viewModel.selectedEffectMarker,
+- Line 1143:               let region = pendingEffectFocusRegion ?? selectedMarker.focusRegion {
+- Line 1144:                let nudgeDistance = keyPress.modifiers.contains(.option) ? 10.0 : 1.0
+- Line 1145:                let nudgedRegion: EffectFocusRegion?
+- Line 1168:                    let nudgeAmount = keyPress.modifiers.contains(.command)
+- Line 1199:               let selectedMarker = viewModel.selectedZoomMarker,
+- Line 1200:               let region = pendingNoZoomOverflowRegion ?? selectedMarker.noZoomOverflowRegion {
+- Line 1201:                let nudgeDistance = keyPress.modifiers.contains(.option) ? 10.0 : 1.0
 
 ### Views/Review/ReviewPlaybackPreviewViews.swift
 - Lines: 1023
@@ -2265,50 +2448,52 @@ Generated: 2026-05-30 14:12:34
 - Line 173:            let cleaned = string.replacingOccurrences(of: "s", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
 
 ### Views/Review/ReviewTimelineInteractionViews.swift
-- Lines: 414
+- Lines: 436
 - Imports:
 - import AppKit
 - import SwiftUI
 - Types:
-- Line 78:extension ContentView {
+- Line 93:extension ContentView {
 - Functions / Vars:
 - Line 5:    let startX: CGFloat
 - Line 6:    let endX: CGFloat
-- Line 7:    let trackCenterY: CGFloat
-- Line 8:    let accentColor: Color
-- Line 9:    let pulseToken: Int
-- Line 13:    var body: some View {
-- Line 14:        let rawWidth = max(endX - startX, 1)
-- Line 15:        let bandWidth = max(rawWidth, 12)
-- Line 16:        let bandCenterX = startX + (rawWidth / 2)
-- Line 17:        let bandHeight: CGFloat = 28
-- Line 18:        let bracketHeight: CGFloat = 34
-- Line 19:        let lineOpacity = pulseActive ? 0.95 : 0.72
-- Line 20:        let fillOpacity = pulseActive ? 0.28 : 0.18
-- Line 62:    func path(in rect: CGRect) -> Path {
-- Line 63:        var path = Path()
-- Line 65:        let sideY = rect.height * 0.34
-- Line 66:        let neckY = rect.maxY
-- Line 80:    func timelineToolbar(
-- Line 111:    func timelineCanvasView(
-- Line 183:                    let displayedPhase = displayedPhaseProvider(layout.marker)
-- Line 238:               let hoveredTooltipMarker,
-- Line 239:               let hoveredTooltipMarkerNumber,
-- Line 240:               let hoveredTooltipAnchor {
-- Line 264:    func smartSetupTimelineHighlight(
-- Line 282:    func timelineRulerView(
-- Line 287:        let ticks = timelineRulerTicks(visibleRange: visibleRange, width: width)
-- Line 291:                let x = timelineX(for: tick.time, visibleRange: visibleRange, width: width)
-- Line 299:                    let labelInset: CGFloat = 22
-- Line 300:                    let labelX = min(max(x, labelInset), max(width - labelInset, labelInset))
-- Line 314:    func timelinePlayheadView(
-- Line 320:        let playheadColor = flowTrackTheme.timelinePlayhead
-- Line 321:        let separationColor = Color(nsColor: .controlBackgroundColor)
-- Line 364:    func timelineInstructionText(
-- Line 378:    func timelineInstructionView(
-- Line 394:    func timelineFooterView(
+- Line 7:    let eventXs: [CGFloat]
+- Line 8:    let trackCenterY: CGFloat
+- Line 9:    let accentColor: Color
+- Line 10:    let pulseToken: Int
+- Line 14:    var body: some View {
+- Line 15:        let rawWidth = max(endX - startX, 1)
+- Line 16:        let bandWidth = max(rawWidth, 12)
+- Line 17:        let bandCenterX = startX + (rawWidth / 2)
+- Line 18:        let bandHeight: CGFloat = 28
+- Line 19:        let bracketHeight: CGFloat = 34
+- Line 20:        let lineOpacity = pulseActive ? 0.95 : 0.72
+- Line 21:        let fillOpacity = pulseActive ? 0.28 : 0.18
+- Line 77:    func path(in rect: CGRect) -> Path {
+- Line 78:        var path = Path()
+- Line 80:        let sideY = rect.height * 0.34
+- Line 81:        let neckY = rect.maxY
+- Line 95:    func timelineToolbar(
+- Line 126:    func timelineCanvasView(
+- Line 200:                    let displayedPhase = displayedPhaseProvider(layout.marker)
+- Line 255:               let hoveredTooltipMarker,
+- Line 256:               let hoveredTooltipMarkerNumber,
+- Line 257:               let hoveredTooltipAnchor {
+- Line 281:    func smartSetupTimelineHighlight(
+- Line 290:            let visibleEventXs = eventTimes
+- Line 304:    func timelineRulerView(
+- Line 309:        let ticks = timelineRulerTicks(visibleRange: visibleRange, width: width)
+- Line 313:                let x = timelineX(for: tick.time, visibleRange: visibleRange, width: width)
+- Line 321:                    let labelInset: CGFloat = 22
+- Line 322:                    let labelX = min(max(x, labelInset), max(width - labelInset, labelInset))
+- Line 336:    func timelinePlayheadView(
+- Line 342:        let playheadColor = flowTrackTheme.timelinePlayhead
+- Line 343:        let separationColor = Color(nsColor: .controlBackgroundColor)
+- Line 386:    func timelineInstructionText(
+- Line 400:    func timelineInstructionView(
+- Line 416:    func timelineFooterView(
 - SwiftUI State:
-- Line 11:    @State private var pulseActive = false
+- Line 12:    @State private var pulseActive = false
 
 ### Views/Review/ReviewTimelineViews.swift
 - Lines: 467
@@ -2403,48 +2588,48 @@ Generated: 2026-05-30 14:12:34
 - Line 294:        let laneHeight: CGFloat = 9
 
 ### Views/Review/SmartSetupViews.swift
-- Lines: 368
+- Lines: 375
 - Imports:
 - import SwiftUI
 - Types:
 - Line 3:struct SmartSetupReviewPanel: View {
 - Functions / Vars:
-- Line 7:    var body: some View {
-- Line 34:    private var header: some View {
-- Line 73:    private var suggestionList: some View {
-- Line 98:    let suggestion: SmartSetupSuggestion
-- Line 99:    let isSelected: Bool
-- Line 100:    let onSelect: () -> Void
-- Line 101:    let onDismiss: () -> Void
-- Line 103:    var body: some View {
-- Line 104:        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
-- Line 162:    private func explanationLine(title: String, text: String) -> some View {
-- Line 174:    private func providerBadge(_ title: String, accentColor: Color) -> some View {
-- Line 193:    var displayTitle: String {
-- Line 206:    var providerBadgeTitle: String? {
-- Line 223:    var displayTitle: String {
-- Line 242:    var headline: String {
-- Line 260:    var reviewStateLabel: String {
-- Line 269:    var whatFlowTrackNoticed: String {
-- Line 288:    var suggestedChange: String {
-- Line 301:    var whyItMayHelp: String {
-- Line 314:    var displayTimeRange: String {
-- Line 319:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
-- Line 323:    var displayMetadata: String {
-- Line 324:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
-- Line 332:    private var zoomScaleText: String? {
-- Line 343:    private var confidenceText: String {
-- Line 347:    private var proposalTime: Double {
-- Line 360:    static func timeString(_ seconds: Double) -> String {
-- Line 361:        let clampedSeconds = max(seconds, 0)
-- Line 362:        let wholeSeconds = Int(clampedSeconds)
-- Line 363:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
-- Line 364:        let minutes = wholeSeconds / 60
-- Line 365:        let secondsRemainder = wholeSeconds % 60
+- Line 6:    var isEmbeddedInInspector = false
+- Line 8:    var body: some View {
+- Line 35:    private var header: some View {
+- Line 74:    private var suggestionList: some View {
+- Line 99:    let suggestion: SmartSetupSuggestion
+- Line 100:    let isSelected: Bool
+- Line 101:    let onSelect: () -> Void
+- Line 102:    let onDismiss: () -> Void
+- Line 104:    var body: some View {
+- Line 105:        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
+- Line 163:    private func providerBadge(_ title: String, accentColor: Color) -> some View {
+- Line 182:    var providerBadgeTitle: String? {
+- Line 210:    private var hasTextChangeSupport: Bool {
+- Line 217:    private var hasScreenTextSupport: Bool {
+- Line 226:    var headline: String {
+- Line 244:    var reviewStateLabel: String {
+- Line 253:    var adviceBody: String {
+- Line 261:    private var fallbackAdviceBody: String {
+- Line 304:    var displayTimeRange: String {
+- Line 309:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
+- Line 313:    var displayMetadata: String {
+- Line 319:    private var opportunitySummary: String {
+- Line 335:    private var confidenceText: String? {
+- Line 346:    private var proposalTime: Double {
+- Line 359:    private func stableChoice(from options: [String]) -> String {
+- Line 361:        let value = suggestionID.unicodeScalars.reduce(0) { partialResult, scalar in
+- Line 367:    static func timeString(_ seconds: Double) -> String {
+- Line 368:        let clampedSeconds = max(seconds, 0)
+- Line 369:        let wholeSeconds = Int(clampedSeconds)
+- Line 370:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+- Line 371:        let minutes = wholeSeconds / 60
+- Line 372:        let secondsRemainder = wholeSeconds % 60
 - SwiftUI State:
 - Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 - Line 5:    @ObservedObject var viewModel: CaptureSetupViewModel
-- Line 96:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 97:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 
 ### Views/Review/TimelineToolbarControls.swift
 - Lines: 315

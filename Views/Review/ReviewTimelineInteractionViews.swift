@@ -4,6 +4,7 @@ import SwiftUI
 private struct SmartSuggestionsTimelineHighlightView: View {
     let startX: CGFloat
     let endX: CGFloat
+    let eventXs: [CGFloat]
     let trackCenterY: CGFloat
     let accentColor: Color
     let pulseToken: Int
@@ -38,6 +39,20 @@ private struct SmartSuggestionsTimelineHighlightView: View {
                     .frame(width: 2, height: bracketHeight)
             }
             .frame(width: bandWidth, height: bracketHeight)
+
+            ForEach(Array(eventXs.enumerated()), id: \.offset) { _, eventX in
+                Circle()
+                    .fill(accentColor.opacity(lineOpacity))
+                    .frame(width: 6, height: 6)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(pulseActive ? 0.62 : 0.38), lineWidth: 1)
+                    )
+                    .position(
+                        x: min(max(eventX - bandCenterX + (bandWidth / 2), 3), max(bandWidth - 3, 3)),
+                        y: bandHeight / 2
+                    )
+            }
         }
         .scaleEffect(x: 1, y: pulseActive ? 1.12 : 1, anchor: .center)
         .position(x: bandCenterX, y: trackCenterY)
@@ -118,6 +133,7 @@ extension ContentView {
         segmentLayouts: [TimelineSegmentLayout],
         effectLayouts: [EffectTimelineSegmentLayout],
         smartSetupHighlightRange: SmartSetupSourceTimeRange?,
+        smartSetupHighlightEventTimes: [Double],
         smartSetupHighlightPulseToken: Int,
         timelineInteractionSuppressed: Bool,
         selectedZoomMarkerID: String?,
@@ -158,6 +174,7 @@ extension ContentView {
             if let smartSetupHighlightRange {
                 smartSetupTimelineHighlight(
                     range: smartSetupHighlightRange,
+                    eventTimes: smartSetupHighlightEventTimes,
                     visibleRange: visibleRange,
                     width: width,
                     trackCenterY: trackCenterY,
@@ -263,15 +280,20 @@ extension ContentView {
     @ViewBuilder
     func smartSetupTimelineHighlight(
         range: SmartSetupSourceTimeRange,
+        eventTimes: [Double],
         visibleRange: TimelineVisibleRange,
         width: CGFloat,
         trackCenterY: CGFloat,
         pulseToken: Int
     ) -> some View {
         if let clippedRange = visibleRange.clippedRange(start: range.startTime, end: range.endTime) {
+            let visibleEventXs = eventTimes
+                .filter { visibleRange.contains($0) }
+                .map { timelineX(for: $0, visibleRange: visibleRange, width: width) }
             SmartSuggestionsTimelineHighlightView(
                 startX: timelineX(for: clippedRange.start, visibleRange: visibleRange, width: width),
                 endX: timelineX(for: clippedRange.end, visibleRange: visibleRange, width: width),
+                eventXs: visibleEventXs,
                 trackCenterY: trackCenterY,
                 accentColor: FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme),
                 pulseToken: pulseToken

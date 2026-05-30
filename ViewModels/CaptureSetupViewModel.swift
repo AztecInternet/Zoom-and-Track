@@ -8,6 +8,14 @@ import AppKit
 import AVKit
 import Foundation
 
+private struct SmartSetupAnalysisResult {
+    let heuristicSuggestions: [SmartSetupSuggestion]
+    let suggestions: [SmartSetupSuggestion]
+    let frameDiagnostics: ActivityRegionFrameSamplingDiagnostics
+    let ocrDiagnostics: SmartSuggestionOCRDiagnostics
+    let regionMetadata: [String: SmartSuggestionOCRRegionMetadata]
+}
+
 @MainActor
 final class CaptureSetupViewModel: ObservableObject {
     enum PlaybackPresentationMode {
@@ -41,6 +49,18 @@ final class CaptureSetupViewModel: ObservableObject {
                 return false
             }
         }
+    }
+
+    private struct SmartSuggestionContextDebugItem {
+        let suggestionID: String
+        let title: String
+        let timeRange: String
+        let uiContext: SmartSuggestionUIContext
+        let uiContextConfidence: Double
+        let supportingText: String?
+        let contextSpecificWordingEligible: Bool
+        let contextSpecificWordingApplied: Bool
+        let fallbackReason: String?
     }
 
     @Published var displays: [ShareableCaptureTarget] = []
@@ -101,6 +121,9 @@ final class CaptureSetupViewModel: ObservableObject {
     @Published private(set) var smartSetupStatusMessage: String?
     @Published private(set) var isRunningSmartSetup = false
     
+    private var latestSmartSuggestionContextDebug: [SmartSuggestionContextDebugItem] = []
+    private var smartSetupRunTask: Task<Void, Never>?
+    private var smartSetupRunRevision = 0
     private var hasRestoredLastRecording = false
     private var activePlaybackScopeURL: URL?
     private var mainPlaybackTimeObserver: Any?
@@ -144,6 +167,8 @@ final class CaptureSetupViewModel: ObservableObject {
     private let markerPreviewCacheService = MarkerPreviewCacheService()
     private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
     private let smartSuggestionAggregator = SmartSuggestionAggregator.defaultAggregator()
+    private let smartSuggestionFrameSampler = SmartSuggestionFrameSamplerService()
+    private let smartSuggestionVisionAnalysisService = SmartSuggestionVisionAnalysisService()
     private let exportManager = ExportManager()
     private let previewTransitionFadeInDuration: TimeInterval = 0.12
     private let previewTransitionHoldDuration: TimeInterval = 1.0
@@ -526,39 +551,86 @@ final class CaptureSetupViewModel: ObservableObject {
     }
 
     func runSmartSetup() {
-        guard !isRunningSmartSetup else { return }
         guard let summary = recordingSummary else {
             smartSetupStatusMessage = "Load a capture before running Smart Suggestions."
             return
         }
 
-        isRunningSmartSetup = true
-        smartSetupStatusMessage = "Running Smart Suggestions..."
-        defer { isRunningSmartSetup = false }
+        smartSetupRunTask?.cancel()
+        smartSetupRunRevision &+= 1
+        let runRevision = smartSetupRunRevision
+        let bundleURL = summary.bundleURL
+        let recordingURL = summary.recordingURL
+        let duration = summary.duration ?? summary.lastEventTimestamp ?? 0
+        let contentCoordinateSize = summary.contentCoordinateSize
+        let existingZoomMarkers = summary.zoomMarkers
+        let existingEffectMarkers = summary.effectMarkers
 
-        do {
-            let events = try projectBundleService.loadRecordedEvents(from: summary.bundleURL)
-            let context = SmartSuggestionContext(
-                events: events,
-                duration: summary.duration ?? summary.lastEventTimestamp ?? 0,
-                contentCoordinateSize: summary.contentCoordinateSize,
-                existingZoomMarkers: summary.zoomMarkers,
-                existingEffectMarkers: summary.effectMarkers
-            )
-            let suggestions = smartSuggestionAggregator.generateSuggestions(context: context)
-            pendingSmartSetupSuggestions = suggestions
-            selectedSmartSetupSuggestionID = suggestions.first?.suggestionID
-            activeSmartSuggestionPreviewEndTime = nil
-            let providerSummary = smartSuggestionProviderSummary(for: suggestions)
-            smartSetupStatusMessage = suggestions.isEmpty
-                ? "Smart Suggestions did not find any useful suggestions."
-                : "Smart Suggestions found \(suggestions.count) suggestion\(suggestions.count == 1 ? "" : "s"). \(providerSummary)"
-        } catch {
-            pendingSmartSetupSuggestions = []
-            selectedSmartSetupSuggestionID = nil
-            activeSmartSuggestionPreviewEndTime = nil
-            smartSetupStatusMessage = "Smart Suggestions could not load recorded events: \(error.localizedDescription)"
+        isRunningSmartSetup = true
+        smartSetupStatusMessage = "Checking screen activity..."
+
+        smartSetupRunTask = Task { [weak self] in
+            do {
+                let result = try await Task.detached(priority: .utility) {
+                    try await makeSmartSetupAnalysis(
+                        bundleURL: bundleURL,
+                        recordingURL: recordingURL,
+                        duration: duration,
+                        contentCoordinateSize: contentCoordinateSize,
+                        existingZoomMarkers: existingZoomMarkers,
+                        existingEffectMarkers: existingEffectMarkers
+                    )
+                }.value
+
+                guard !Task.isCancelled else { return }
+                self?.finishSmartSetupRun(result, revision: runRevision)
+            } catch is CancellationError {
+                self?.finishCancelledSmartSetupRun(revision: runRevision)
+            } catch {
+                self?.finishFailedSmartSetupRun(error, revision: runRevision)
+            }
         }
+    }
+
+    private func finishSmartSetupRun(_ result: SmartSetupAnalysisResult, revision: Int) {
+        guard revision == smartSetupRunRevision else { return }
+
+        let contextDebugItems = smartSuggestionContextDebugItems(
+            visibleSuggestions: result.suggestions,
+            originalSuggestions: result.heuristicSuggestions,
+            regionMetadata: result.regionMetadata
+        )
+        latestSmartSuggestionContextDebug = contextDebugItems
+        printSmartSuggestionContextDebug(contextDebugItems)
+        printSmartSuggestionOCRDebug(result.ocrDiagnostics)
+        pendingSmartSetupSuggestions = result.suggestions
+        selectedSmartSetupSuggestionID = result.suggestions.first?.suggestionID
+        activeSmartSuggestionPreviewEndTime = nil
+        isRunningSmartSetup = false
+            let visionSummary = smartSuggestionVisionSummary(
+                suggestionCount: result.suggestions.count,
+                originalSuggestionCount: result.heuristicSuggestions.count,
+                frameDiagnostics: result.frameDiagnostics,
+                ocrDiagnostics: result.ocrDiagnostics
+            )
+        smartSetupStatusMessage = result.suggestions.isEmpty
+            ? "Smart Suggestions did not find any useful suggestions. \(visionSummary)"
+            : "\(result.suggestions.count) suggestion\(result.suggestions.count == 1 ? "" : "s") found. \(visionSummary)"
+    }
+
+    private func finishCancelledSmartSetupRun(revision: Int) {
+        guard revision == smartSetupRunRevision else { return }
+        isRunningSmartSetup = false
+    }
+
+    private func finishFailedSmartSetupRun(_ error: Error, revision: Int) {
+        guard revision == smartSetupRunRevision else { return }
+        pendingSmartSetupSuggestions = []
+        selectedSmartSetupSuggestionID = nil
+        activeSmartSuggestionPreviewEndTime = nil
+        latestSmartSuggestionContextDebug = []
+        isRunningSmartSetup = false
+        smartSetupStatusMessage = "Smart Suggestions could not load recorded events: \(error.localizedDescription)"
     }
 
     private func smartSuggestionProviderSummary(for suggestions: [SmartSetupSuggestion]) -> String {
@@ -569,6 +641,173 @@ final class CaptureSetupViewModel: ObservableObject {
         let clicksCount = counts["clicks"] ?? 0
         let templateCount = counts["templates"] ?? 0
         return "Smart Suggestions: \(rulesCount) rules, \(clickClustersCount) click-cluster\(clickClustersCount == 1 ? "" : "s"), \(clicksCount) clicks, \(templateCount) template\(templateCount == 1 ? "" : "s")."
+    }
+
+    private func smartSuggestionFrameSamplingSummary(_ diagnostics: ActivityRegionFrameSamplingDiagnostics) -> String {
+        let elapsedMilliseconds = Int((diagnostics.elapsedSeconds * 1_000).rounded())
+        return "Activity Regions: \(diagnostics.regionCount), sampled frames: \(diagnostics.sampledFrameCount), failed: \(diagnostics.failedSampleCount), time: \(elapsedMilliseconds)ms."
+    }
+
+    private func smartSuggestionVisionSummary(
+        suggestionCount: Int,
+        originalSuggestionCount: Int,
+        frameDiagnostics: ActivityRegionFrameSamplingDiagnostics,
+        ocrDiagnostics: SmartSuggestionOCRDiagnostics
+    ) -> String {
+        var summary = ocrDiagnostics.analyzedFrameCount > 0
+            ? "Screen content checked."
+            : "Screen content check skipped."
+        let reducedSuggestionCount = max(originalSuggestionCount - suggestionCount, 0)
+        if reducedSuggestionCount > 0 {
+            summary += " \(reducedSuggestionCount) weak suggestion\(reducedSuggestionCount == 1 ? "" : "s") reduced."
+        }
+        if frameDiagnostics.failedSampleCount > 0 || ocrDiagnostics.failedOCRCount > 0 {
+            summary += " \(frameDiagnostics.failedSampleCount + ocrDiagnostics.failedOCRCount) screen check\(frameDiagnostics.failedSampleCount + ocrDiagnostics.failedOCRCount == 1 ? "" : "s") could not complete."
+        }
+        return summary
+    }
+
+    private func smartSuggestionUIContextSummary(
+        _ contextDebugItems: [SmartSuggestionContextDebugItem]
+    ) -> String {
+        guard !contextDebugItems.isEmpty else { return "" }
+
+        let counts = Dictionary(grouping: contextDebugItems, by: \.uiContext)
+            .mapValues(\.count)
+        let contextParts = SmartSuggestionUIContext.allCases.compactMap { context -> String? in
+            guard let count = counts[context],
+                  count > 0 else {
+                return nil
+            }
+            return "\(context.displayName) \(count)"
+        }
+
+        guard !contextParts.isEmpty else { return "" }
+        return "Context: \(contextParts.joined(separator: ", "))."
+    }
+
+    private func smartSuggestionContextDebugItems(
+        visibleSuggestions: [SmartSetupSuggestion],
+        originalSuggestions: [SmartSetupSuggestion],
+        regionMetadata: [String: SmartSuggestionOCRRegionMetadata]
+    ) -> [SmartSuggestionContextDebugItem] {
+        let originalSuggestionsByID = Dictionary(
+            uniqueKeysWithValues: originalSuggestions.map { ($0.suggestionID, $0) }
+        )
+
+        return visibleSuggestions.map { suggestion in
+            let metadata = regionMetadata["suggestion-\(suggestion.suggestionID)"]
+            let originalSuggestion = originalSuggestionsByID[suggestion.suggestionID]
+            let eligible = metadata?.hasUsefulUIContext ?? false
+            let applied = eligible
+                && (
+                    suggestion.userTitle != originalSuggestion?.userTitle
+                    || suggestion.userReason != originalSuggestion?.userReason
+                )
+
+            return SmartSuggestionContextDebugItem(
+                suggestionID: suggestion.suggestionID,
+                title: suggestion.userTitle ?? smartSuggestionFallbackTitle(for: suggestion),
+                timeRange: smartSuggestionDebugTimeRange(for: suggestion),
+                uiContext: metadata?.uiContext ?? .unknown,
+                uiContextConfidence: metadata?.uiContextConfidence ?? 0,
+                supportingText: metadata?.supportingText,
+                contextSpecificWordingEligible: eligible,
+                contextSpecificWordingApplied: applied,
+                fallbackReason: smartSuggestionContextFallbackReason(
+                    metadata: metadata,
+                    eligible: eligible,
+                    applied: applied
+                )
+            )
+        }
+    }
+
+    private func smartSuggestionContextFallbackReason(
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        eligible: Bool,
+        applied: Bool
+    ) -> String? {
+        guard let metadata else { return "no OCR metadata for visible suggestion" }
+        guard eligible else {
+            if metadata.uiContext == .unknown {
+                return "unknown context"
+            }
+            return "below threshold"
+        }
+        guard applied else { return "context matched existing wording" }
+        return nil
+    }
+
+    private func printSmartSuggestionContextDebug(_ items: [SmartSuggestionContextDebugItem]) {
+        guard !items.isEmpty else {
+            print("[SmartSuggestionContext] no visible suggestions")
+            return
+        }
+
+        print("[SmartSuggestionContext] \(smartSuggestionUIContextSummary(items))")
+        for item in items {
+            let confidence = String(format: "%.2f", item.uiContextConfidence)
+            let supportingText = item.supportingText ?? "none"
+            let wording = item.contextSpecificWordingApplied
+                ? "applied"
+                : "fallback: \(item.fallbackReason ?? "not applied")"
+            print("[SmartSuggestionContext] \(item.timeRange) | \(item.title) | \(item.uiContext.rawValue) | \(confidence) | supporting: \(supportingText) | eligible: \(item.contextSpecificWordingEligible) | \(wording)")
+        }
+    }
+
+    private func printSmartSuggestionOCRDebug(_ diagnostics: SmartSuggestionOCRDiagnostics) {
+        let previewText = diagnostics.previewStrings.isEmpty
+            ? "none"
+            : diagnostics.previewStrings.joined(separator: " | ")
+        print("[SmartSuggestionOCR] frames: \(diagnostics.analyzedFrameCount), crop observations: \(diagnostics.cropTextObservationCount), full-frame fallback observations: \(diagnostics.fullFrameFallbackTextObservationCount), failed: \(diagnostics.failedOCRCount), preview: \(previewText)")
+    }
+
+    private func smartSuggestionDebugTimeRange(for suggestion: SmartSetupSuggestion) -> String {
+        if let sourceTimeRange = suggestion.sourceTimeRange {
+            return "\(smartSuggestionDebugTimeString(sourceTimeRange.startTime))–\(smartSuggestionDebugTimeString(sourceTimeRange.endTime))"
+        }
+
+        if let sourceEventTimestamp = suggestion.sourceEvents.first?.timestamp {
+            return smartSuggestionDebugTimeString(sourceEventTimestamp)
+        }
+
+        return smartSuggestionDebugTimeString(smartSuggestionProposalTime(for: suggestion))
+    }
+
+    private func smartSuggestionDebugTimeString(_ seconds: Double) -> String {
+        let clampedSeconds = max(seconds, 0)
+        let wholeSeconds = Int(clampedSeconds)
+        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+        let minutes = wholeSeconds / 60
+        let secondsRemainder = wholeSeconds % 60
+        return String(format: "%02d:%02d.%d", minutes, secondsRemainder, tenths)
+    }
+
+    private func smartSuggestionProposalTime(for suggestion: SmartSetupSuggestion) -> Double {
+        switch suggestion.proposal {
+        case .zoom(let proposal):
+            return proposal.sourceEventTimestamp
+        case .zoomAdjustment(let proposal):
+            return proposal.startTime
+        case .effect(let proposal):
+            return proposal.sourceEventTimestamp
+        case .regionTighten(let proposal):
+            return proposal.sourceTime
+        }
+    }
+
+    private func smartSuggestionFallbackTitle(for suggestion: SmartSetupSuggestion) -> String {
+        switch suggestion.proposal {
+        case .zoomAdjustment:
+            return "Keep this interaction in focus"
+        case .zoom:
+            return "Guide attention to this moment"
+        case .effect:
+            return "Consider a subtle focus effect"
+        case .regionTighten:
+            return "Review this focus area"
+        }
     }
 
     func acceptSmartSetupSuggestion(_ suggestionID: String) {
@@ -3199,4 +3438,64 @@ final class CaptureSetupViewModel: ObservableObject {
         }
         isEffectMarkerSelectionPinned = false
     }
+}
+
+private func makeSmartSetupAnalysis(
+    bundleURL: URL,
+    recordingURL: URL,
+    duration: Double,
+    contentCoordinateSize: CGSize,
+    existingZoomMarkers: [ZoomPlanItem],
+    existingEffectMarkers: [EffectPlanItem]
+) async throws -> SmartSetupAnalysisResult {
+    let events = try ProjectBundleService().loadRecordedEvents(from: bundleURL)
+    try Task.checkCancellation()
+
+    let context = SmartSuggestionContext(
+        events: events,
+        duration: duration,
+        contentCoordinateSize: contentCoordinateSize,
+        existingZoomMarkers: existingZoomMarkers,
+        existingEffectMarkers: existingEffectMarkers
+    )
+    let heuristicSuggestions = SmartSuggestionAggregator.defaultAggregator().generateSuggestions(context: context)
+    try Task.checkCancellation()
+
+    let activityRegions = ActivityRegionBuilder.activityRegions(
+        from: heuristicSuggestions,
+        events: events,
+        duration: context.duration,
+        contentCoordinateSize: context.contentCoordinateSize
+    )
+    let frameSamplingResult = await SmartSuggestionFrameSamplerService().sampleFrames(
+        recordingURL: recordingURL,
+        duration: context.duration,
+        regions: activityRegions
+    )
+    try Task.checkCancellation()
+
+    let visionAnalysisService = SmartSuggestionVisionAnalysisService()
+    let ocrAnalysisResult = await visionAnalysisService.analyzeText(
+        in: frameSamplingResult.samples,
+        regions: activityRegions
+    )
+    try Task.checkCancellation()
+
+    let regionMetadata = visionAnalysisService.regionMetadata(
+        for: activityRegions,
+        analysisResult: ocrAnalysisResult,
+        contentCoordinateSize: context.contentCoordinateSize
+    )
+    let suggestions = visionAnalysisService.visionTunedSuggestions(
+        from: heuristicSuggestions,
+        regionMetadataByID: regionMetadata
+    )
+
+    return SmartSetupAnalysisResult(
+        heuristicSuggestions: heuristicSuggestions,
+        suggestions: suggestions,
+        frameDiagnostics: frameSamplingResult.diagnostics,
+        ocrDiagnostics: ocrAnalysisResult.diagnostics,
+        regionMetadata: regionMetadata
+    )
 }

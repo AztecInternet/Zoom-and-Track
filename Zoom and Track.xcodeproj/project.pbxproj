@@ -10,6 +10,8 @@
 		DD2512CC2FC5979C0043ED21 /* FlowTrackOnboardingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512CB2FC5979C0043ED21 /* FlowTrackOnboardingManager.swift */; };
 		DD2512CE2FC599930043ED21 /* FlowTrackOnboardingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512CD2FC599930043ED21 /* FlowTrackOnboardingViews.swift */; };
 		DD2512D02FCA39FD0043ED21 /* SmartSuggestionProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512CF2FCA39FD0043ED21 /* SmartSuggestionProviders.swift */; };
+		DD2512D22FCB48FE0043ED21 /* SmartSuggestionFrameSamplerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512D12FCB48FE0043ED21 /* SmartSuggestionFrameSamplerService.swift */; };
+		DD2512D42FCB50640043ED21 /* SmartSuggestionVisionAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512D32FCB50640043ED21 /* SmartSuggestionVisionAnalysisService.swift */; };
 		DD367DF52FBCD8A000F44877 /* HelpModeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */; };
 		DD367DF72FBCE4AC00F44877 /* FlowTrackCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF62FBCE4AC00F44877 /* FlowTrackCommands.swift */; };
 		DD367DF92FBF034000F44877 /* FlowTrackTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF82FBF034000F44877 /* FlowTrackTheme.swift */; };
@@ -64,6 +66,8 @@
 		DD2512CB2FC5979C0043ED21 /* FlowTrackOnboardingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackOnboardingManager.swift; sourceTree = "<group>"; };
 		DD2512CD2FC599930043ED21 /* FlowTrackOnboardingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackOnboardingViews.swift; sourceTree = "<group>"; };
 		DD2512CF2FCA39FD0043ED21 /* SmartSuggestionProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionProviders.swift; sourceTree = "<group>"; };
+		DD2512D12FCB48FE0043ED21 /* SmartSuggestionFrameSamplerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionFrameSamplerService.swift; sourceTree = "<group>"; };
+		DD2512D32FCB50640043ED21 /* SmartSuggestionVisionAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionVisionAnalysisService.swift; sourceTree = "<group>"; };
 		DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpModeViews.swift; sourceTree = "<group>"; };
 		DD367DF62FBCE4AC00F44877 /* FlowTrackCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackCommands.swift; sourceTree = "<group>"; };
 		DD367DF82FBF034000F44877 /* FlowTrackTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackTheme.swift; sourceTree = "<group>"; };
@@ -190,6 +194,8 @@
 				DD367DFC2FC064DC00F44877 /* FlowTrackThemeStore.swift */,
 				DD367E002FC3A39A00F44877 /* SmartSetupSuggestionService.swift */,
 				DD2512CF2FCA39FD0043ED21 /* SmartSuggestionProviders.swift */,
+				DD2512D12FCB48FE0043ED21 /* SmartSuggestionFrameSamplerService.swift */,
+				DD2512D32FCB50640043ED21 /* SmartSuggestionVisionAnalysisService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -376,6 +382,7 @@
 				DD88BC552FA8562800BFFBBF /* ContentView.swift in Sources */,
 				DD88BC652FAA78E400BFFBBF /* ZoomAndClicksEditorViews.swift in Sources */,
 				DD367DFB2FBF04BE00F44877 /* FlowTrackColourLabViews.swift in Sources */,
+				DD2512D22FCB48FE0043ED21 /* SmartSuggestionFrameSamplerService.swift in Sources */,
 				DD367DF92FBF034000F44877 /* FlowTrackTheme.swift in Sources */,
 				DDA524B92FB47F36001B74F0 /* CreatorEffectDefaultsService.swift in Sources */,
 				DD88BC6D2FAAA39800BFFBBF /* CaptureInfoInspectorViews.swift in Sources */,
@@ -388,6 +395,7 @@
 				DD88BC572FA8562800BFFBBF /* InputEventCaptureService.swift in Sources */,
 				DD88BC832FABA9AC00BFFBBF /* CaptureMetadataManager.swift in Sources */,
 				DD88BC712FAAACE400BFFBBF /* LibraryViews.swift in Sources */,
+				DD2512D42FCB50640043ED21 /* SmartSuggestionVisionAnalysisService.swift in Sources */,
 				DD88BC912FABCCC800BFFBBF /* TimecodeFormatting.swift in Sources */,
 				DD88BC752FAAFD1F00BFFBBF /* SettingsViews.swift in Sources */,
 				DD88BC582FA8562800BFFBBF /* MarkerPreviewCacheService.swift in Sources */,

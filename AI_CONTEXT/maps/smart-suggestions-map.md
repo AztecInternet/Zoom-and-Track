@@ -1,6 +1,6 @@
 # Smart Suggestions Map
 
-Generated: 2026-05-30 14:12:34
+Generated: 2026-05-30 21:12:39
 
 ## Files
 
@@ -184,46 +184,46 @@ Generated: 2026-05-30 14:12:34
 - Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
 
 ### Views/Review/SmartSetupViews.swift
-- Lines: 368
+- Lines: 375
 - Imports:
 - import SwiftUI
 - Types:
 - Line 3:struct SmartSetupReviewPanel: View {
 - Functions / Vars:
-- Line 7:    var body: some View {
-- Line 34:    private var header: some View {
-- Line 73:    private var suggestionList: some View {
-- Line 98:    let suggestion: SmartSetupSuggestion
-- Line 99:    let isSelected: Bool
-- Line 100:    let onSelect: () -> Void
-- Line 101:    let onDismiss: () -> Void
-- Line 103:    var body: some View {
-- Line 104:        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
-- Line 162:    private func explanationLine(title: String, text: String) -> some View {
-- Line 174:    private func providerBadge(_ title: String, accentColor: Color) -> some View {
-- Line 193:    var displayTitle: String {
-- Line 206:    var providerBadgeTitle: String? {
-- Line 223:    var displayTitle: String {
-- Line 242:    var headline: String {
-- Line 260:    var reviewStateLabel: String {
-- Line 269:    var whatFlowTrackNoticed: String {
-- Line 288:    var suggestedChange: String {
-- Line 301:    var whyItMayHelp: String {
-- Line 314:    var displayTimeRange: String {
-- Line 319:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
-- Line 323:    var displayMetadata: String {
-- Line 324:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
-- Line 332:    private var zoomScaleText: String? {
-- Line 343:    private var confidenceText: String {
-- Line 347:    private var proposalTime: Double {
-- Line 360:    static func timeString(_ seconds: Double) -> String {
-- Line 361:        let clampedSeconds = max(seconds, 0)
-- Line 362:        let wholeSeconds = Int(clampedSeconds)
-- Line 363:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
-- Line 364:        let minutes = wholeSeconds / 60
-- Line 365:        let secondsRemainder = wholeSeconds % 60
+- Line 6:    var isEmbeddedInInspector = false
+- Line 8:    var body: some View {
+- Line 35:    private var header: some View {
+- Line 74:    private var suggestionList: some View {
+- Line 99:    let suggestion: SmartSetupSuggestion
+- Line 100:    let isSelected: Bool
+- Line 101:    let onSelect: () -> Void
+- Line 102:    let onDismiss: () -> Void
+- Line 104:    var body: some View {
+- Line 105:        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
+- Line 163:    private func providerBadge(_ title: String, accentColor: Color) -> some View {
+- Line 182:    var providerBadgeTitle: String? {
+- Line 210:    private var hasTextChangeSupport: Bool {
+- Line 217:    private var hasScreenTextSupport: Bool {
+- Line 226:    var headline: String {
+- Line 244:    var reviewStateLabel: String {
+- Line 253:    var adviceBody: String {
+- Line 261:    private var fallbackAdviceBody: String {
+- Line 304:    var displayTimeRange: String {
+- Line 309:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
+- Line 313:    var displayMetadata: String {
+- Line 319:    private var opportunitySummary: String {
+- Line 335:    private var confidenceText: String? {
+- Line 346:    private var proposalTime: Double {
+- Line 359:    private func stableChoice(from options: [String]) -> String {
+- Line 361:        let value = suggestionID.unicodeScalars.reduce(0) { partialResult, scalar in
+- Line 367:    static func timeString(_ seconds: Double) -> String {
+- Line 368:        let clampedSeconds = max(seconds, 0)
+- Line 369:        let wholeSeconds = Int(clampedSeconds)
+- Line 370:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+- Line 371:        let minutes = wholeSeconds / 60
+- Line 372:        let secondsRemainder = wholeSeconds % 60
 - SwiftUI State:
 - Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 - Line 5:    @ObservedObject var viewModel: CaptureSetupViewModel
-- Line 96:    @Environment(\.flowTrackTheme) private var flowTrackTheme
+- Line 97:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 

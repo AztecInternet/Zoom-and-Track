@@ -3,6 +3,7 @@ import SwiftUI
 struct SmartSetupReviewPanel: View {
     @Environment(\.flowTrackTheme) private var flowTrackTheme
     @ObservedObject var viewModel: CaptureSetupViewModel
+    var isEmbeddedInInspector = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -19,15 +20,15 @@ struct SmartSetupReviewPanel: View {
                 suggestionList
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(isEmbeddedInInspector ? 0 : 12)
+        .frame(maxWidth: .infinity, maxHeight: isEmbeddedInInspector ? .infinity : nil, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(flowTrackTheme.inspectorBackground)
+                .fill(isEmbeddedInInspector ? Color.clear : flowTrackTheme.inspectorBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(flowTrackTheme.inspectorBorder, lineWidth: 1)
+                .stroke(isEmbeddedInInspector ? Color.clear : flowTrackTheme.inspectorBorder, lineWidth: 1)
         )
     }
 
@@ -88,7 +89,7 @@ struct SmartSetupReviewPanel: View {
             }
             .padding(.vertical, 1)
         }
-        .frame(maxHeight: 260)
+        .frame(maxHeight: isEmbeddedInInspector ? .infinity : 260)
     }
 }
 
@@ -103,18 +104,19 @@ private struct SmartSetupSuggestionRow: View {
     var body: some View {
         let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
 
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(suggestion.headline)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(flowTrackTheme.primaryText)
-                if let providerBadgeTitle = suggestion.providerBadgeTitle {
-                    providerBadge(providerBadgeTitle, accentColor: accentColor)
-                }
-                Spacer(minLength: 6)
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .center, spacing: 8) {
                 Text(suggestion.reviewStateLabel)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(isSelected ? accentColor : flowTrackTheme.mutedText)
+                    .lineLimit(1)
+
+                Spacer(minLength: 6)
+
+                if let providerBadgeTitle = suggestion.providerBadgeTitle {
+                    providerBadge(providerBadgeTitle, accentColor: accentColor)
+                }
+
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .semibold))
@@ -126,17 +128,16 @@ private struct SmartSetupSuggestionRow: View {
                 .help("Dismiss this suggestion")
             }
 
-            if let userReason = suggestion.userReason?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !userReason.isEmpty {
-                Text(userReason)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(flowTrackTheme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(suggestion.headline)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(flowTrackTheme.primaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
-            explanationLine(title: "Noticed", text: suggestion.whatFlowTrackNoticed)
-            explanationLine(title: "Suggest", text: suggestion.suggestedChange)
-            explanationLine(title: "Why", text: suggestion.whyItMayHelp)
+            Text(suggestion.adviceBody)
+                .font(.system(size: 10.5))
+                .foregroundStyle(flowTrackTheme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
 
             Text(suggestion.displayMetadata)
                 .font(.system(size: 10))
@@ -159,18 +160,6 @@ private struct SmartSetupSuggestionRow: View {
         .onTapGesture(perform: onSelect)
     }
 
-    private func explanationLine(title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title.uppercased())
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(flowTrackTheme.mutedText)
-            Text(text)
-                .font(.system(size: 10.5))
-                .foregroundStyle(flowTrackTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
     private func providerBadge(_ title: String, accentColor: Color) -> some View {
         Text(title)
             .font(.system(size: 8.5, weight: .semibold))
@@ -189,52 +178,47 @@ private struct SmartSetupSuggestionRow: View {
     }
 }
 
-private extension SmartSetupSuggestionKind {
-    var displayTitle: String {
-        switch self {
-        case .zoomMarker:
-            return "Zoom adjustment"
-        case .effectMarker:
-            return "Effect review"
-        case .regionTighten:
-            return "Region review"
-        }
-    }
-}
-
 private extension SmartSetupSuggestion {
     var providerBadgeTitle: String? {
+        if hasTextChangeSupport {
+            return "Text Change"
+        }
+        if hasScreenTextSupport {
+            return "Review"
+        }
+
         switch providerID {
-        case "rules":
-            return "Rules"
         case "click-clusters":
-            return "Click Cluster"
+            return sourceEvents.count > 1 ? "Sequence" : "Interaction"
         case "clicks":
-            return "Clicks"
+            return "Interaction"
         case "templates":
-            return "Template"
+            return "Focus"
+        case "rules":
+            if reasons.contains(.cursorPause) {
+                return "Timing"
+            }
+            if reasons.contains(.repeatedActivityZone) || reasons.contains(.denseActivity) {
+                return "Review"
+            }
+            return kind == .zoomMarker ? "Focus" : "Review"
         default:
             return nil
         }
     }
-}
 
-private extension SmartSetupSuggestionReason {
-    var displayTitle: String {
-        switch self {
-        case .click:
-            return "Click"
-        case .cursorPause:
-            return "Cursor pause"
-        case .repeatedActivityZone:
-            return "Repeated activity"
-        case .timelineGap:
-            return "Timeline gap"
-        case .denseActivity:
-            return "Dense activity"
-        case .manualRegion:
-            return "Manual region"
-        }
+    private var hasTextChangeSupport: Bool {
+        guard let userReason else { return false }
+        return userReason.localizedCaseInsensitiveContains("screen content changes")
+            || userReason.localizedCaseInsensitiveContains("changes what is visible")
+            || userReason.localizedCaseInsensitiveContains("something on screen changes")
+    }
+
+    private var hasScreenTextSupport: Bool {
+        guard let userReason else { return false }
+        return userReason.localizedCaseInsensitiveContains("readable content")
+            || userReason.localizedCaseInsensitiveContains("screen content")
+            || userReason.localizedCaseInsensitiveContains("stay oriented")
     }
 }
 
@@ -266,48 +250,54 @@ private extension SmartSetupSuggestion {
         }
     }
 
-    var whatFlowTrackNoticed: String {
+    var adviceBody: String {
+        if let userReason = userReason?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !userReason.isEmpty {
+            return userReason
+        }
+        return fallbackAdviceBody
+    }
+
+    private var fallbackAdviceBody: String {
         switch proposal {
-        case .zoomAdjustment(let proposal):
-            return "I noticed \(proposal.markerCount) existing click markers close together in the same area."
-        case .zoom(let proposal):
-            return "I noticed recorded activity near \(Self.timeString(proposal.sourceEventTimestamp))."
+        case .zoomAdjustment:
+            return stableChoice(from: [
+                "Keep this short sequence steady so the viewer can follow the action.",
+                "This connected interaction may work better as one clear focus moment.",
+                "Hold attention here if this part is important to the edit."
+            ])
+        case .zoom:
+            return stableChoice(from: [
+                "This short interaction may be worth highlighting.",
+                "A little more focus here could help the viewer follow what changed.",
+                "Review this moment if the click matters to the story."
+            ])
         case .effect:
             if reasons.contains(.cursorPause) {
-                return "I noticed the cursor pause near one area for a short stretch."
+                return stableChoice(from: [
+                    "You paused here, so a subtle focus effect may help guide attention.",
+                    "Attention stayed in one place, which may make this a useful emphasis point.",
+                    "This quiet moment may be worth a gentle visual cue."
+                ])
             }
             if reasons.contains(.repeatedActivityZone) {
-                return "I noticed repeated activity in one area over a short stretch."
+                return stableChoice(from: [
+                    "Activity was concentrated here, so a light focus effect may help the viewer know where to look.",
+                    "Several actions happened in this area, which may be worth a gentle visual cue.",
+                    "This area carries repeated activity and may benefit from clearer focus."
+                ])
             }
-            return "I noticed activity that may be worth checking."
+            return stableChoice(from: [
+                "A light visual cue here may help guide attention.",
+                "Review this moment for subtle emphasis if it matters to the story.",
+                "This part may read more clearly with a gentle focus effect."
+            ])
         case .regionTighten:
-            return "A rough focus region is available for review."
-        }
-    }
-
-    var suggestedChange: String {
-        switch proposal {
-        case .zoomAdjustment:
-            return "Use the first marker to zoom in, keep the middle markers as No Zoom, then zoom out on the final marker."
-        case .zoom:
-            return "Check whether the existing marker timing should hold a little longer around this interaction."
-        case .effect:
-            return "If this moment matters, consider adding a subtle focus effect manually after reviewing the frame."
-        case .regionTighten:
-            return "Check the region by eye before tightening it manually."
-        }
-    }
-
-    var whyItMayHelp: String {
-        switch proposal {
-        case .zoomAdjustment:
-            return "That may avoid repeated zooming while the viewer follows one interaction."
-        case .zoom:
-            return "A steadier hold can make the interaction easier to follow."
-        case .effect:
-            return "This may help guide attention, but this suggestion only uses event timing."
-        case .regionTighten:
-            return "This may reduce visual distraction, but visual analysis is not enabled yet."
+            return stableChoice(from: [
+                "Tighten this area only if it makes the action clearer.",
+                "A smaller focus area may reduce distraction around the important action.",
+                "Review the frame and keep the focus area as simple as possible."
+            ])
         }
     }
 
@@ -321,27 +311,36 @@ private extension SmartSetupSuggestion {
     }
 
     var displayMetadata: String {
-        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
-        if let zoomScaleText {
-            parts.append(zoomScaleText)
-        }
-        parts.append(confidenceText)
-        return parts.joined(separator: " · ")
+        [displayTimeRange, opportunitySummary, confidenceText]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
-    private var zoomScaleText: String? {
+    private var opportunitySummary: String {
         switch proposal {
-        case .zoom(let proposal):
-            return String(format: "%.1fx", proposal.zoomScale)
-        case .zoomAdjustment(let proposal):
-            return "\(proposal.markerCount) markers"
-        case .effect, .regionTighten:
-            return nil
+        case .zoomAdjustment:
+            return "Focus sequence"
+        case .zoom:
+            if providerID == "click-clusters" {
+                return "Focus sequence"
+            }
+            return reasons.contains(.click) ? "Interaction highlight" : "Focus moment"
+        case .effect:
+            return "Focus effect"
+        case .regionTighten:
+            return "Focus area"
         }
     }
 
-    private var confidenceText: String {
-        "\(Int((score.value * 100).rounded()))% helpfulness"
+    private var confidenceText: String? {
+        switch score.value {
+        case 0.82...:
+            return nil
+        case 0.68..<0.82:
+            return "Worth reviewing"
+        default:
+            return "Possibly useful"
+        }
     }
 
     private var proposalTime: Double {
@@ -355,6 +354,14 @@ private extension SmartSetupSuggestion {
         case .regionTighten(let proposal):
             return proposal.sourceTime
         }
+    }
+
+    private func stableChoice(from options: [String]) -> String {
+        guard !options.isEmpty else { return "" }
+        let value = suggestionID.unicodeScalars.reduce(0) { partialResult, scalar in
+            ((partialResult &* 31) &+ Int(scalar.value)) & 0x7fffffff
+        }
+        return options[value % options.count]
     }
 
     static func timeString(_ seconds: Double) -> String {
