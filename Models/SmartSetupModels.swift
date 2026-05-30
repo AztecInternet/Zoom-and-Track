@@ -22,6 +22,7 @@ struct SmartSetupSuggestionEnvelope: Codable, Equatable {
 struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     var suggestionID: String
     var providerID: String
+    var userReason: String?
     var kind: SmartSetupSuggestionKind
     var sourceTimeRange: SmartSetupSourceTimeRange?
     var sourceEvents: [SmartSetupSourceEventReference]
@@ -34,6 +35,7 @@ struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     init(
         suggestionID: String,
         providerID: String = "unknown",
+        userReason: String? = nil,
         kind: SmartSetupSuggestionKind,
         sourceTimeRange: SmartSetupSourceTimeRange?,
         sourceEvents: [SmartSetupSourceEventReference],
@@ -43,6 +45,7 @@ struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     ) {
         self.suggestionID = suggestionID
         self.providerID = providerID
+        self.userReason = userReason
         self.kind = kind
         self.sourceTimeRange = sourceTimeRange
         self.sourceEvents = sourceEvents
@@ -54,6 +57,7 @@ struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case suggestionID
         case providerID
+        case userReason
         case kind
         case sourceTimeRange
         case sourceEvents
@@ -66,6 +70,7 @@ struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         suggestionID = try container.decode(String.self, forKey: .suggestionID)
         providerID = try container.decodeIfPresent(String.self, forKey: .providerID) ?? "unknown"
+        userReason = try container.decodeIfPresent(String.self, forKey: .userReason)
         kind = try container.decode(SmartSetupSuggestionKind.self, forKey: .kind)
         sourceTimeRange = try container.decodeIfPresent(SmartSetupSourceTimeRange.self, forKey: .sourceTimeRange)
         sourceEvents = try container.decode([SmartSetupSourceEventReference].self, forKey: .sourceEvents)

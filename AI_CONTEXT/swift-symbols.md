@@ -1,6 +1,6 @@
 # Swift Symbols
 
-Generated: 2026-05-30 06:34:23
+Generated: 2026-05-30 06:44:26
 
 ## App/ContentView.swift
 - Line 12:struct ContentView: View {
@@ -177,17 +177,17 @@ Generated: 2026-05-30 06:34:23
 ## Models/SmartSetupModels.swift
 - Line 3:struct SmartSetupSuggestionEnvelope: Codable, Equatable {
 - Line 22:struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
-- Line 78:enum SmartSetupSuggestionKind: String, Codable, CaseIterable {
-- Line 84:enum SmartSetupSuggestionReason: String, Codable, CaseIterable {
-- Line 93:struct SmartSetupCandidateScore: Codable, Equatable {
-- Line 103:struct SmartSetupScoreComponent: Codable, Equatable {
-- Line 109:struct SmartSetupSourceTimeRange: Codable, Equatable {
-- Line 119:struct SmartSetupSourceEventReference: Codable, Equatable {
-- Line 140:enum SmartSetupMarkerProposal: Codable, Equatable {
-- Line 147:struct SmartSetupZoomMarkerAdjustmentProposal: Codable, Equatable {
-- Line 158:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
-- Line 177:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
-- Line 195:struct SmartSetupRegionTightenProposal: Codable, Equatable {
+- Line 83:enum SmartSetupSuggestionKind: String, Codable, CaseIterable {
+- Line 89:enum SmartSetupSuggestionReason: String, Codable, CaseIterable {
+- Line 98:struct SmartSetupCandidateScore: Codable, Equatable {
+- Line 108:struct SmartSetupScoreComponent: Codable, Equatable {
+- Line 114:struct SmartSetupSourceTimeRange: Codable, Equatable {
+- Line 124:struct SmartSetupSourceEventReference: Codable, Equatable {
+- Line 145:enum SmartSetupMarkerProposal: Codable, Equatable {
+- Line 152:struct SmartSetupZoomMarkerAdjustmentProposal: Codable, Equatable {
+- Line 163:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
+- Line 182:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
+- Line 200:struct SmartSetupRegionTightenProposal: Codable, Equatable {
 
 ## Services/CreatorEffectDefaultsService.swift
 - Line 8:struct CreatorEffectDefaultsService {
@@ -289,15 +289,15 @@ Generated: 2026-05-30 06:34:23
 - Line 15:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion]
 - Line 18:struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
 - Line 27:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
-- Line 43:struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 56:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
-- Line 111:        func flushCurrentCluster() {
-- Line 382:struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 389:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
-- Line 500:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 503:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
-- Line 577:struct SmartSuggestionAggregator {
-- Line 601:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 44:struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 57:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 112:        func flushCurrentCluster() {
+- Line 384:struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 391:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 503:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 506:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 581:struct SmartSuggestionAggregator {
+- Line 605:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
 
 ## ViewModels/CaptureSetupViewModel.swift
 - Line 13:    enum PlaybackPresentationMode {

@@ -35,6 +35,7 @@ struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
         .map { suggestion in
             var markedSuggestion = suggestion
             markedSuggestion.providerID = providerID
+            markedSuggestion.userReason = "Rule-based focus opportunity detected"
             return markedSuggestion
         }
     }
@@ -198,6 +199,7 @@ struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
         return SmartSetupSuggestion(
             suggestionID: stableID(for: event, at: index, in: cluster, point: point),
             providerID: providerID,
+            userReason: "\(cluster.count) nearby clicks detected",
             kind: .zoomMarker,
             sourceTimeRange: SmartSetupSourceTimeRange(
                 startTime: timing.startTime,
@@ -448,6 +450,7 @@ struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
         return SmartSetupSuggestion(
             suggestionID: stableID(for: event, point: point),
             providerID: providerID,
+            userReason: "Mouse click detected",
             kind: .zoomMarker,
             sourceTimeRange: SmartSetupSourceTimeRange(
                 startTime: max(event.timestamp - 0.35, 0),
@@ -537,6 +540,7 @@ struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
             SmartSetupSuggestion(
                 suggestionID: stableID(time: sourceTime, x: centerX, y: centerY),
                 providerID: providerID,
+                userReason: "Fallback starter suggestion",
                 kind: .zoomMarker,
                 sourceTimeRange: SmartSetupSourceTimeRange(
                     startTime: max(sourceTime - 0.5, 0),

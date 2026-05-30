@@ -123,6 +123,14 @@ private struct SmartSetupSuggestionRow: View {
                 .help("Dismiss this suggestion")
             }
 
+            if let userReason = suggestion.userReason?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !userReason.isEmpty {
+                Text(userReason)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(flowTrackTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             explanationLine(title: "Noticed", text: suggestion.whatFlowTrackNoticed)
             explanationLine(title: "Suggest", text: suggestion.suggestedChange)
             explanationLine(title: "Why", text: suggestion.whyItMayHelp)
