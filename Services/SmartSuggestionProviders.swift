@@ -35,8 +35,20 @@ struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
         .map { suggestion in
             var markedSuggestion = suggestion
             markedSuggestion.providerID = providerID
+            markedSuggestion.userTitle = title(for: suggestion)
             markedSuggestion.userReason = "Rule-based focus opportunity detected"
             return markedSuggestion
+        }
+    }
+
+    private func title(for suggestion: SmartSetupSuggestion) -> String {
+        switch suggestion.proposal {
+        case .zoomAdjustment:
+            return "Stay zoomed during this click sequence"
+        case .effect:
+            return "Review a possible focus effect"
+        case .zoom, .regionTighten:
+            return "Review a possible editing opportunity"
         }
     }
 }
@@ -199,6 +211,7 @@ struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
         return SmartSetupSuggestion(
             suggestionID: stableID(for: event, at: index, in: cluster, point: point),
             providerID: providerID,
+            userTitle: "Review a \(cluster.count)-click focus sequence",
             userReason: "\(cluster.count) nearby clicks detected",
             kind: .zoomMarker,
             sourceTimeRange: SmartSetupSourceTimeRange(
@@ -337,7 +350,9 @@ struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
         let startTime = first.timestamp - existingZoomTimeTolerance
         let endTime = last.timestamp + existingZoomTimeTolerance
         return existingZoomMarkers.contains { marker in
-            marker.sourceEventTimestamp >= startTime && marker.sourceEventTimestamp <= endTime
+            marker.shouldSuppressClickSmartSuggestion
+                && marker.sourceEventTimestamp >= startTime
+                && marker.sourceEventTimestamp <= endTime
         }
     }
 
@@ -450,6 +465,7 @@ struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
         return SmartSetupSuggestion(
             suggestionID: stableID(for: event, point: point),
             providerID: providerID,
+            userTitle: "Focus on this click",
             userReason: "Mouse click detected",
             kind: .zoomMarker,
             sourceTimeRange: SmartSetupSourceTimeRange(
@@ -474,7 +490,8 @@ struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
 
     private func hasNearbyZoomMarker(at time: Double, existingZoomMarkers: [ZoomPlanItem]) -> Bool {
         existingZoomMarkers.contains { marker in
-            abs(marker.sourceEventTimestamp - time) <= existingZoomTimeTolerance
+            marker.shouldSuppressClickSmartSuggestion
+                && abs(marker.sourceEventTimestamp - time) <= existingZoomTimeTolerance
         }
     }
 
@@ -497,6 +514,12 @@ struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
         let xKey = Int(point.x.rounded())
         let yKey = Int(point.y.rounded())
         return "click-focus-\(timeKey)-\(xKey)-\(yKey)"
+    }
+}
+
+private extension ZoomPlanItem {
+    var shouldSuppressClickSmartSuggestion: Bool {
+        markerNameSource == .manual
     }
 }
 
@@ -540,6 +563,7 @@ struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
             SmartSetupSuggestion(
                 suggestionID: stableID(time: sourceTime, x: centerX, y: centerY),
                 providerID: providerID,
+                userTitle: "Starter focus suggestion",
                 userReason: "Fallback starter suggestion",
                 kind: .zoomMarker,
                 sourceTimeRange: SmartSetupSourceTimeRange(

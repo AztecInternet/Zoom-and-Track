@@ -240,6 +240,11 @@ private extension SmartSetupSuggestionReason {
 
 private extension SmartSetupSuggestion {
     var headline: String {
+        if let userTitle = userTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !userTitle.isEmpty {
+            return userTitle
+        }
+
         switch proposal {
         case .zoomAdjustment:
             return "Stay zoomed during this click sequence"

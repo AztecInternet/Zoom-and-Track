@@ -1,27 +1,27 @@
 # Smart Suggestions Map
 
-Generated: 2026-05-30 07:27:08
+Generated: 2026-05-30 08:30:29
 
 ## Files
 
 ### Models/SmartSetupModels.swift
-- Lines: 217
+- Lines: 222
 - Imports:
 - import Foundation
 - Types:
 - Line 3:struct SmartSetupSuggestionEnvelope: Codable, Equatable {
 - Line 22:struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
-- Line 83:enum SmartSetupSuggestionKind: String, Codable, CaseIterable {
-- Line 89:enum SmartSetupSuggestionReason: String, Codable, CaseIterable {
-- Line 98:struct SmartSetupCandidateScore: Codable, Equatable {
-- Line 108:struct SmartSetupScoreComponent: Codable, Equatable {
-- Line 114:struct SmartSetupSourceTimeRange: Codable, Equatable {
-- Line 124:struct SmartSetupSourceEventReference: Codable, Equatable {
-- Line 145:enum SmartSetupMarkerProposal: Codable, Equatable {
-- Line 152:struct SmartSetupZoomMarkerAdjustmentProposal: Codable, Equatable {
-- Line 163:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
-- Line 182:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
-- Line 200:struct SmartSetupRegionTightenProposal: Codable, Equatable {
+- Line 88:enum SmartSetupSuggestionKind: String, Codable, CaseIterable {
+- Line 94:enum SmartSetupSuggestionReason: String, Codable, CaseIterable {
+- Line 103:struct SmartSetupCandidateScore: Codable, Equatable {
+- Line 113:struct SmartSetupScoreComponent: Codable, Equatable {
+- Line 119:struct SmartSetupSourceTimeRange: Codable, Equatable {
+- Line 129:struct SmartSetupSourceEventReference: Codable, Equatable {
+- Line 150:enum SmartSetupMarkerProposal: Codable, Equatable {
+- Line 157:struct SmartSetupZoomMarkerAdjustmentProposal: Codable, Equatable {
+- Line 168:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
+- Line 187:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
+- Line 205:struct SmartSetupRegionTightenProposal: Codable, Equatable {
 - Functions / Vars:
 - Line 4:    var schemaVersion: Int
 - Line 5:    var source: String
@@ -29,69 +29,70 @@ Generated: 2026-05-30 07:27:08
 - Line 7:    var suggestions: [SmartSetupSuggestion]
 - Line 23:    var suggestionID: String
 - Line 24:    var providerID: String
-- Line 25:    var userReason: String?
-- Line 26:    var kind: SmartSetupSuggestionKind
-- Line 27:    var sourceTimeRange: SmartSetupSourceTimeRange?
-- Line 28:    var sourceEvents: [SmartSetupSourceEventReference]
-- Line 29:    var proposal: SmartSetupMarkerProposal
-- Line 30:    var score: SmartSetupCandidateScore
-- Line 31:    var reasons: [SmartSetupSuggestionReason]
-- Line 33:    var id: String { suggestionID }
-- Line 70:        let container = try decoder.container(keyedBy: CodingKeys.self)
-- Line 99:    var value: Double
-- Line 100:    var components: [SmartSetupScoreComponent]
-- Line 109:    var reason: SmartSetupSuggestionReason
-- Line 110:    var weight: Double
-- Line 111:    var detail: String?
-- Line 115:    var startTime: Double
-- Line 116:    var endTime: Double
-- Line 125:    var type: RecordedEventType
-- Line 126:    var timestamp: Double
-- Line 127:    var x: Double
-- Line 128:    var y: Double
-- Line 153:    var targetMarkerIDs: [String]
-- Line 154:    var startTime: Double
-- Line 155:    var endTime: Double
-- Line 156:    var suggestedFirstZoomType: ZoomType
-- Line 157:    var suggestedMiddleZoomType: ZoomType
-- Line 158:    var suggestedFinalZoomType: ZoomType
-- Line 159:    var suggestedHoldDuration: Double?
-- Line 160:    var markerCount: Int
-- Line 164:    var sourceEventTimestamp: Double
-- Line 165:    var rawX: Double?
-- Line 166:    var rawY: Double?
-- Line 167:    var centerX: Double
-- Line 168:    var centerY: Double
-- Line 169:    var zoomScale: Double
-- Line 170:    var leadInTime: Double
-- Line 171:    var zoomInDuration: Double
-- Line 172:    var holdDuration: Double
-- Line 173:    var zoomOutDuration: Double
-- Line 174:    var easeStyle: ZoomEaseStyle
-- Line 175:    var zoomType: ZoomType
-- Line 176:    var bounceAmount: Double
-- Line 177:    var clickPulse: ClickPulseConfiguration?
-- Line 178:    var noZoomFallbackMode: NoZoomFallbackMode
-- Line 179:    var noZoomOverflowRegion: NoZoomOverflowRegion?
-- Line 183:    var sourceEventTimestamp: Double
-- Line 184:    var startTime: Double
-- Line 185:    var holdStartTime: Double
-- Line 186:    var holdEndTime: Double
-- Line 187:    var endTime: Double
-- Line 188:    var style: EffectStyle
-- Line 189:    var amount: Double
-- Line 190:    var blurAmount: Double
-- Line 191:    var darkenAmount: Double
-- Line 192:    var tintAmount: Double
-- Line 193:    var cornerRadius: Double
-- Line 194:    var feather: Double
-- Line 195:    var tintColor: EffectTintColor
-- Line 196:    var focusRegion: EffectFocusRegion?
-- Line 197:    var distortion: DistortionConfiguration?
-- Line 201:    var sourceTime: Double
-- Line 202:    var originalRegion: EffectFocusRegion
-- Line 203:    var proposedRegion: EffectFocusRegion
-- Line 204:    var confidence: Double
+- Line 25:    var userTitle: String?
+- Line 26:    var userReason: String?
+- Line 27:    var kind: SmartSetupSuggestionKind
+- Line 28:    var sourceTimeRange: SmartSetupSourceTimeRange?
+- Line 29:    var sourceEvents: [SmartSetupSourceEventReference]
+- Line 30:    var proposal: SmartSetupMarkerProposal
+- Line 31:    var score: SmartSetupCandidateScore
+- Line 32:    var reasons: [SmartSetupSuggestionReason]
+- Line 34:    var id: String { suggestionID }
+- Line 74:        let container = try decoder.container(keyedBy: CodingKeys.self)
+- Line 104:    var value: Double
+- Line 105:    var components: [SmartSetupScoreComponent]
+- Line 114:    var reason: SmartSetupSuggestionReason
+- Line 115:    var weight: Double
+- Line 116:    var detail: String?
+- Line 120:    var startTime: Double
+- Line 121:    var endTime: Double
+- Line 130:    var type: RecordedEventType
+- Line 131:    var timestamp: Double
+- Line 132:    var x: Double
+- Line 133:    var y: Double
+- Line 158:    var targetMarkerIDs: [String]
+- Line 159:    var startTime: Double
+- Line 160:    var endTime: Double
+- Line 161:    var suggestedFirstZoomType: ZoomType
+- Line 162:    var suggestedMiddleZoomType: ZoomType
+- Line 163:    var suggestedFinalZoomType: ZoomType
+- Line 164:    var suggestedHoldDuration: Double?
+- Line 165:    var markerCount: Int
+- Line 169:    var sourceEventTimestamp: Double
+- Line 170:    var rawX: Double?
+- Line 171:    var rawY: Double?
+- Line 172:    var centerX: Double
+- Line 173:    var centerY: Double
+- Line 174:    var zoomScale: Double
+- Line 175:    var leadInTime: Double
+- Line 176:    var zoomInDuration: Double
+- Line 177:    var holdDuration: Double
+- Line 178:    var zoomOutDuration: Double
+- Line 179:    var easeStyle: ZoomEaseStyle
+- Line 180:    var zoomType: ZoomType
+- Line 181:    var bounceAmount: Double
+- Line 182:    var clickPulse: ClickPulseConfiguration?
+- Line 183:    var noZoomFallbackMode: NoZoomFallbackMode
+- Line 184:    var noZoomOverflowRegion: NoZoomOverflowRegion?
+- Line 188:    var sourceEventTimestamp: Double
+- Line 189:    var startTime: Double
+- Line 190:    var holdStartTime: Double
+- Line 191:    var holdEndTime: Double
+- Line 192:    var endTime: Double
+- Line 193:    var style: EffectStyle
+- Line 194:    var amount: Double
+- Line 195:    var blurAmount: Double
+- Line 196:    var darkenAmount: Double
+- Line 197:    var tintAmount: Double
+- Line 198:    var cornerRadius: Double
+- Line 199:    var feather: Double
+- Line 200:    var tintColor: EffectTintColor
+- Line 201:    var focusRegion: EffectFocusRegion?
+- Line 202:    var distortion: DistortionConfiguration?
+- Line 206:    var sourceTime: Double
+- Line 207:    var originalRegion: EffectFocusRegion
+- Line 208:    var proposedRegion: EffectFocusRegion
+- Line 209:    var confidence: Double
 
 ### Services/SmartSetupSuggestionService.swift
 - Lines: 444
@@ -183,7 +184,7 @@ Generated: 2026-05-30 07:27:08
 - Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
 
 ### Views/Review/SmartSetupViews.swift
-- Lines: 363
+- Lines: 368
 - Imports:
 - import SwiftUI
 - Types:
@@ -204,23 +205,23 @@ Generated: 2026-05-30 07:27:08
 - Line 206:    var providerBadgeTitle: String? {
 - Line 223:    var displayTitle: String {
 - Line 242:    var headline: String {
-- Line 255:    var reviewStateLabel: String {
-- Line 264:    var whatFlowTrackNoticed: String {
-- Line 283:    var suggestedChange: String {
-- Line 296:    var whyItMayHelp: String {
-- Line 309:    var displayTimeRange: String {
-- Line 314:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
-- Line 318:    var displayMetadata: String {
-- Line 319:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
-- Line 327:    private var zoomScaleText: String? {
-- Line 338:    private var confidenceText: String {
-- Line 342:    private var proposalTime: Double {
-- Line 355:    static func timeString(_ seconds: Double) -> String {
-- Line 356:        let clampedSeconds = max(seconds, 0)
-- Line 357:        let wholeSeconds = Int(clampedSeconds)
-- Line 358:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
-- Line 359:        let minutes = wholeSeconds / 60
-- Line 360:        let secondsRemainder = wholeSeconds % 60
+- Line 260:    var reviewStateLabel: String {
+- Line 269:    var whatFlowTrackNoticed: String {
+- Line 288:    var suggestedChange: String {
+- Line 301:    var whyItMayHelp: String {
+- Line 314:    var displayTimeRange: String {
+- Line 319:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
+- Line 323:    var displayMetadata: String {
+- Line 324:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
+- Line 332:    private var zoomScaleText: String? {
+- Line 343:    private var confidenceText: String {
+- Line 347:    private var proposalTime: Double {
+- Line 360:    static func timeString(_ seconds: Double) -> String {
+- Line 361:        let clampedSeconds = max(seconds, 0)
+- Line 362:        let wholeSeconds = Int(clampedSeconds)
+- Line 363:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+- Line 364:        let minutes = wholeSeconds / 60
+- Line 365:        let secondsRemainder = wholeSeconds % 60
 - SwiftUI State:
 - Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 - Line 5:    @ObservedObject var viewModel: CaptureSetupViewModel

@@ -1,6 +1,6 @@
 # Project Map
 
-Generated: 2026-05-30 07:27:08
+Generated: 2026-05-30 08:30:29
 
 ## Swift Files
 
@@ -566,23 +566,23 @@ Generated: 2026-05-30 07:27:08
 - Line 333:    var id: UUID { captureID }
 
 ### Models/SmartSetupModels.swift
-- Lines: 217
+- Lines: 222
 - Imports:
 - import Foundation
 - Types:
 - Line 3:struct SmartSetupSuggestionEnvelope: Codable, Equatable {
 - Line 22:struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
-- Line 83:enum SmartSetupSuggestionKind: String, Codable, CaseIterable {
-- Line 89:enum SmartSetupSuggestionReason: String, Codable, CaseIterable {
-- Line 98:struct SmartSetupCandidateScore: Codable, Equatable {
-- Line 108:struct SmartSetupScoreComponent: Codable, Equatable {
-- Line 114:struct SmartSetupSourceTimeRange: Codable, Equatable {
-- Line 124:struct SmartSetupSourceEventReference: Codable, Equatable {
-- Line 145:enum SmartSetupMarkerProposal: Codable, Equatable {
-- Line 152:struct SmartSetupZoomMarkerAdjustmentProposal: Codable, Equatable {
-- Line 163:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
-- Line 182:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
-- Line 200:struct SmartSetupRegionTightenProposal: Codable, Equatable {
+- Line 88:enum SmartSetupSuggestionKind: String, Codable, CaseIterable {
+- Line 94:enum SmartSetupSuggestionReason: String, Codable, CaseIterable {
+- Line 103:struct SmartSetupCandidateScore: Codable, Equatable {
+- Line 113:struct SmartSetupScoreComponent: Codable, Equatable {
+- Line 119:struct SmartSetupSourceTimeRange: Codable, Equatable {
+- Line 129:struct SmartSetupSourceEventReference: Codable, Equatable {
+- Line 150:enum SmartSetupMarkerProposal: Codable, Equatable {
+- Line 157:struct SmartSetupZoomMarkerAdjustmentProposal: Codable, Equatable {
+- Line 168:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
+- Line 187:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
+- Line 205:struct SmartSetupRegionTightenProposal: Codable, Equatable {
 - Functions / Vars:
 - Line 4:    var schemaVersion: Int
 - Line 5:    var source: String
@@ -590,69 +590,70 @@ Generated: 2026-05-30 07:27:08
 - Line 7:    var suggestions: [SmartSetupSuggestion]
 - Line 23:    var suggestionID: String
 - Line 24:    var providerID: String
-- Line 25:    var userReason: String?
-- Line 26:    var kind: SmartSetupSuggestionKind
-- Line 27:    var sourceTimeRange: SmartSetupSourceTimeRange?
-- Line 28:    var sourceEvents: [SmartSetupSourceEventReference]
-- Line 29:    var proposal: SmartSetupMarkerProposal
-- Line 30:    var score: SmartSetupCandidateScore
-- Line 31:    var reasons: [SmartSetupSuggestionReason]
-- Line 33:    var id: String { suggestionID }
-- Line 70:        let container = try decoder.container(keyedBy: CodingKeys.self)
-- Line 99:    var value: Double
-- Line 100:    var components: [SmartSetupScoreComponent]
-- Line 109:    var reason: SmartSetupSuggestionReason
-- Line 110:    var weight: Double
-- Line 111:    var detail: String?
-- Line 115:    var startTime: Double
-- Line 116:    var endTime: Double
-- Line 125:    var type: RecordedEventType
-- Line 126:    var timestamp: Double
-- Line 127:    var x: Double
-- Line 128:    var y: Double
-- Line 153:    var targetMarkerIDs: [String]
-- Line 154:    var startTime: Double
-- Line 155:    var endTime: Double
-- Line 156:    var suggestedFirstZoomType: ZoomType
-- Line 157:    var suggestedMiddleZoomType: ZoomType
-- Line 158:    var suggestedFinalZoomType: ZoomType
-- Line 159:    var suggestedHoldDuration: Double?
-- Line 160:    var markerCount: Int
-- Line 164:    var sourceEventTimestamp: Double
-- Line 165:    var rawX: Double?
-- Line 166:    var rawY: Double?
-- Line 167:    var centerX: Double
-- Line 168:    var centerY: Double
-- Line 169:    var zoomScale: Double
-- Line 170:    var leadInTime: Double
-- Line 171:    var zoomInDuration: Double
-- Line 172:    var holdDuration: Double
-- Line 173:    var zoomOutDuration: Double
-- Line 174:    var easeStyle: ZoomEaseStyle
-- Line 175:    var zoomType: ZoomType
-- Line 176:    var bounceAmount: Double
-- Line 177:    var clickPulse: ClickPulseConfiguration?
-- Line 178:    var noZoomFallbackMode: NoZoomFallbackMode
-- Line 179:    var noZoomOverflowRegion: NoZoomOverflowRegion?
-- Line 183:    var sourceEventTimestamp: Double
-- Line 184:    var startTime: Double
-- Line 185:    var holdStartTime: Double
-- Line 186:    var holdEndTime: Double
-- Line 187:    var endTime: Double
-- Line 188:    var style: EffectStyle
-- Line 189:    var amount: Double
-- Line 190:    var blurAmount: Double
-- Line 191:    var darkenAmount: Double
-- Line 192:    var tintAmount: Double
-- Line 193:    var cornerRadius: Double
-- Line 194:    var feather: Double
-- Line 195:    var tintColor: EffectTintColor
-- Line 196:    var focusRegion: EffectFocusRegion?
-- Line 197:    var distortion: DistortionConfiguration?
-- Line 201:    var sourceTime: Double
-- Line 202:    var originalRegion: EffectFocusRegion
-- Line 203:    var proposedRegion: EffectFocusRegion
-- Line 204:    var confidence: Double
+- Line 25:    var userTitle: String?
+- Line 26:    var userReason: String?
+- Line 27:    var kind: SmartSetupSuggestionKind
+- Line 28:    var sourceTimeRange: SmartSetupSourceTimeRange?
+- Line 29:    var sourceEvents: [SmartSetupSourceEventReference]
+- Line 30:    var proposal: SmartSetupMarkerProposal
+- Line 31:    var score: SmartSetupCandidateScore
+- Line 32:    var reasons: [SmartSetupSuggestionReason]
+- Line 34:    var id: String { suggestionID }
+- Line 74:        let container = try decoder.container(keyedBy: CodingKeys.self)
+- Line 104:    var value: Double
+- Line 105:    var components: [SmartSetupScoreComponent]
+- Line 114:    var reason: SmartSetupSuggestionReason
+- Line 115:    var weight: Double
+- Line 116:    var detail: String?
+- Line 120:    var startTime: Double
+- Line 121:    var endTime: Double
+- Line 130:    var type: RecordedEventType
+- Line 131:    var timestamp: Double
+- Line 132:    var x: Double
+- Line 133:    var y: Double
+- Line 158:    var targetMarkerIDs: [String]
+- Line 159:    var startTime: Double
+- Line 160:    var endTime: Double
+- Line 161:    var suggestedFirstZoomType: ZoomType
+- Line 162:    var suggestedMiddleZoomType: ZoomType
+- Line 163:    var suggestedFinalZoomType: ZoomType
+- Line 164:    var suggestedHoldDuration: Double?
+- Line 165:    var markerCount: Int
+- Line 169:    var sourceEventTimestamp: Double
+- Line 170:    var rawX: Double?
+- Line 171:    var rawY: Double?
+- Line 172:    var centerX: Double
+- Line 173:    var centerY: Double
+- Line 174:    var zoomScale: Double
+- Line 175:    var leadInTime: Double
+- Line 176:    var zoomInDuration: Double
+- Line 177:    var holdDuration: Double
+- Line 178:    var zoomOutDuration: Double
+- Line 179:    var easeStyle: ZoomEaseStyle
+- Line 180:    var zoomType: ZoomType
+- Line 181:    var bounceAmount: Double
+- Line 182:    var clickPulse: ClickPulseConfiguration?
+- Line 183:    var noZoomFallbackMode: NoZoomFallbackMode
+- Line 184:    var noZoomOverflowRegion: NoZoomOverflowRegion?
+- Line 188:    var sourceEventTimestamp: Double
+- Line 189:    var startTime: Double
+- Line 190:    var holdStartTime: Double
+- Line 191:    var holdEndTime: Double
+- Line 192:    var endTime: Double
+- Line 193:    var style: EffectStyle
+- Line 194:    var amount: Double
+- Line 195:    var blurAmount: Double
+- Line 196:    var darkenAmount: Double
+- Line 197:    var tintAmount: Double
+- Line 198:    var cornerRadius: Double
+- Line 199:    var feather: Double
+- Line 200:    var tintColor: EffectTintColor
+- Line 201:    var focusRegion: EffectFocusRegion?
+- Line 202:    var distortion: DistortionConfiguration?
+- Line 206:    var sourceTime: Double
+- Line 207:    var originalRegion: EffectFocusRegion
+- Line 208:    var proposedRegion: EffectFocusRegion
+- Line 209:    var confidence: Double
 
 ### Services/CreatorEffectDefaultsService.swift
 - Lines: 64
@@ -1202,7 +1203,7 @@ Generated: 2026-05-30 07:27:08
 - Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
 
 ### Services/SmartSuggestionProviders.swift
-- Lines: 711
+- Lines: 735
 - Imports:
 - import CoreGraphics
 - import Foundation
@@ -1210,10 +1211,10 @@ Generated: 2026-05-30 07:27:08
 - Line 4:struct SmartSuggestionContext {
 - Line 12:protocol SmartSuggestionProvider {
 - Line 18:struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 44:struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 384:struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 503:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 581:struct SmartSuggestionAggregator {
+- Line 56:struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 399:struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 526:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 605:struct SmartSuggestionAggregator {
 - Functions / Vars:
 - Line 5:    let events: [RecordedEvent]
 - Line 6:    let duration: Double
@@ -1226,75 +1227,75 @@ Generated: 2026-05-30 07:27:08
 - Line 21:    private let service: SmartSetupSuggestionService
 - Line 27:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
 - Line 36:            var markedSuggestion = suggestion
-- Line 45:    let providerID = "click-clusters"
-- Line 47:    private let maxClusters = 5
-- Line 48:    private let maxEmittedSuggestions = 8
-- Line 49:    private let maximumTimeGap = 4.0
-- Line 50:    private let maximumNormalizedDistance = 0.12
-- Line 51:    private let existingZoomTimeTolerance = 0.65
-- Line 52:    private let clusterLeadInTime = 0.35
-- Line 53:    private let clusterZoomDuration = 0.35
-- Line 54:    private let minimumClusterHold = 0.45
-- Line 55:    private let finalClusterTail = 0.65
-- Line 57:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
-- Line 60:        let clickEvents = sortedClickEvents(from: context.events)
-- Line 63:        let safeContentSize = CGSize(
-- Line 67:        let clusters = clickClusters(from: clickEvents, contentCoordinateSize: safeContentSize)
-- Line 68:        var suggestions: [SmartSetupSuggestion] = []
-- Line 69:        var acceptedClusterCount = 0
-- Line 76:            let remainingSuggestionSlots = maxEmittedSuggestions - suggestions.count
-- Line 95:    private func sortedClickEvents(from events: [RecordedEvent]) -> [RecordedEvent] {
-- Line 108:    private func clickClusters(from events: [RecordedEvent], contentCoordinateSize: CGSize) -> [[RecordedEvent]] {
-- Line 109:        var clusters: [[RecordedEvent]] = []
-- Line 110:        var currentCluster: [RecordedEvent] = []
-- Line 112:        func flushCurrentCluster() {
-- Line 125:            let timeGap = event.timestamp - previous.timestamp
-- Line 126:            let distance = normalizedDistance(from: previous, to: event, contentCoordinateSize: contentCoordinateSize)
-- Line 139:    private func clusterSuggestions(for cluster: [RecordedEvent], contentCoordinateSize: CGSize, duration: Double, limit: Int) -> [SmartSetupSuggestion] {
-- Line 140:        let selectedEvents = selectedEventsForSequence(from: cluster, limit: limit)
-- Line 153:    private func selectedEventsForSequence(from cluster: [RecordedEvent], limit: Int) -> [RecordedEvent] {
-- Line 158:        let middleLimit = max(limit - 2, 0)
-- Line 159:        let middleEvents = cluster.dropFirst().dropLast().prefix(middleLimit)
-- Line 163:    private func suggestion(
-- Line 171:        let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
-- Line 172:        let zoomType = zoomType(for: index, count: sequenceCount)
-- Line 173:        let timing = markerTiming(
-- Line 180:        let proposal = SmartSetupZoomMarkerProposal(
-- Line 229:    private func markerTiming(
-- Line 236:        let zoomType = zoomType(for: index, count: sequenceCount)
-- Line 237:        let nextTimestamp = nextClusterTimestamp(after: event, in: cluster)
-- Line 238:        let previousTimestamp = previousClusterTimestamp(before: event, in: cluster)
-- Line 242:            let holdUntil = min(nextTimestamp ?? event.timestamp + minimumClusterHold, duration)
-- Line 243:            let holdDuration = max(holdUntil - event.timestamp, minimumClusterHold)
-- Line 253:            let previousGap = previousTimestamp.map { max(event.timestamp - $0, 0) } ?? minimumClusterHold
-- Line 254:            let nextGap = nextTimestamp.map { max($0 - event.timestamp, 0) } ?? minimumClusterHold
-- Line 255:            let localWindow = min(previousGap, nextGap, 1.0)
-- Line 285:    private func timing(
-- Line 293:        let timelineEnd = max(duration, 0)
-- Line 294:        let safeEventTimestamp = min(max(eventTimestamp, 0), timelineEnd)
-- Line 295:        let safeLeadIn = max(min(leadInTime, safeEventTimestamp), 0)
-- Line 296:        let safeZoomInDuration = max(zoomInDuration, 0)
-- Line 297:        let requestedZoomOutDuration = max(zoomOutDuration, 0)
-- Line 298:        let requestedHoldDuration = max(holdDuration, minimumClusterHold)
-- Line 299:        let availableAfterEvent = max(timelineEnd - safeEventTimestamp, 0)
-- Line 300:        let safeHoldDuration = min(requestedHoldDuration, availableAfterEvent)
-- Line 301:        let safeZoomOutDuration = min(requestedZoomOutDuration, max(availableAfterEvent - safeHoldDuration, 0))
-- Line 302:        let endTime = safeEventTimestamp + safeHoldDuration + safeZoomOutDuration
-- Line 313:    private func zoomType(for index: Int, count: Int) -> ZoomType {
-- Line 323:    private func previousClusterTimestamp(before event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
-- Line 329:    private func nextClusterTimestamp(after event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
-- Line 335:    private func isCoveredByExistingZoomMarker(_ cluster: [RecordedEvent], existingZoomMarkers: [ZoomPlanItem]) -> Bool {
-- Line 337:        let startTime = first.timestamp - existingZoomTimeTolerance
-- Line 338:        let endTime = last.timestamp + existingZoomTimeTolerance
-- Line 344:    private func averagePoint(for events: [RecordedEvent], contentCoordinateSize: CGSize) -> CGPoint {
-- Line 346:        let total = events.reduce(CGPoint.zero) { partialResult, event in
-- Line 347:            let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
-- Line 353:    private func normalizedDistance(from lhs: RecordedEvent, to rhs: RecordedEvent, contentCoordinateSize: CGSize) -> Double {
-- Line 354:        let lhsPoint = normalizedPoint(clampedContentPoint(for: lhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
-- Line 355:        let rhsPoint = normalizedPoint(clampedContentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
-- Line 356:        let deltaX = lhsPoint.x - rhsPoint.x
-- Line 357:        let deltaY = lhsPoint.y - rhsPoint.y
-- Line 361:    private func clampedContentPoint(for event: RecordedEvent, contentCoordinateSize: CGSize) -> CGPoint {
+- Line 44:    private func title(for suggestion: SmartSetupSuggestion) -> String {
+- Line 57:    let providerID = "click-clusters"
+- Line 59:    private let maxClusters = 5
+- Line 60:    private let maxEmittedSuggestions = 8
+- Line 61:    private let maximumTimeGap = 4.0
+- Line 62:    private let maximumNormalizedDistance = 0.12
+- Line 63:    private let existingZoomTimeTolerance = 0.65
+- Line 64:    private let clusterLeadInTime = 0.35
+- Line 65:    private let clusterZoomDuration = 0.35
+- Line 66:    private let minimumClusterHold = 0.45
+- Line 67:    private let finalClusterTail = 0.65
+- Line 69:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 72:        let clickEvents = sortedClickEvents(from: context.events)
+- Line 75:        let safeContentSize = CGSize(
+- Line 79:        let clusters = clickClusters(from: clickEvents, contentCoordinateSize: safeContentSize)
+- Line 80:        var suggestions: [SmartSetupSuggestion] = []
+- Line 81:        var acceptedClusterCount = 0
+- Line 88:            let remainingSuggestionSlots = maxEmittedSuggestions - suggestions.count
+- Line 107:    private func sortedClickEvents(from events: [RecordedEvent]) -> [RecordedEvent] {
+- Line 120:    private func clickClusters(from events: [RecordedEvent], contentCoordinateSize: CGSize) -> [[RecordedEvent]] {
+- Line 121:        var clusters: [[RecordedEvent]] = []
+- Line 122:        var currentCluster: [RecordedEvent] = []
+- Line 124:        func flushCurrentCluster() {
+- Line 137:            let timeGap = event.timestamp - previous.timestamp
+- Line 138:            let distance = normalizedDistance(from: previous, to: event, contentCoordinateSize: contentCoordinateSize)
+- Line 151:    private func clusterSuggestions(for cluster: [RecordedEvent], contentCoordinateSize: CGSize, duration: Double, limit: Int) -> [SmartSetupSuggestion] {
+- Line 152:        let selectedEvents = selectedEventsForSequence(from: cluster, limit: limit)
+- Line 165:    private func selectedEventsForSequence(from cluster: [RecordedEvent], limit: Int) -> [RecordedEvent] {
+- Line 170:        let middleLimit = max(limit - 2, 0)
+- Line 171:        let middleEvents = cluster.dropFirst().dropLast().prefix(middleLimit)
+- Line 175:    private func suggestion(
+- Line 183:        let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
+- Line 184:        let zoomType = zoomType(for: index, count: sequenceCount)
+- Line 185:        let timing = markerTiming(
+- Line 192:        let proposal = SmartSetupZoomMarkerProposal(
+- Line 242:    private func markerTiming(
+- Line 249:        let zoomType = zoomType(for: index, count: sequenceCount)
+- Line 250:        let nextTimestamp = nextClusterTimestamp(after: event, in: cluster)
+- Line 251:        let previousTimestamp = previousClusterTimestamp(before: event, in: cluster)
+- Line 255:            let holdUntil = min(nextTimestamp ?? event.timestamp + minimumClusterHold, duration)
+- Line 256:            let holdDuration = max(holdUntil - event.timestamp, minimumClusterHold)
+- Line 266:            let previousGap = previousTimestamp.map { max(event.timestamp - $0, 0) } ?? minimumClusterHold
+- Line 267:            let nextGap = nextTimestamp.map { max($0 - event.timestamp, 0) } ?? minimumClusterHold
+- Line 268:            let localWindow = min(previousGap, nextGap, 1.0)
+- Line 298:    private func timing(
+- Line 306:        let timelineEnd = max(duration, 0)
+- Line 307:        let safeEventTimestamp = min(max(eventTimestamp, 0), timelineEnd)
+- Line 308:        let safeLeadIn = max(min(leadInTime, safeEventTimestamp), 0)
+- Line 309:        let safeZoomInDuration = max(zoomInDuration, 0)
+- Line 310:        let requestedZoomOutDuration = max(zoomOutDuration, 0)
+- Line 311:        let requestedHoldDuration = max(holdDuration, minimumClusterHold)
+- Line 312:        let availableAfterEvent = max(timelineEnd - safeEventTimestamp, 0)
+- Line 313:        let safeHoldDuration = min(requestedHoldDuration, availableAfterEvent)
+- Line 314:        let safeZoomOutDuration = min(requestedZoomOutDuration, max(availableAfterEvent - safeHoldDuration, 0))
+- Line 315:        let endTime = safeEventTimestamp + safeHoldDuration + safeZoomOutDuration
+- Line 326:    private func zoomType(for index: Int, count: Int) -> ZoomType {
+- Line 336:    private func previousClusterTimestamp(before event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
+- Line 342:    private func nextClusterTimestamp(after event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
+- Line 348:    private func isCoveredByExistingZoomMarker(_ cluster: [RecordedEvent], existingZoomMarkers: [ZoomPlanItem]) -> Bool {
+- Line 350:        let startTime = first.timestamp - existingZoomTimeTolerance
+- Line 351:        let endTime = last.timestamp + existingZoomTimeTolerance
+- Line 359:    private func averagePoint(for events: [RecordedEvent], contentCoordinateSize: CGSize) -> CGPoint {
+- Line 361:        let total = events.reduce(CGPoint.zero) { partialResult, event in
+- Line 362:            let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
+- Line 368:    private func normalizedDistance(from lhs: RecordedEvent, to rhs: RecordedEvent, contentCoordinateSize: CGSize) -> Double {
+- Line 369:        let lhsPoint = normalizedPoint(clampedContentPoint(for: lhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
+- Line 370:        let rhsPoint = normalizedPoint(clampedContentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
+- Line 371:        let deltaX = lhsPoint.x - rhsPoint.x
+- Line 372:        let deltaY = lhsPoint.y - rhsPoint.y
 
 ### ViewModels/CaptureSetupViewModel.swift
 - Lines: 3202
@@ -2402,7 +2403,7 @@ Generated: 2026-05-30 07:27:08
 - Line 294:        let laneHeight: CGFloat = 9
 
 ### Views/Review/SmartSetupViews.swift
-- Lines: 363
+- Lines: 368
 - Imports:
 - import SwiftUI
 - Types:
@@ -2423,23 +2424,23 @@ Generated: 2026-05-30 07:27:08
 - Line 206:    var providerBadgeTitle: String? {
 - Line 223:    var displayTitle: String {
 - Line 242:    var headline: String {
-- Line 255:    var reviewStateLabel: String {
-- Line 264:    var whatFlowTrackNoticed: String {
-- Line 283:    var suggestedChange: String {
-- Line 296:    var whyItMayHelp: String {
-- Line 309:    var displayTimeRange: String {
-- Line 314:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
-- Line 318:    var displayMetadata: String {
-- Line 319:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
-- Line 327:    private var zoomScaleText: String? {
-- Line 338:    private var confidenceText: String {
-- Line 342:    private var proposalTime: Double {
-- Line 355:    static func timeString(_ seconds: Double) -> String {
-- Line 356:        let clampedSeconds = max(seconds, 0)
-- Line 357:        let wholeSeconds = Int(clampedSeconds)
-- Line 358:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
-- Line 359:        let minutes = wholeSeconds / 60
-- Line 360:        let secondsRemainder = wholeSeconds % 60
+- Line 260:    var reviewStateLabel: String {
+- Line 269:    var whatFlowTrackNoticed: String {
+- Line 288:    var suggestedChange: String {
+- Line 301:    var whyItMayHelp: String {
+- Line 314:    var displayTimeRange: String {
+- Line 319:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
+- Line 323:    var displayMetadata: String {
+- Line 324:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
+- Line 332:    private var zoomScaleText: String? {
+- Line 343:    private var confidenceText: String {
+- Line 347:    private var proposalTime: Double {
+- Line 360:    static func timeString(_ seconds: Double) -> String {
+- Line 361:        let clampedSeconds = max(seconds, 0)
+- Line 362:        let wholeSeconds = Int(clampedSeconds)
+- Line 363:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+- Line 364:        let minutes = wholeSeconds / 60
+- Line 365:        let secondsRemainder = wholeSeconds % 60
 - SwiftUI State:
 - Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 - Line 5:    @ObservedObject var viewModel: CaptureSetupViewModel

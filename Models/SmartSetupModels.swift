@@ -22,6 +22,7 @@ struct SmartSetupSuggestionEnvelope: Codable, Equatable {
 struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     var suggestionID: String
     var providerID: String
+    var userTitle: String?
     var userReason: String?
     var kind: SmartSetupSuggestionKind
     var sourceTimeRange: SmartSetupSourceTimeRange?
@@ -35,6 +36,7 @@ struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     init(
         suggestionID: String,
         providerID: String = "unknown",
+        userTitle: String? = nil,
         userReason: String? = nil,
         kind: SmartSetupSuggestionKind,
         sourceTimeRange: SmartSetupSourceTimeRange?,
@@ -45,6 +47,7 @@ struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     ) {
         self.suggestionID = suggestionID
         self.providerID = providerID
+        self.userTitle = userTitle
         self.userReason = userReason
         self.kind = kind
         self.sourceTimeRange = sourceTimeRange
@@ -57,6 +60,7 @@ struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case suggestionID
         case providerID
+        case userTitle
         case userReason
         case kind
         case sourceTimeRange
@@ -70,6 +74,7 @@ struct SmartSetupSuggestion: Codable, Equatable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         suggestionID = try container.decode(String.self, forKey: .suggestionID)
         providerID = try container.decodeIfPresent(String.self, forKey: .providerID) ?? "unknown"
+        userTitle = try container.decodeIfPresent(String.self, forKey: .userTitle)
         userReason = try container.decodeIfPresent(String.self, forKey: .userReason)
         kind = try container.decode(SmartSetupSuggestionKind.self, forKey: .kind)
         sourceTimeRange = try container.decodeIfPresent(SmartSetupSourceTimeRange.self, forKey: .sourceTimeRange)
