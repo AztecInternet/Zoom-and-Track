@@ -399,7 +399,7 @@ struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
 struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
     let providerID = "clicks"
 
-    private let maxSuggestions = 5
+    private let maxCandidateSuggestions = 12
     private let existingZoomTimeTolerance = 0.65
     private let emittedSuggestionTimeTolerance = 0.65
 
@@ -433,7 +433,7 @@ struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
 
             suggestions.append(suggestion(for: event, contentCoordinateSize: safeContentSize, duration: context.duration))
 
-            if suggestions.count >= maxSuggestions {
+            if suggestions.count >= maxCandidateSuggestions {
                 break
             }
         }
@@ -608,6 +608,7 @@ struct SmartSuggestionAggregator {
     private let zoomTimeConflictTolerance = 0.65
     private let effectTimeConflictTolerance = 0.80
     private let substantialOverlapRatio = 0.50
+    private let maxVisibleClickSuggestions = 5
 
     init(providers: [any SmartSuggestionProvider]) {
         self.providers = providers
@@ -637,7 +638,10 @@ struct SmartSuggestionAggregator {
             }
         }
 
-        return scoreTunedSuggestions(from: conflictFilteredSuggestions(from: mergedSuggestions)).sorted { lhs, rhs in
+        let conflictFilteredSuggestions = conflictFilteredSuggestions(from: mergedSuggestions)
+        let providerCappedSuggestions = providerCappedSuggestions(from: conflictFilteredSuggestions)
+
+        return scoreTunedSuggestions(from: providerCappedSuggestions).sorted { lhs, rhs in
             if lhs.score.value != rhs.score.value {
                 return lhs.score.value > rhs.score.value
             }
@@ -662,6 +666,21 @@ struct SmartSuggestionAggregator {
                 components: suggestion.score.components
             )
             return tunedSuggestion
+        }
+    }
+
+    private func providerCappedSuggestions(from suggestions: [SmartSetupSuggestion]) -> [SmartSetupSuggestion] {
+        var visibleClickSuggestionCount = 0
+        return suggestions.filter { suggestion in
+            guard suggestion.providerID == "clicks" else {
+                return true
+            }
+
+            guard visibleClickSuggestionCount < maxVisibleClickSuggestions else {
+                return false
+            }
+            visibleClickSuggestionCount += 1
+            return true
         }
     }
 

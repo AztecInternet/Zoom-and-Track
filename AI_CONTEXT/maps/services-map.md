@@ -1,6 +1,6 @@
 # Services Map
 
-Generated: 2026-05-30 08:30:29
+Generated: 2026-05-30 14:12:34
 
 ## Files
 
@@ -552,7 +552,7 @@ Generated: 2026-05-30 08:30:29
 - Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
 
 ### Services/SmartSuggestionProviders.swift
-- Lines: 735
+- Lines: 754
 - Imports:
 - import CoreGraphics
 - import Foundation

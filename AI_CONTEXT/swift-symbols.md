@@ -1,6 +1,6 @@
 # Swift Symbols
 
-Generated: 2026-05-30 08:30:29
+Generated: 2026-05-30 14:12:34
 
 ## App/ContentView.swift
 - Line 12:struct ContentView: View {
@@ -297,7 +297,7 @@ Generated: 2026-05-30 08:30:29
 - Line 526:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
 - Line 529:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
 - Line 605:struct SmartSuggestionAggregator {
-- Line 629:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 630:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
 
 ## ViewModels/CaptureSetupViewModel.swift
 - Line 13:    enum PlaybackPresentationMode {
