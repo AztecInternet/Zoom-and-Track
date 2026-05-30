@@ -1,6 +1,6 @@
 # Review & Timeline Map
 
-Generated: 2026-05-30 06:44:26
+Generated: 2026-05-30 07:27:08
 
 ## Files
 
@@ -1081,7 +1081,7 @@ Generated: 2026-05-30 06:44:26
 - Line 294:        let laneHeight: CGFloat = 9
 
 ### Views/Review/SmartSetupViews.swift
-- Lines: 326
+- Lines: 363
 - Imports:
 - import SwiftUI
 - Types:
@@ -1096,27 +1096,29 @@ Generated: 2026-05-30 06:44:26
 - Line 101:    let onDismiss: () -> Void
 - Line 103:    var body: some View {
 - Line 104:        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
-- Line 159:    private func explanationLine(title: String, text: String) -> some View {
-- Line 173:    var displayTitle: String {
-- Line 186:    var displayTitle: String {
-- Line 205:    var headline: String {
-- Line 218:    var reviewStateLabel: String {
-- Line 227:    var whatFlowTrackNoticed: String {
-- Line 246:    var suggestedChange: String {
-- Line 259:    var whyItMayHelp: String {
-- Line 272:    var displayTimeRange: String {
-- Line 277:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
-- Line 281:    var displayMetadata: String {
-- Line 282:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
-- Line 290:    private var zoomScaleText: String? {
-- Line 301:    private var confidenceText: String {
-- Line 305:    private var proposalTime: Double {
-- Line 318:    static func timeString(_ seconds: Double) -> String {
-- Line 319:        let clampedSeconds = max(seconds, 0)
-- Line 320:        let wholeSeconds = Int(clampedSeconds)
-- Line 321:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
-- Line 322:        let minutes = wholeSeconds / 60
-- Line 323:        let secondsRemainder = wholeSeconds % 60
+- Line 162:    private func explanationLine(title: String, text: String) -> some View {
+- Line 174:    private func providerBadge(_ title: String, accentColor: Color) -> some View {
+- Line 193:    var displayTitle: String {
+- Line 206:    var providerBadgeTitle: String? {
+- Line 223:    var displayTitle: String {
+- Line 242:    var headline: String {
+- Line 255:    var reviewStateLabel: String {
+- Line 264:    var whatFlowTrackNoticed: String {
+- Line 283:    var suggestedChange: String {
+- Line 296:    var whyItMayHelp: String {
+- Line 309:    var displayTimeRange: String {
+- Line 314:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
+- Line 318:    var displayMetadata: String {
+- Line 319:        var parts = [kind.displayTitle, displayTimeRange, reasons.map(\.displayTitle).joined(separator: ", ")]
+- Line 327:    private var zoomScaleText: String? {
+- Line 338:    private var confidenceText: String {
+- Line 342:    private var proposalTime: Double {
+- Line 355:    static func timeString(_ seconds: Double) -> String {
+- Line 356:        let clampedSeconds = max(seconds, 0)
+- Line 357:        let wholeSeconds = Int(clampedSeconds)
+- Line 358:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+- Line 359:        let minutes = wholeSeconds / 60
+- Line 360:        let secondsRemainder = wholeSeconds % 60
 - SwiftUI State:
 - Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 - Line 5:    @ObservedObject var viewModel: CaptureSetupViewModel

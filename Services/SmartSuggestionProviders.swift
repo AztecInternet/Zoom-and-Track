@@ -613,7 +613,10 @@ struct SmartSuggestionAggregator {
             }
         }
 
-        return conflictFilteredSuggestions(from: mergedSuggestions).sorted { lhs, rhs in
+        return scoreTunedSuggestions(from: conflictFilteredSuggestions(from: mergedSuggestions)).sorted { lhs, rhs in
+            if lhs.score.value != rhs.score.value {
+                return lhs.score.value > rhs.score.value
+            }
             let lhsTime = sortTime(for: lhs)
             let rhsTime = sortTime(for: rhs)
             if lhsTime != rhsTime {
@@ -625,6 +628,30 @@ struct SmartSuggestionAggregator {
 
     private func sortTime(for suggestion: SmartSetupSuggestion) -> Double {
         suggestion.sourceTimeRange?.startTime ?? suggestion.sourceEvents.first?.timestamp ?? 0
+    }
+
+    private func scoreTunedSuggestions(from suggestions: [SmartSetupSuggestion]) -> [SmartSetupSuggestion] {
+        suggestions.map { suggestion in
+            var tunedSuggestion = suggestion
+            tunedSuggestion.score = SmartSetupCandidateScore(
+                value: tunedScoreValue(for: suggestion),
+                components: suggestion.score.components
+            )
+            return tunedSuggestion
+        }
+    }
+
+    private func tunedScoreValue(for suggestion: SmartSetupSuggestion) -> Double {
+        switch suggestion.providerID {
+        case "click-clusters":
+            return max(suggestion.score.value, 0.88)
+        case "clicks":
+            return max(suggestion.score.value, 0.78)
+        case "templates":
+            return min(max(suggestion.score.value, 0.55), 0.65)
+        default:
+            return suggestion.score.value
+        }
     }
 
     private func conflictFilteredSuggestions(from suggestions: [SmartSetupSuggestion]) -> [SmartSetupSuggestion] {

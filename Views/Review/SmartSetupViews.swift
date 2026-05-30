@@ -108,6 +108,9 @@ private struct SmartSetupSuggestionRow: View {
                 Text(suggestion.headline)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(flowTrackTheme.primaryText)
+                if let providerBadgeTitle = suggestion.providerBadgeTitle {
+                    providerBadge(providerBadgeTitle, accentColor: accentColor)
+                }
                 Spacer(minLength: 6)
                 Text(suggestion.reviewStateLabel)
                     .font(.system(size: 10, weight: .medium))
@@ -167,6 +170,23 @@ private struct SmartSetupSuggestionRow: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
+
+    private func providerBadge(_ title: String, accentColor: Color) -> some View {
+        Text(title)
+            .font(.system(size: 8.5, weight: .semibold))
+            .foregroundStyle(flowTrackTheme.secondaryText)
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule()
+                    .fill(flowTrackTheme.cardBackground.opacity(0.56))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(accentColor.opacity(isSelected ? 0.45 : 0.28), lineWidth: 1)
+            )
+    }
 }
 
 private extension SmartSetupSuggestionKind {
@@ -178,6 +198,23 @@ private extension SmartSetupSuggestionKind {
             return "Effect review"
         case .regionTighten:
             return "Region review"
+        }
+    }
+}
+
+private extension SmartSetupSuggestion {
+    var providerBadgeTitle: String? {
+        switch providerID {
+        case "rules":
+            return "Rules"
+        case "click-clusters":
+            return "Click Cluster"
+        case "clicks":
+            return "Clicks"
+        case "templates":
+            return "Template"
+        default:
+            return nil
         }
     }
 }
