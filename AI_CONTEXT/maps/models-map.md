@@ -1,6 +1,6 @@
 # Models Map
 
-Generated: 2026-05-29 22:39:07
+Generated: 2026-05-30 06:30:00
 
 ## Files
 
@@ -231,7 +231,7 @@ Generated: 2026-05-29 22:39:07
 - Line 199:    var confidence: Double
 
 ### ViewModels/CaptureSetupViewModel.swift
-- Lines: 3200
+- Lines: 3202
 - Imports:
 - import Combine
 - import AppKit

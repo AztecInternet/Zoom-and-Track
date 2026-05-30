@@ -565,8 +565,10 @@ final class CaptureSetupViewModel: ObservableObject {
         let counts = Dictionary(grouping: suggestions, by: \.providerID)
             .mapValues(\.count)
         let rulesCount = counts["rules"] ?? 0
+        let clickClustersCount = counts["click-clusters"] ?? 0
+        let clicksCount = counts["clicks"] ?? 0
         let templateCount = counts["templates"] ?? 0
-        return "Smart Suggestions: \(rulesCount) rules, \(templateCount) template\(templateCount == 1 ? "" : "s")."
+        return "Smart Suggestions: \(rulesCount) rules, \(clickClustersCount) click-cluster\(clickClustersCount == 1 ? "" : "s"), \(clicksCount) clicks, \(templateCount) template\(templateCount == 1 ? "" : "s")."
     }
 
     func acceptSmartSetupSuggestion(_ suggestionID: String) {
