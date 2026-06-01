@@ -1,6 +1,6 @@
 # Review & Timeline Map
 
-Generated: 2026-05-30 21:12:39
+Generated: 2026-06-01 05:55:50
 
 ## Files
 
@@ -1083,7 +1083,7 @@ Generated: 2026-05-30 21:12:39
 - Line 294:        let laneHeight: CGFloat = 9
 
 ### Views/Review/SmartSetupViews.swift
-- Lines: 375
+- Lines: 719
 - Imports:
 - import SwiftUI
 - Types:
@@ -1098,29 +1098,67 @@ Generated: 2026-05-30 21:12:39
 - Line 101:    let onSelect: () -> Void
 - Line 102:    let onDismiss: () -> Void
 - Line 104:    var body: some View {
-- Line 105:        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
-- Line 163:    private func providerBadge(_ title: String, accentColor: Color) -> some View {
-- Line 182:    var providerBadgeTitle: String? {
-- Line 210:    private var hasTextChangeSupport: Bool {
-- Line 217:    private var hasScreenTextSupport: Bool {
-- Line 226:    var headline: String {
-- Line 244:    var reviewStateLabel: String {
-- Line 253:    var adviceBody: String {
-- Line 261:    private var fallbackAdviceBody: String {
-- Line 304:    var displayTimeRange: String {
-- Line 309:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
-- Line 313:    var displayMetadata: String {
-- Line 319:    private var opportunitySummary: String {
-- Line 335:    private var confidenceText: String? {
-- Line 346:    private var proposalTime: Double {
-- Line 359:    private func stableChoice(from options: [String]) -> String {
-- Line 361:        let value = suggestionID.unicodeScalars.reduce(0) { partialResult, scalar in
-- Line 367:    static func timeString(_ seconds: Double) -> String {
-- Line 368:        let clampedSeconds = max(seconds, 0)
-- Line 369:        let wholeSeconds = Int(clampedSeconds)
-- Line 370:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
-- Line 371:        let minutes = wholeSeconds / 60
-- Line 372:        let secondsRemainder = wholeSeconds % 60
+- Line 105:        let badgeTitle = suggestion.providerBadgeTitle
+- Line 106:        let metadataText = suggestion.displayMetadata
+- Line 107:        let accentRole = suggestion.accentRole
+- Line 108:        let accentColor = FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
+- Line 175:    private func providerBadge(_ title: String, accentColor: Color) -> some View {
+- Line 194:    var debugName: String {
+- Line 217:    var badgeTitle: String? {
+- Line 234:    var accentRole: FlowTrackAccentRole {
+- Line 241:    var providerBadgeTitle: String? {
+- Line 285:    fileprivate var editIntent: SmartSuggestionEditIntent {
+- Line 292:        let title = (userTitle ?? headlineFallbackTitle).trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 293:        let lowercasedTitle = title.lowercased()
+- Line 313:    private var isExistingEffectReviewSuggestion: Bool {
+- Line 325:    private var isExistingZoomReviewSuggestion: Bool {
+- Line 339:    private var isProposedEffectIdea: Bool {
+- Line 349:    func debugVisibleIdentity(
+- Line 355:        let sourceIDs = sourceMarkerIDs
+- Line 356:        let sourceText = sourceIDs.isEmpty ? "none" : sourceIDs.joined(separator: ",")
+- Line 357:        let badgeText = badgeTitle ?? "none"
+- Line 358:        let existingState = providerID == "existing-edits" ? "existing" : "new"
+- Line 363:    private var sourceMarkerIDs: [String] {
+- Line 373:    private var proposalCaseName: String {
+- Line 386:    private var hasTextChangeSupport: Bool {
+- Line 395:    private var hasScreenTextSupport: Bool {
+- Line 404:    var headline: String {
+- Line 408:    private var headlineFallbackTitle: String {
+- Line 421:    private var authoritativeHeadline: String {
+- Line 422:        let rawTitle = userTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+- Line 437:    private var addHeadline: String {
+- Line 459:    private var keepHeadline: String {
+- Line 469:    private var adjustHeadline: String {
+- Line 480:    private var removeHeadline: String {
+- Line 490:    var reviewStateLabel: String? {
+- Line 494:    var adviceBody: String {
+- Line 503:    private var fallbackAdviceBody: String {
+- Line 518:    private var addFallbackAdviceBody: String {
+- Line 561:    private var keepFallbackAdviceBody: String {
+- Line 579:    private var adjustFallbackAdviceBody: String {
+- Line 580:        let title = headline.lowercased()
+- Line 598:    private var removeFallbackAdviceBody: String {
+- Line 608:    private func titleMatchingIntent(_ title: String, allowedPrefixes: [String]) -> String? {
+- Line 610:        let normalizedTitle = title.lowercased()
+- Line 614:    private func bodyMatchesIntent(_ body: String) -> Bool {
+- Line 615:        let normalizedBody = body.lowercased()
+- Line 630:    private func containsAny(_ text: String, prefixesOrPhrases: [String]) -> Bool {
+- Line 634:    var displayTimeRange: String {
+- Line 639:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
+- Line 643:    var displayMetadata: String {
+- Line 649:    private var opportunitySummary: String {
+- Line 668:    private var zoomReviewSummary: String {
+- Line 669:        let title = userTitle ?? ""
+- Line 679:    private var confidenceText: String? {
+- Line 690:    private var proposalTime: Double {
+- Line 703:    private func stableChoice(from options: [String]) -> String {
+- Line 705:        let value = suggestionID.unicodeScalars.reduce(0) { partialResult, scalar in
+- Line 711:    static func timeString(_ seconds: Double) -> String {
+- Line 712:        let clampedSeconds = max(seconds, 0)
+- Line 713:        let wholeSeconds = Int(clampedSeconds)
+- Line 714:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+- Line 715:        let minutes = wholeSeconds / 60
+- Line 716:        let secondsRemainder = wholeSeconds % 60
 - SwiftUI State:
 - Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 - Line 5:    @ObservedObject var viewModel: CaptureSetupViewModel

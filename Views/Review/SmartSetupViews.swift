@@ -102,19 +102,24 @@ private struct SmartSetupSuggestionRow: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
+        let badgeTitle = suggestion.providerBadgeTitle
+        let metadataText = suggestion.displayMetadata
+        let accentRole = suggestion.accentRole
+        let accentColor = FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
 
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .center, spacing: 8) {
-                Text(suggestion.reviewStateLabel)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(isSelected ? accentColor : flowTrackTheme.mutedText)
-                    .lineLimit(1)
+                if let reviewStateLabel = suggestion.reviewStateLabel {
+                    Text(reviewStateLabel)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(isSelected ? accentColor : flowTrackTheme.mutedText)
+                        .lineLimit(1)
+                }
 
                 Spacer(minLength: 6)
 
-                if let providerBadgeTitle = suggestion.providerBadgeTitle {
-                    providerBadge(providerBadgeTitle, accentColor: accentColor)
+                if let badgeTitle {
+                    providerBadge(badgeTitle, accentColor: accentColor)
                 }
 
                 Button(action: onDismiss) {
@@ -139,7 +144,7 @@ private struct SmartSetupSuggestionRow: View {
                 .foregroundStyle(flowTrackTheme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text(suggestion.displayMetadata)
+            Text(metadataText)
                 .font(.system(size: 10))
                 .foregroundStyle(flowTrackTheme.mutedText)
                 .lineLimit(2)
@@ -158,6 +163,13 @@ private struct SmartSetupSuggestionRow: View {
         )
         .shadow(color: isSelected ? accentColor.opacity(0.18) : Color.clear, radius: 5, x: 0, y: 0)
         .onTapGesture(perform: onSelect)
+        .onAppear {
+            suggestion.debugVisibleIdentity(
+                badgeTitle: badgeTitle,
+                accentRole: accentRole,
+                metadataText: metadataText
+            )
+        }
     }
 
     private func providerBadge(_ title: String, accentColor: Color) -> some View {
@@ -178,16 +190,68 @@ private struct SmartSetupSuggestionRow: View {
     }
 }
 
-private extension SmartSetupSuggestion {
-    var providerBadgeTitle: String? {
-        if hasTextChangeSupport {
-            return "Text Change"
+private extension FlowTrackAccentRole {
+    var debugName: String {
+        switch self {
+        case .zoomAndClicks:
+            return "zoomAndClicks"
+        case .effects:
+            return "effects"
+        case .capture:
+            return "capture"
+        case .library:
+            return "library"
+        case .settings:
+            return "settings"
         }
-        if hasScreenTextSupport {
-            return "Review"
+    }
+}
+
+private enum SmartSuggestionEditIntent: String {
+    case add
+    case keep
+    case adjust
+    case remove
+    case reviewFallback
+
+    var badgeTitle: String? {
+        switch self {
+        case .add:
+            return "Add"
+        case .keep:
+            return "Keep"
+        case .adjust:
+            return "Adjust"
+        case .remove:
+            return "Remove"
+        case .reviewFallback:
+            return nil
+        }
+    }
+}
+
+private extension SmartSetupSuggestion {
+    var accentRole: FlowTrackAccentRole {
+        if isExistingEffectReviewSuggestion || isProposedEffectIdea {
+            return .effects
+        }
+        return .zoomAndClicks
+    }
+
+    var providerBadgeTitle: String? {
+        if let intentBadge = editIntent.badgeTitle {
+            return intentBadge
         }
 
         switch providerID {
+        case "existing-edits":
+            if isExistingEffectReviewSuggestion {
+                return "Effect"
+            }
+            if isExistingZoomReviewSuggestion {
+                return "Zoom"
+            }
+            return "Review"
         case "click-clusters":
             return sourceEvents.count > 1 ? "Sequence" : "Interaction"
         case "clicks":
@@ -203,7 +267,119 @@ private extension SmartSetupSuggestion {
             }
             return kind == .zoomMarker ? "Focus" : "Review"
         default:
-            return nil
+            break
+        }
+
+        if isProposedEffectIdea {
+            return "Effect Idea"
+        }
+        if hasTextChangeSupport {
+            return "Text Change"
+        }
+        if hasScreenTextSupport {
+            return "Review"
+        }
+        return nil
+    }
+
+    fileprivate var editIntent: SmartSuggestionEditIntent {
+        if case .zoomAdjustment = proposal {
+            return .adjust
+        }
+        guard providerID == "existing-edits" else {
+            return .add
+        }
+        let title = (userTitle ?? headlineFallbackTitle).trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercasedTitle = title.lowercased()
+
+        if lowercasedTitle.hasPrefix("consider removing") || lowercasedTitle.hasPrefix("remove") {
+            return .remove
+        }
+        if lowercasedTitle.hasPrefix("keep") {
+            return .keep
+        }
+        if lowercasedTitle.hasPrefix("extend")
+            || lowercasedTitle.hasPrefix("resize")
+            || lowercasedTitle.hasPrefix("expand")
+            || lowercasedTitle.hasPrefix("move")
+            || lowercasedTitle.hasPrefix("shorten")
+            || lowercasedTitle.hasPrefix("refine")
+            || lowercasedTitle.hasPrefix("adjust") {
+            return .adjust
+        }
+        return .reviewFallback
+    }
+
+    private var isExistingEffectReviewSuggestion: Bool {
+        guard providerID == "existing-edits",
+              kind == .effectMarker,
+              suggestionID.hasPrefix("existing-effect-") else {
+            return false
+        }
+        if case .effect = proposal {
+            return true
+        }
+        return false
+    }
+
+    private var isExistingZoomReviewSuggestion: Bool {
+        guard providerID == "existing-edits",
+              kind == .zoomMarker,
+              suggestionID.hasPrefix("existing-zoom-") else {
+            return false
+        }
+        switch proposal {
+        case .zoom, .zoomAdjustment:
+            return true
+        case .effect, .regionTighten:
+            return false
+        }
+    }
+
+    private var isProposedEffectIdea: Bool {
+        guard providerID != "existing-edits" else { return false }
+        switch proposal {
+        case .effect, .regionTighten:
+            return true
+        case .zoom, .zoomAdjustment:
+            return false
+        }
+    }
+
+    func debugVisibleIdentity(
+        badgeTitle: String?,
+        accentRole: FlowTrackAccentRole,
+        metadataText: String
+    ) {
+        #if DEBUG
+        let sourceIDs = sourceMarkerIDs
+        let sourceText = sourceIDs.isEmpty ? "none" : sourceIDs.joined(separator: ",")
+        let badgeText = badgeTitle ?? "none"
+        let existingState = providerID == "existing-edits" ? "existing" : "new"
+        print("[SmartSuggestionCard] suggestionID=\(suggestionID) providerID=\(providerID) existing=\(existingState) intent=\(editIntent.rawValue) kind=\(kind.rawValue) proposal=\(proposalCaseName) sourceMarkerIDs=\(sourceText) realZoom=\(isExistingZoomReviewSuggestion) realEffect=\(isExistingEffectReviewSuggestion) badge=\(badgeText) accentRole=\(accentRole.debugName) title=\(headline) metadata=\(metadataText)")
+        #endif
+    }
+
+    private var sourceMarkerIDs: [String] {
+        if suggestionID.hasPrefix("existing-effect-") {
+            return [String(suggestionID.dropFirst("existing-effect-".count))]
+        }
+        if suggestionID.hasPrefix("existing-zoom-") {
+            return [String(suggestionID.dropFirst("existing-zoom-".count))]
+        }
+        return []
+    }
+
+    private var proposalCaseName: String {
+        switch proposal {
+        case .zoom:
+            return "zoom"
+        case .zoomAdjustment:
+            return "zoomAdjustment"
+        case .effect:
+            return "effect"
+        case .regionTighten:
+            return "regionTighten"
         }
     }
 
@@ -212,6 +388,8 @@ private extension SmartSetupSuggestion {
         return userReason.localizedCaseInsensitiveContains("screen content changes")
             || userReason.localizedCaseInsensitiveContains("changes what is visible")
             || userReason.localizedCaseInsensitiveContains("something on screen changes")
+            || userReason.localizedCaseInsensitiveContains("what changes")
+            || userReason.localizedCaseInsensitiveContains("transition")
     }
 
     private var hasScreenTextSupport: Bool {
@@ -224,81 +402,233 @@ private extension SmartSetupSuggestion {
 
 private extension SmartSetupSuggestion {
     var headline: String {
-        if let userTitle = userTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !userTitle.isEmpty {
-            return userTitle
-        }
+        authoritativeHeadline
+    }
 
+    private var headlineFallbackTitle: String {
         switch proposal {
         case .zoomAdjustment:
-            return "Stay zoomed during this click sequence"
+            return "Refine this focus sequence"
         case .zoom:
-            return "Review this zoom timing"
+            return "Add a short focus hold here"
         case .effect:
-            return "Review a possible focus effect"
+            return isExistingEffectReviewSuggestion ? "Keep this effect" : "Add a subtle focus effect here"
         case .regionTighten:
-            return "Review this focus region"
+            return "Resize this focus region"
         }
     }
 
-    var reviewStateLabel: String {
+    private var authoritativeHeadline: String {
+        let rawTitle = userTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        switch editIntent {
+        case .add:
+            return titleMatchingIntent(rawTitle, allowedPrefixes: ["add"]) ?? addHeadline
+        case .keep:
+            return titleMatchingIntent(rawTitle, allowedPrefixes: ["keep"]) ?? keepHeadline
+        case .adjust:
+            return titleMatchingIntent(rawTitle, allowedPrefixes: ["extend", "resize", "expand", "move", "shorten", "refine", "adjust", "tighten"]) ?? adjustHeadline
+        case .remove:
+            return titleMatchingIntent(rawTitle, allowedPrefixes: ["consider removing", "remove"]) ?? removeHeadline
+        case .reviewFallback:
+            return titleMatchingIntent(rawTitle, allowedPrefixes: ["review"]) ?? headlineFallbackTitle
+        }
+    }
+
+    private var addHeadline: String {
         switch proposal {
         case .zoomAdjustment:
-            return "Smart Adjust"
-        case .zoom, .effect, .regionTighten:
-            return "Review only"
+            return "Refine this focus sequence"
+        case .zoom:
+            if providerID == "click-clusters" && sourceEvents.count > 1 {
+                return "Add a zoom hold covering this \(sourceEvents.count)-step interaction"
+            }
+            if providerID == "clicks" || reasons.contains(.click) {
+                return "Add a short focus hold for this click"
+            }
+            return "Add a short focus hold here"
+        case .effect:
+            if providerID == "rules", reasons.contains(.repeatedActivityZone) {
+                return "Add a subtle focus effect here"
+            }
+            return "Add a subtle focus effect here"
+        case .regionTighten:
+            return "Add a subtle focus effect around this area"
         }
+    }
+
+    private var keepHeadline: String {
+        if isExistingEffectReviewSuggestion {
+            return "Keep this effect"
+        }
+        if isExistingZoomReviewSuggestion {
+            return "Keep this zoom"
+        }
+        return "Keep this edit"
+    }
+
+    private var adjustHeadline: String {
+        switch proposal {
+        case .zoomAdjustment:
+            return "Refine this focus sequence"
+        case .zoom:
+            return isExistingZoomReviewSuggestion ? "Move this zoom" : "Refine this focus hold"
+        case .effect, .regionTighten:
+            return isExistingEffectReviewSuggestion ? "Expand this effect region to include the changing content" : "Tighten this focus area"
+        }
+    }
+
+    private var removeHeadline: String {
+        if isExistingEffectReviewSuggestion {
+            return "Consider removing this effect"
+        }
+        if isExistingZoomReviewSuggestion {
+            return "Consider removing this zoom"
+        }
+        return "Consider removing this edit"
+    }
+
+    var reviewStateLabel: String? {
+        editIntent == .reviewFallback ? "Review" : nil
     }
 
     var adviceBody: String {
         if let userReason = userReason?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !userReason.isEmpty {
+           !userReason.isEmpty,
+           bodyMatchesIntent(userReason) {
             return userReason
         }
         return fallbackAdviceBody
     }
 
     private var fallbackAdviceBody: String {
+        switch editIntent {
+        case .add:
+            return addFallbackAdviceBody
+        case .keep:
+            return keepFallbackAdviceBody
+        case .adjust:
+            return adjustFallbackAdviceBody
+        case .remove:
+            return removeFallbackAdviceBody
+        case .reviewFallback:
+            return "Review this moment if it affects how clearly the step reads."
+        }
+    }
+
+    private var addFallbackAdviceBody: String {
         switch proposal {
         case .zoomAdjustment:
             return stableChoice(from: [
-                "Keep this short sequence steady so the viewer can follow the action.",
-                "This connected interaction may work better as one clear focus moment.",
-                "Hold attention here if this part is important to the edit."
+                "Viewers may need more time to follow this sequence.",
+                "The connected interaction may be easier to follow as one clear focus move.",
+                "This sequence may benefit from a steadier focus move."
             ])
         case .zoom:
             return stableChoice(from: [
-                "This short interaction may be worth highlighting.",
-                "A little more focus here could help the viewer follow what changed.",
-                "Review this moment if the click matters to the story."
+                "This interaction may need additional emphasis.",
+                "Viewers may need help following what changes.",
+                "This moment may move past too quickly."
             ])
         case .effect:
             if reasons.contains(.cursorPause) {
                 return stableChoice(from: [
-                    "You paused here, so a subtle focus effect may help guide attention.",
-                    "Attention stayed in one place, which may make this a useful emphasis point.",
-                    "This quiet moment may be worth a gentle visual cue."
+                    "This pause can guide attention if it matters to the edit.",
+                    "Gentle emphasis can help this pause read as intentional.",
+                    "A light visual cue can make this quiet moment easier to notice."
                 ])
             }
             if reasons.contains(.repeatedActivityZone) {
                 return stableChoice(from: [
-                    "Activity was concentrated here, so a light focus effect may help the viewer know where to look.",
-                    "Several actions happened in this area, which may be worth a gentle visual cue.",
-                    "This area carries repeated activity and may benefit from clearer focus."
+                    "Viewers may need help knowing where to look.",
+                    "This area appears to matter to the step.",
+                    "This active area may move past too quickly."
                 ])
             }
             return stableChoice(from: [
-                "A light visual cue here may help guide attention.",
-                "Review this moment for subtle emphasis if it matters to the story.",
-                "This part may read more clearly with a gentle focus effect."
+                "A light visual cue can help guide attention.",
+                "Subtle emphasis can help if this moment matters to the story.",
+                "This part may need more attention to read clearly."
             ])
         case .regionTighten:
             return stableChoice(from: [
-                "Tighten this area only if it makes the action clearer.",
-                "A smaller focus area may reduce distraction around the important action.",
-                "Review the frame and keep the focus area as simple as possible."
+                "A tighter focus area may make the action clearer.",
+                "A smaller focus area can reduce distraction around the action.",
+                "The important area may need a more deliberate frame."
             ])
         }
+    }
+
+    private var keepFallbackAdviceBody: String {
+        if isExistingEffectReviewSuggestion {
+            return stableChoice(from: [
+                "The effect already highlights the changing content clearly.",
+                "The effect appears to guide attention without obvious distraction.",
+                "The highlighted area stays relevant through this part of the edit."
+            ])
+        }
+        if isExistingZoomReviewSuggestion {
+            return stableChoice(from: [
+                "The zoom guides attention to the most important part of the screen.",
+                "The zoom appears to follow the action clearly.",
+                "The zoom keeps the relevant information easy to follow."
+            ])
+        }
+        return "This edit appears to support the step clearly."
+    }
+
+    private var adjustFallbackAdviceBody: String {
+        let title = headline.lowercased()
+        if title.hasPrefix("extend") {
+            return title.contains("zoom")
+                ? "Viewers may need more time before the zoom ends."
+                : "Viewers may need more time before the effect ends."
+        }
+        if title.hasPrefix("resize") || title.hasPrefix("expand") || title.hasPrefix("tighten") {
+            return "The highlighted area may not fully cover the changing information."
+        }
+        if title.hasPrefix("move") {
+            return "The focus point may not land on the most important part of the screen."
+        }
+        if title.hasPrefix("shorten") {
+            return "The edit may stay on screen longer than the step needs."
+        }
+        return "This existing edit may need a small timing or framing adjustment."
+    }
+
+    private var removeFallbackAdviceBody: String {
+        if isExistingEffectReviewSuggestion {
+            return "The activity may already be clear without this effect."
+        }
+        if isExistingZoomReviewSuggestion {
+            return "The activity may already be clear without this zoom."
+        }
+        return "The activity may already be clear without additional emphasis."
+    }
+
+    private func titleMatchingIntent(_ title: String, allowedPrefixes: [String]) -> String? {
+        guard !title.isEmpty else { return nil }
+        let normalizedTitle = title.lowercased()
+        return allowedPrefixes.contains { normalizedTitle.hasPrefix($0) } ? title : nil
+    }
+
+    private func bodyMatchesIntent(_ body: String) -> Bool {
+        let normalizedBody = body.lowercased()
+        switch editIntent {
+        case .add:
+            return !containsAny(normalizedBody, prefixesOrPhrases: ["keep this", "consider removing", "remove this", "resize this", "expand this", "extend this", "move this", "shorten this"])
+        case .keep:
+            return !containsAny(normalizedBody, prefixesOrPhrases: ["add ", "consider removing", "remove this", "resize this", "expand this", "extend this", "move this", "shorten this", "may need more time"])
+        case .adjust:
+            return !containsAny(normalizedBody, prefixesOrPhrases: ["add ", "keep this", "consider removing", "remove this"])
+        case .remove:
+            return !containsAny(normalizedBody, prefixesOrPhrases: ["add ", "keep this", "resize this", "expand this", "extend this", "move this", "shorten this"])
+        case .reviewFallback:
+            return true
+        }
+    }
+
+    private func containsAny(_ text: String, prefixesOrPhrases: [String]) -> Bool {
+        prefixesOrPhrases.contains { text.contains($0) }
     }
 
     var displayTimeRange: String {
@@ -324,12 +654,26 @@ private extension SmartSetupSuggestion {
             if providerID == "click-clusters" {
                 return "Focus sequence"
             }
+            if isExistingZoomReviewSuggestion {
+                return zoomReviewSummary
+            }
             return reasons.contains(.click) ? "Interaction highlight" : "Focus moment"
         case .effect:
-            return "Focus effect"
+            return isExistingEffectReviewSuggestion ? "Visual effect" : "Suggested effect"
         case .regionTighten:
-            return "Focus area"
+            return isExistingEffectReviewSuggestion ? "Visual effect" : "Focus idea"
         }
+    }
+
+    private var zoomReviewSummary: String {
+        let title = userTitle ?? ""
+        if title.localizedCaseInsensitiveContains("hold") {
+            return "Zoom hold"
+        }
+        if title.localizedCaseInsensitiveContains("timing") {
+            return "Zoom timing"
+        }
+        return "Focus zoom"
     }
 
     private var confidenceText: String? {

@@ -1,11 +1,11 @@
 # Onboarding Map
 
-Generated: 2026-05-30 21:12:39
+Generated: 2026-06-01 05:55:50
 
 ## Files
 
 ### App/ContentView.swift
-- Lines: 1658
+- Lines: 1634
 - Imports:
 - import AppKit
 - import AVFoundation
@@ -26,10 +26,10 @@ Generated: 2026-05-30 21:12:39
 - Line 196:    enum CaptureInfoField: Hashable {
 - Line 202:    enum MotionTuning {
 - Line 210:    struct LibraryFilterOption: Identifiable {
-- Line 1588:struct SharingAnchorView: NSViewRepresentable {
-- Line 1610:enum ReviewHeaderAction {
-- Line 1616:enum AppTab: String, CaseIterable, Identifiable {
-- Line 1651:struct MarkerListEntry: Identifiable {
+- Line 1564:struct SharingAnchorView: NSViewRepresentable {
+- Line 1586:enum ReviewHeaderAction {
+- Line 1592:enum AppTab: String, CaseIterable, Identifiable {
+- Line 1627:struct MarkerListEntry: Identifiable {
 - Functions / Vars:
 - Line 98:        let point: CGPoint
 - Line 99:        let fittedRect: CGRect

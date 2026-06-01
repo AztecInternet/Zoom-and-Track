@@ -220,3 +220,144 @@ struct SmartSetupRegionTightenProposal: Codable, Equatable {
         self.confidence = min(max(confidence, 0), 1)
     }
 }
+
+extension SmartSetupSuggestion {
+    func reviewPlaybackRange(recordingDuration: Double) -> SmartSetupSourceTimeRange {
+        let safeDuration = max(recordingDuration, 0)
+        let rawFocusMoment = self.focusMoment
+        let focusMoment = clampedReviewTime(rawFocusMoment, duration: safeDuration)
+        let eventTimes = sourceEvents
+            .map(\.timestamp)
+            .filter { $0.isFinite }
+            .sorted()
+        let preRoll = 2.0
+        let postRoll = 1.5
+        let eventPaddingBefore = 0.25
+        let eventPaddingAfter = 0.60
+        let minimumDuration = 1.5
+        let maximumDuration = 8.0
+
+        var startTime = focusMoment - preRoll
+        var endTime = focusMoment + postRoll
+
+        if let firstEventTime = eventTimes.first {
+            startTime = min(startTime, firstEventTime - eventPaddingBefore)
+        }
+        if let lastEventTime = eventTimes.last {
+            endTime = max(endTime, lastEventTime + eventPaddingAfter)
+        }
+
+        var range = clampedReviewRange(
+            startTime: startTime,
+            endTime: endTime,
+            focusMoment: focusMoment,
+            duration: safeDuration,
+            minimumDuration: minimumDuration,
+            maximumDuration: maximumDuration
+        )
+
+        if range.endTime - range.startTime < minimumDuration {
+            range = clampedReviewRange(
+                startTime: focusMoment - (minimumDuration * 0.5),
+                endTime: focusMoment + (minimumDuration * 0.5),
+                focusMoment: focusMoment,
+                duration: safeDuration,
+                minimumDuration: minimumDuration,
+                maximumDuration: maximumDuration
+            )
+        }
+
+        return SmartSetupSourceTimeRange(startTime: range.startTime, endTime: range.endTime)
+    }
+
+    var focusMoment: Double {
+        if let representativeEventTime {
+            return representativeEventTime
+        }
+
+        let proposalTime: Double
+        switch proposal {
+        case .zoom(let proposal):
+            proposalTime = proposal.sourceEventTimestamp
+        case .zoomAdjustment(let proposal):
+            proposalTime = (proposal.startTime + proposal.endTime) / 2
+        case .effect(let proposal):
+            proposalTime = proposal.sourceEventTimestamp
+        case .regionTighten(let proposal):
+            proposalTime = proposal.sourceTime
+        }
+        if proposalTime.isFinite {
+            return proposalTime
+        }
+
+        if let sourceTimeRange {
+            return (sourceTimeRange.startTime + sourceTimeRange.endTime) / 2
+        }
+        return 0
+    }
+
+    private var representativeEventTime: Double? {
+        let clickTimes = sourceEvents
+            .filter { $0.type == .leftMouseDown || $0.type == .rightMouseDown }
+            .map(\.timestamp)
+            .filter { $0.isFinite }
+            .sorted()
+        if !clickTimes.isEmpty {
+            return clickTimes[clickTimes.count / 2]
+        }
+
+        let eventTimes = sourceEvents
+            .map(\.timestamp)
+            .filter { $0.isFinite }
+            .sorted()
+        if !eventTimes.isEmpty {
+            return eventTimes[eventTimes.count / 2]
+        }
+
+        return nil
+    }
+
+    private func clampedReviewRange(
+        startTime: Double,
+        endTime: Double,
+        focusMoment: Double,
+        duration: Double,
+        minimumDuration: Double,
+        maximumDuration: Double
+    ) -> (startTime: Double, endTime: Double) {
+        let upperBound = duration > 0 ? duration : max(endTime, focusMoment + minimumDuration)
+        var startTime = startTime.isFinite ? startTime : focusMoment - 1.0
+        var endTime = endTime.isFinite ? endTime : focusMoment + 1.0
+
+        if endTime - startTime > maximumDuration {
+            startTime = focusMoment - (maximumDuration * 0.45)
+            endTime = startTime + maximumDuration
+        }
+
+        startTime = min(max(startTime, 0), upperBound)
+        endTime = min(max(endTime, startTime), upperBound)
+
+        if endTime - startTime < minimumDuration {
+            let missingDuration = minimumDuration - (endTime - startTime)
+            startTime = max(startTime - (missingDuration * 0.5), 0)
+            endTime = min(endTime + (missingDuration * 0.5), upperBound)
+        }
+
+        if endTime - startTime < minimumDuration {
+            if startTime <= 0 {
+                endTime = min(startTime + minimumDuration, upperBound)
+            } else if endTime >= upperBound {
+                startTime = max(endTime - minimumDuration, 0)
+            }
+        }
+
+        return (startTime, max(endTime, startTime))
+    }
+
+    private func clampedReviewTime(_ time: Double, duration: Double) -> Double {
+        let fallbackTime = sourceTimeRange.map { ($0.startTime + $0.endTime) / 2 } ?? 0
+        let finiteTime = time.isFinite ? time : fallbackTime
+        guard duration > 0 else { return max(finiteTime, 0) }
+        return min(max(finiteTime, 0), duration)
+    }
+}

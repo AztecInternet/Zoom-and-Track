@@ -65,6 +65,16 @@ enum SmartSuggestionUIContext: String, CaseIterable {
     }
 }
 
+enum SmartSuggestionOCRTextRole: String {
+    case clickTargetText
+    case nearbyContextText
+    case changedAreaText
+    case pageContentText
+    case fallbackText
+
+    var debugLabel: String { rawValue }
+}
+
 struct SmartSuggestionOCRRegionMetadata {
     let regionID: String
     let textCount: Int
@@ -75,6 +85,8 @@ struct SmartSuggestionOCRRegionMetadata {
     let uiContextConfidence: Double
     let supportingText: String?
     let supportingTextConfidence: Float?
+    let supportingTextRole: SmartSuggestionOCRTextRole
+    let supportingTextRoleReason: String?
 
     var appearsVisuallyMeaningful: Bool {
         textCount > 0 || hasTextNearSourceEvent || hasTextChange
@@ -173,7 +185,8 @@ struct SmartSuggestionVisionAnalysisService {
     func regionMetadata(
         for regions: [ActivityRegion],
         analysisResult: SmartSuggestionOCRAnalysisResult,
-        contentCoordinateSize: CGSize
+        contentCoordinateSize: CGSize,
+        visualChangeMetadataByID: [String: SmartSuggestionVisualChangeMetadata] = [:]
     ) -> [String: SmartSuggestionOCRRegionMetadata] {
         let observationsByRegionID = Dictionary(grouping: analysisResult.observations, by: \.regionID)
         return regions.reduce(into: [:]) { partialResult, region in
@@ -181,18 +194,26 @@ struct SmartSuggestionVisionAnalysisService {
             partialResult[region.id] = metadata(
                 for: region,
                 observations: observations,
-                contentCoordinateSize: contentCoordinateSize
+                contentCoordinateSize: contentCoordinateSize,
+                visualChangeMetadata: visualChangeMetadataByID[region.id]
             )
         }
     }
 
     func visionTunedSuggestions(
         from suggestions: [SmartSetupSuggestion],
-        regionMetadataByID: [String: SmartSuggestionOCRRegionMetadata]
+        regionMetadataByID: [String: SmartSuggestionOCRRegionMetadata],
+        visualChangeMetadataByID: [String: SmartSuggestionVisualChangeMetadata] = [:]
     ) -> [SmartSetupSuggestion] {
         suggestions.compactMap { suggestion in
-            let metadata = regionMetadataByID["suggestion-\(suggestion.suggestionID)"]
-            return visionTunedSuggestion(suggestion, metadata: metadata)
+            let regionID = "suggestion-\(suggestion.suggestionID)"
+            let metadata = regionMetadataByID[regionID]
+            let visualChangeMetadata = visualChangeMetadataByID[regionID]
+            return visionTunedSuggestion(
+                suggestion,
+                metadata: metadata,
+                visualChangeMetadata: visualChangeMetadata
+            )
         }
         .sorted { lhs, rhs in
             if lhs.score.value != rhs.score.value {
@@ -210,14 +231,16 @@ struct SmartSuggestionVisionAnalysisService {
     private func metadata(
         for region: ActivityRegion,
         observations: [SmartSuggestionOCRTextObservation],
-        contentCoordinateSize: CGSize
+        contentCoordinateSize: CGSize,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
     ) -> SmartSuggestionOCRRegionMetadata {
         let uniqueSnippets = uniqueTextSnippets(from: observations)
         let classification = uiContextClassification(
             for: region,
             observations: observations,
             uniqueSnippets: uniqueSnippets,
-            contentCoordinateSize: contentCoordinateSize
+            contentCoordinateSize: contentCoordinateSize,
+            visualChangeMetadata: visualChangeMetadata
         )
         return SmartSuggestionOCRRegionMetadata(
             regionID: region.id,
@@ -235,36 +258,68 @@ struct SmartSuggestionVisionAnalysisService {
             supportingTextConfidence: confidence(
                 for: classification.supportingText,
                 in: observations
-            )
+            ),
+            supportingTextRole: classification.supportingTextRole,
+            supportingTextRoleReason: classification.supportingTextRoleReason
         )
     }
 
     private func visionTunedSuggestion(
         _ suggestion: SmartSetupSuggestion,
-        metadata: SmartSuggestionOCRRegionMetadata?
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
     ) -> SmartSetupSuggestion? {
-        guard let metadata else { return suggestion }
-
         var tunedSuggestion = suggestion
         let baseScore = tunedSuggestion.score.value
         var scoreAdjustment = 0.0
-        if metadata.hasTextNearSourceEvent {
-            scoreAdjustment += 0.05
-        } else if metadata.textCount > 0 {
-            scoreAdjustment += 0.025
-        }
-        if metadata.hasTextChange {
-            scoreAdjustment += 0.04
-        }
-        if metadata.hasUsefulUIContext {
-            scoreAdjustment += 0.025
-        }
-        if shouldSoftlyDowngrade(suggestion, metadata: metadata) {
-            scoreAdjustment -= 0.08
+
+        if let metadata {
+            if metadata.hasTextNearSourceEvent {
+                scoreAdjustment += 0.05
+            } else if metadata.textCount > 0 {
+                scoreAdjustment += 0.025
+            }
+            if metadata.hasTextChange {
+                scoreAdjustment += 0.04
+            }
+            if metadata.hasUsefulUIContext {
+                scoreAdjustment += 0.025
+            }
+            if shouldSoftlyDowngrade(suggestion, metadata: metadata) {
+                scoreAdjustment -= 0.08
+            }
         }
 
+        if let visualChangeMetadata {
+            scoreAdjustment += visualChangeScoreAdjustment(for: suggestion, metadata: visualChangeMetadata)
+        }
+        scoreAdjustment += existingEditEvidenceScoreAdjustment(
+            for: suggestion,
+            metadata: metadata,
+            visualChangeMetadata: visualChangeMetadata
+        )
+
         let tunedScore = min(max(baseScore + scoreAdjustment, 0), 1)
-        if shouldSuppress(suggestion, tunedScore: tunedScore, metadata: metadata) {
+        if let metadata,
+           shouldSuppress(suggestion, tunedScore: tunedScore, metadata: metadata) {
+            debugSuppressedSuggestion(suggestion, reason: "weak proposed suggestion", intent: "add")
+            return nil
+        }
+        if shouldSuppressEmptyExistingEdit(
+            suggestion,
+            metadata: metadata,
+            visualChangeMetadata: visualChangeMetadata
+        ) {
+            debugSuppressedSuggestion(suggestion, reason: "existing edit has no supporting evidence", intent: editIntentName(for: suggestion))
+            return nil
+        }
+        if shouldSuppressWeakProposedSuggestion(
+            suggestion,
+            tunedScore: tunedScore,
+            metadata: metadata,
+            visualChangeMetadata: visualChangeMetadata
+        ) {
+            debugSuppressedSuggestion(suggestion, reason: "weak add opportunity", intent: "add")
             return nil
         }
 
@@ -272,16 +327,96 @@ struct SmartSuggestionVisionAnalysisService {
             value: tunedScore,
             components: suggestion.score.components
         )
-        tunedSuggestion.userReason = visionSupportedReason(
-            existingReason: tunedSuggestion.userReason,
-            metadata: metadata
-        )
-        tunedSuggestion.userTitle = contextSupportedTitle(
-            existingTitle: tunedSuggestion.userTitle,
-            suggestion: tunedSuggestion,
-            metadata: metadata
-        )
+
+        if let metadata, tunedSuggestion.providerID != "existing-edits" {
+            tunedSuggestion.userReason = visionSupportedReason(
+                existingReason: tunedSuggestion.userReason,
+                metadata: metadata,
+                visualChangeMetadata: visualChangeMetadata
+            )
+            tunedSuggestion.userTitle = contextSupportedTitle(
+                existingTitle: tunedSuggestion.userTitle,
+                suggestion: tunedSuggestion,
+                metadata: metadata
+            )
+        } else if let visualChangeMetadata, tunedSuggestion.providerID != "existing-edits" {
+            tunedSuggestion.userReason = visualChangeSupportedReason(
+                existingReason: tunedSuggestion.userReason,
+                metadata: nil,
+                visualChangeMetadata: visualChangeMetadata
+            )
+        }
+        if tunedSuggestion.providerID == "existing-edits" {
+            tunedSuggestion = existingEditEvidenceWording(
+                for: tunedSuggestion,
+                metadata: metadata,
+                visualChangeMetadata: visualChangeMetadata
+            )
+        }
         return tunedSuggestion
+    }
+
+    private func existingEditEvidenceScoreAdjustment(
+        for suggestion: SmartSetupSuggestion,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> Double {
+        guard suggestion.providerID == "existing-edits" else { return 0 }
+
+        var adjustment = 0.0
+        if let visualChangeMetadata {
+            if visualChangeMetadata.hasVisibleChange {
+                adjustment += 0.03
+            }
+            if visualChangeMetadata.changeNearInteraction {
+                adjustment += 0.03
+            }
+            if visualChangeMetadata.likelyLargeTransition {
+                adjustment += 0.025
+            }
+        }
+        if let metadata {
+            if metadata.hasTextChange {
+                adjustment += 0.025
+            }
+            if metadata.hasTextNearSourceEvent {
+                adjustment += 0.02
+            }
+            if metadata.hasUsefulUIContext {
+                adjustment += 0.02
+            }
+            if !metadata.appearsVisuallyMeaningful && visualChangeMetadata?.hasVisibleChange != true {
+                adjustment -= 0.035
+            }
+        } else if visualChangeMetadata?.hasVisibleChange != true {
+            adjustment -= 0.025
+        }
+
+        return min(max(adjustment, -0.04), 0.10)
+    }
+
+    private func visualChangeScoreAdjustment(
+        for suggestion: SmartSetupSuggestion,
+        metadata: SmartSuggestionVisualChangeMetadata
+    ) -> Double {
+        guard metadata.hasVisibleChange else {
+            guard suggestion.providerID == "rules" || suggestion.providerID == "templates" else { return 0 }
+            return -0.03
+        }
+
+        var adjustment = 0.0
+        if metadata.changeNearInteraction {
+            adjustment += 0.04
+        } else if metadata.changeFarFromInteraction {
+            adjustment += 0.008
+        }
+        if metadata.likelyPanelOpen || metadata.likelyPanelClose {
+            adjustment += 0.012
+        }
+        if metadata.likelyLargeTransition {
+            adjustment += 0.02
+        }
+        return min(max(adjustment, -0.035), 0.06)
     }
 
     private func shouldSoftlyDowngrade(
@@ -307,12 +442,83 @@ struct SmartSuggestionVisionAnalysisService {
         return tunedScore < 0.55
     }
 
+    private func shouldSuppressEmptyExistingEdit(
+        _ suggestion: SmartSetupSuggestion,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> Bool {
+        guard suggestion.providerID == "existing-edits" else { return false }
+        guard suggestion.sourceEvents.isEmpty else { return false }
+        let hasTextEvidence = metadata?.appearsVisuallyMeaningful == true || metadata?.hasUsefulUIContext == true
+        let hasVisualEvidence = visualChangeMetadata?.hasVisibleChange == true
+        guard !hasTextEvidence && !hasVisualEvidence else { return false }
+        return suggestion.userTitle == "Keep this effect"
+            || suggestion.userTitle == "Keep this zoom"
+            || suggestion.userTitle == "Review this focus effect"
+            || suggestion.userTitle == "Review this visual effect"
+            || suggestion.userTitle == "Review this focus zoom"
+    }
+
+    private func shouldSuppressWeakProposedSuggestion(
+        _ suggestion: SmartSetupSuggestion,
+        tunedScore: Double,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> Bool {
+        guard suggestion.providerID != "existing-edits" else { return false }
+        guard tunedScore < 0.52 else { return false }
+        let hasTextEvidence = metadata?.appearsVisuallyMeaningful == true || metadata?.hasUsefulUIContext == true
+        let hasVisualEvidence = visualChangeMetadata.map(visualChangeIsMeaningfulForWording) ?? false
+        let hasSourceEvents = !suggestion.sourceEvents.isEmpty
+        return !hasTextEvidence && !hasVisualEvidence && !hasSourceEvents
+    }
+
+    private func editIntentName(for suggestion: SmartSetupSuggestion) -> String {
+        if case .zoomAdjustment = suggestion.proposal {
+            return "adjust"
+        }
+        guard suggestion.providerID == "existing-edits" else {
+            return "add"
+        }
+        let title = suggestion.userTitle?.lowercased() ?? ""
+        if title.hasPrefix("consider removing") || title.hasPrefix("remove") {
+            return "remove"
+        }
+        if title.hasPrefix("keep") {
+            return "keep"
+        }
+        if title.hasPrefix("extend")
+            || title.hasPrefix("resize")
+            || title.hasPrefix("move")
+            || title.hasPrefix("shorten")
+            || title.contains(" adjust ") {
+            return "adjust"
+        }
+        return "reviewFallback"
+    }
+
+    private func debugSuppressedSuggestion(_ suggestion: SmartSetupSuggestion, reason: String, intent: String) {
+        #if DEBUG
+        let title = suggestion.userTitle ?? "n/a"
+        let existingState = suggestion.providerID == "existing-edits" ? "existing" : "new"
+        print("[SmartSuggestionIntent] suppressed suggestionID=\(suggestion.suggestionID) providerID=\(suggestion.providerID) existing=\(existingState) intent=\(intent) title=\(title) reason=\(reason)")
+        #endif
+    }
+
     private func visionSupportedReason(
         existingReason: String?,
-        metadata: SmartSuggestionOCRRegionMetadata
+        metadata: SmartSuggestionOCRRegionMetadata,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
     ) -> String? {
         if metadata.hasUsefulUIContext {
-            return contextSupportedReason(metadata)
+            return contextSupportedReason(metadata, visualChangeMetadata: visualChangeMetadata)
+        }
+        if let visualReason = visualChangeSupportedReason(
+            existingReason: nil,
+            metadata: metadata,
+            visualChangeMetadata: visualChangeMetadata
+        ) {
+            return visualReason
         }
         guard metadata.hasTextNearSourceEvent || metadata.hasTextChange else {
             return existingReason
@@ -334,230 +540,512 @@ struct SmartSuggestionVisionAnalysisService {
         case .settingsPanel:
             if let label {
                 return stableChoice(seed: "\(metadata.regionID)-settings-label-title", from: [
-                    "Keep \(label) visible",
-                    "Make \(label) clear",
-                    "Keep the \(label) options visible"
+                    "Add a short focus hold around \(label)",
+                    "Add a short focus hold around \(label)",
+                    "Add a short zoom hold around \(label)"
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-settings-title", from: [
-                "Keep the settings area in focus",
-                "Make this settings change clear",
-                "Hold attention on these options"
+                "Add a short focus hold to the settings",
+                "Add a short zoom hold for this settings change",
+                "Add a focus hold around these options"
             ])
         case .menuInteraction:
             if let label {
                 return stableChoice(seed: "\(metadata.regionID)-menu-label-title", from: [
-                    "Keep the \(label) menu choice clear",
-                    "Highlight the \(label) menu action",
-                    "Keep \(label) easy to follow"
+                    "Add a short focus hold around \(label)",
+                    "Add a short focus hold for the \(label) menu action",
+                    "Add a short zoom hold around \(label)"
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-menu-title", from: [
-                "Keep this menu action clear",
-                "Highlight this menu choice",
-                "Make the menu change easy to follow"
+                "Add a short focus hold to this menu action",
+                "Add a short zoom hold for this menu choice",
+                "Add a focus hold through this menu change"
             ])
         case .dialogInteraction:
             if let label {
                 return stableChoice(seed: "\(metadata.regionID)-dialog-label-title", from: [
-                    "Keep the \(label) dialog clear",
-                    "Make the \(label) confirmation easy to follow",
-                    "Highlight the \(label) moment"
+                    "Add a short focus hold around \(label)",
+                    "Add a short focus hold for the \(label) confirmation",
+                    "Add a subtle focus effect around \(label)"
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-dialog-title", from: [
-                "Highlight this dialog moment",
-                "Keep this dialog clear",
-                "Make this confirmation easy to follow"
+                "Add a subtle focus effect to this dialog moment",
+                "Add a short focus hold to this dialog",
+                "Add a short focus hold for this confirmation"
             ])
         case .textEditing:
             if let label {
                 return stableChoice(seed: "\(metadata.regionID)-text-label-title", from: [
-                    "Keep \(label) readable",
-                    "Make the \(label) text change clear",
-                    "Hold focus on \(label)"
+                    "Add a short focus hold around \(label)",
+                    "Add a short focus hold for the \(label) text change",
+                    "Add a short zoom hold around \(label)"
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-text-title", from: [
-                "Keep the text edit readable",
-                "Make this text change easy to follow",
-                "Hold focus on the edited text"
+                "Add a short focus hold to this text edit",
+                "Add a short zoom hold for this text change",
+                "Add a focus hold around the edited text"
             ])
         case .formEntry:
             if let label {
                 let fieldLabel = formFieldLabelPhrase(label)
                 return stableChoice(seed: "\(metadata.regionID)-form-label-title", from: [
-                    "Keep the \(fieldLabel) field clear",
-                    "Guide attention to the \(fieldLabel)",
-                    "Keep the \(fieldLabel) easy to follow"
+                    "Add a short focus hold around the \(fieldLabel)",
+                    "Add a short zoom hold around the \(fieldLabel)",
+                    "Add a focus hold for the \(fieldLabel)"
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-form-title", from: [
-                "Keep this form entry clear",
-                "Guide attention to this field",
-                "Make this input step easy to follow"
+                "Add a short focus hold to this form entry",
+                "Add a short zoom hold for this field",
+                "Add a focus hold through this input step"
             ])
         case .fileSelection:
             if let label {
                 return stableChoice(seed: "\(metadata.regionID)-file-label-title", from: [
-                    "Keep the \(label) selection clear",
-                    "Highlight the \(label) file step",
-                    "Make the \(label) choice easy to follow"
+                    "Add a short focus hold around \(label)",
+                    "Add a short focus hold for the \(label) file step",
+                    "Add a subtle focus effect around \(label)"
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-file-title", from: [
-                "Keep this file choice clear",
-                "Highlight this file step",
-                "Make this selection easy to follow"
+                "Add a short focus hold to this file choice",
+                "Add a short zoom hold for this file step",
+                "Add a focus hold around this selection"
             ])
         case .toolbarInteraction:
             if let label {
                 return stableChoice(seed: "\(metadata.regionID)-toolbar-label-title", from: [
-                    "Keep the \(label) control clear",
-                    "Highlight the \(label) tool",
-                    "Make \(label) easy to follow"
+                    "Add a short focus hold around \(label)",
+                    "Add a short focus hold for the \(label) tool",
+                    "Add a subtle focus effect around \(label)"
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-toolbar-title", from: [
-                "Keep this toolbar action clear",
-                "Highlight this tool choice",
-                "Make this control easy to follow"
+                "Add a short focus hold to this toolbar action",
+                "Add a short zoom hold for this tool choice",
+                "Add a focus hold around this control"
             ])
         case .sidebarInteraction:
             if let label {
                 return stableChoice(seed: "\(metadata.regionID)-sidebar-label-title", from: [
-                    "Keep \(label) visible in the side panel",
-                    "Guide attention to \(label)",
-                    "Make the \(label) sidebar step clear"
+                    "Add a subtle focus effect to \(label)",
+                    "Add a focus effect to the \(label) sidebar action",
+                    "Add a subtle focus effect around \(label)"
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-sidebar-title", from: [
-                "Keep the sidebar action clear",
-                "Guide attention to this side panel",
-                "Make this sidebar step easy to follow"
+                "Add a subtle focus effect to the side panel",
+                "Add a focus effect to this sidebar action",
+                "Add a subtle focus effect around the side panel"
             ])
         case .contentEditing:
             if let label {
                 return stableChoice(seed: "\(metadata.regionID)-content-label-title", from: [
-                    "Keep \(label) clear",
-                    "Guide attention to \(label)",
-                    "Keep \(label) easy to follow"
+                    "Add a short focus hold around \(label)",
+                    "Add a short zoom hold around \(label)",
+                    "Add a focus hold for \(label)"
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-content-title", from: [
-                "Keep the editing area clear",
-                "Guide attention to this workspace",
-                "Make this content change easy to follow"
+                "Add a short focus hold to the editing area",
+                "Add a subtle focus effect to this workspace",
+                "Add a short focus hold for this content change"
             ])
         case .unknown:
             return existingTitle ?? fallbackTitle(for: suggestion)
         }
     }
 
+    private func existingEditEvidenceWording(
+        for suggestion: SmartSetupSuggestion,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> SmartSetupSuggestion {
+        var tunedSuggestion = suggestion
+        let label = metadata.flatMap(safeSupportingLabel(from:))
+        let hasMeaningfulVisualChange = visualChangeMetadata.map(visualChangeIsMeaningfulForExistingEdit) ?? false
+        let hasStrongTextEvidence = metadata.map { metadata in
+            metadata.hasTextChange || metadata.hasTextNearSourceEvent || metadata.hasUsefulUIContext
+        } ?? false
+
+        switch tunedSuggestion.proposal {
+        case .effect:
+            if isMismatchExistingEffectSuggestion(tunedSuggestion) {
+                break
+            } else if isShortExistingEffectSuggestion(tunedSuggestion) {
+                tunedSuggestion.userTitle = "Extend this effect"
+                tunedSuggestion.userReason = "Viewers may need more time to understand the highlighted area."
+            } else if visualChangeMetadata?.likelyLargeTransition == true {
+                tunedSuggestion.userTitle = "Keep this effect"
+                tunedSuggestion.userReason = existingEffectLargeChangeReason(
+                    label: label,
+                    metadata: metadata,
+                    regionID: visualChangeMetadata?.regionID ?? metadata?.regionID ?? tunedSuggestion.suggestionID
+                )
+            } else if hasMeaningfulVisualChange {
+                tunedSuggestion.userTitle = "Keep this effect"
+                tunedSuggestion.userReason = existingEffectVisibleChangeReason(
+                    label: label,
+                    metadata: metadata,
+                    regionID: visualChangeMetadata?.regionID ?? metadata?.regionID ?? tunedSuggestion.suggestionID
+                )
+            } else if hasStrongTextEvidence {
+                tunedSuggestion.userTitle = "Keep this effect"
+                tunedSuggestion.userReason = existingEffectTextReason(
+                    label: label,
+                    metadata: metadata,
+                    regionID: metadata?.regionID ?? tunedSuggestion.suggestionID
+                )
+            }
+        case .zoom:
+            if isShortExistingZoomSuggestion(tunedSuggestion) && (hasMeaningfulVisualChange || hasStrongTextEvidence || !tunedSuggestion.sourceEvents.isEmpty) {
+                tunedSuggestion.userTitle = "Extend this zoom hold by about 0.5 seconds"
+                tunedSuggestion.userReason = "Viewers may need more time to absorb the information before the zoom ends."
+            } else if visualChangeMetadata?.likelyLargeTransition == true {
+                tunedSuggestion.userTitle = "Keep this zoom"
+                tunedSuggestion.userReason = existingZoomLargeChangeReason(
+                    label: label,
+                    metadata: metadata,
+                    regionID: visualChangeMetadata?.regionID ?? metadata?.regionID ?? tunedSuggestion.suggestionID
+                )
+            } else if hasMeaningfulVisualChange && visualChangeMetadata?.changeNearInteraction == true {
+                tunedSuggestion.userTitle = "Keep this zoom"
+                tunedSuggestion.userReason = existingZoomVisibleChangeReason(
+                    label: label,
+                    metadata: metadata,
+                    regionID: visualChangeMetadata?.regionID ?? metadata?.regionID ?? tunedSuggestion.suggestionID
+                )
+            } else if hasStrongTextEvidence {
+                tunedSuggestion.userTitle = "Keep this zoom"
+                tunedSuggestion.userReason = existingZoomTextReason(
+                    label: label,
+                    metadata: metadata,
+                    regionID: metadata?.regionID ?? tunedSuggestion.suggestionID
+                )
+            }
+        case .zoomAdjustment, .regionTighten:
+            break
+        }
+
+        return tunedSuggestion
+    }
+
+    private func existingEffectLargeChangeReason(
+        label: String?,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        regionID: String
+    ) -> String {
+        if let label {
+            let target = metadata.map { visualChangeLabelPhrase(label, context: $0.uiContext) } ?? label
+            return stableChoice(seed: "\(regionID)-existing-effect-large-label", from: [
+                "The effect stays relevant while \(target) changes.",
+                "The highlighted area continues to guide attention through the transition around \(target)."
+            ])
+        }
+        return stableChoice(seed: "\(regionID)-existing-effect-large", from: [
+            "The effect remains useful after the screen changes.",
+            "The highlighted area continues to guide attention through the transition."
+        ])
+    }
+
+    private func existingEffectVisibleChangeReason(
+        label: String?,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        regionID: String
+    ) -> String {
+        if let label {
+            let target = metadata.map { visualChangeLabelPhrase(label, context: $0.uiContext) } ?? label
+            return stableChoice(seed: "\(regionID)-existing-effect-change-label", from: [
+                "The effect keeps \(target) clear enough for viewers to follow.",
+                "The highlighted area stays useful as \(target) changes."
+            ])
+        }
+        return stableChoice(seed: "\(regionID)-existing-effect-change", from: [
+            "The effect guides attention to the intended area.",
+            "The highlighted area remains relevant while the screen changes."
+        ])
+    }
+
+    private func existingEffectTextReason(
+        label: String?,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        regionID: String
+    ) -> String {
+        if let label {
+            let target = metadata.map { visualChangeLabelPhrase(label, context: $0.uiContext) } ?? label
+            return "The effect keeps \(target) readable and easy to understand."
+        }
+        return stableChoice(seed: "\(regionID)-existing-effect-text", from: [
+            "The effect keeps the important content readable.",
+            "The highlighted area remains clear throughout the effect."
+        ])
+    }
+
+    private func existingZoomLargeChangeReason(
+        label: String?,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        regionID: String
+    ) -> String {
+        if let label {
+            let target = metadata.map { visualChangeLabelPhrase(label, context: $0.uiContext) } ?? label
+            return stableChoice(seed: "\(regionID)-existing-zoom-large-label", from: [
+                "The zoom helps viewers follow the transition around \(target).",
+                "\(target) stays visible long enough to understand the change."
+            ])
+        }
+        return stableChoice(seed: "\(regionID)-existing-zoom-large", from: [
+            "The zoom helps viewers follow the transition.",
+            "The larger screen change has enough time to land."
+        ])
+    }
+
+    private func existingZoomVisibleChangeReason(
+        label: String?,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        regionID: String
+    ) -> String {
+        if let label {
+            let target = metadata.map { visualChangeLabelPhrase(label, context: $0.uiContext) } ?? label
+            return stableChoice(seed: "\(regionID)-existing-zoom-change-label", from: [
+                "The zoom keeps \(target) clear enough for viewers to follow.",
+                "The zoom stays on the information viewers need as \(target) changes."
+            ])
+        }
+        return stableChoice(seed: "\(regionID)-existing-zoom-change", from: [
+            "The zoom guides attention to the most important part of the screen.",
+            "The result remains visible long enough to follow."
+        ])
+    }
+
+    private func existingZoomTextReason(
+        label: String?,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        regionID: String
+    ) -> String {
+        if let label {
+            let target = metadata.map { visualChangeLabelPhrase(label, context: $0.uiContext) } ?? label
+            return "The zoom keeps \(target) readable and easy to understand."
+        }
+        return stableChoice(seed: "\(regionID)-existing-zoom-text", from: [
+            "The zoom keeps the important content readable.",
+            "Viewers get a clear look at this part of the screen."
+        ])
+    }
+
+    private func isMismatchExistingEffectSuggestion(_ suggestion: SmartSetupSuggestion) -> Bool {
+        suggestion.providerID == "existing-edits" && (
+            suggestion.userTitle == "Resize this effect region"
+                || suggestion.userTitle == "Expand this effect region to include the changing content"
+                || suggestion.userTitle == "Check this effect region"
+        )
+    }
+
+    private func isShortExistingEffectSuggestion(_ suggestion: SmartSetupSuggestion) -> Bool {
+        suggestion.providerID == "existing-edits" && (suggestion.userTitle == "Extend this effect" || suggestion.userTitle == "Check this effect timing")
+    }
+
+    private func visualChangeIsMeaningfulForExistingEdit(_ metadata: SmartSuggestionVisualChangeMetadata) -> Bool {
+        guard metadata.hasVisibleChange else { return false }
+        return metadata.changeNearInteraction
+            || metadata.likelyLargeTransition
+            || metadata.changeScore >= 0.16
+            || metadata.changedAreaPercentage >= 0.04
+    }
+
+    private func isShortExistingZoomSuggestion(_ suggestion: SmartSetupSuggestion) -> Bool {
+        guard suggestion.providerID == "existing-edits",
+              case .zoom(let proposal) = suggestion.proposal,
+              let range = suggestion.sourceTimeRange else {
+            return false
+        }
+        return range.endTime - range.startTime < 1.15 || proposal.holdDuration < 0.45
+    }
+
     private func fallbackTitle(for suggestion: SmartSetupSuggestion) -> String {
         switch suggestion.proposal {
         case .zoomAdjustment:
-            return "Keep this interaction in focus"
+            return "Add a steadier focus sequence"
         case .zoom:
-            return "Guide attention to this moment"
+            return "Add a short focus hold here"
         case .effect:
-            return "Consider a subtle focus effect"
+            return "Add a subtle focus effect here"
         case .regionTighten:
-            return "Review this focus area"
+            return "Resize this focus area"
         }
     }
 
-    private func contextSupportedReason(_ metadata: SmartSuggestionOCRRegionMetadata) -> String {
+    private func contextSupportedReason(
+        _ metadata: SmartSuggestionOCRRegionMetadata,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> String {
         let label = safeSupportingLabel(from: metadata)
+        if let visualReason = visualChangeSupportedReason(
+            existingReason: nil,
+            metadata: metadata,
+            visualChangeMetadata: visualChangeMetadata
+        ) {
+            return visualReason
+        }
+
         switch metadata.uiContext {
         case .settingsPanel:
             if let label {
                 return stableChoice(seed: "\(metadata.regionID)-settings-label-reason", from: [
-                    "\(label) appears to be the setting in focus, so keeping it readable can help viewers follow the change.",
-                    "The action seems tied to \(label); a steady focus may make the adjustment easier to understand.",
-                    "Keeping \(label) visible can help the viewer stay oriented during this settings step."
+                    "\(label) needs to stay readable while viewers follow the change.",
+                    "The adjustment may be easy to miss at the current pace.",
+                    "Viewers may need more orientation around \(label)."
                 ])
             }
             return stableChoice(seed: "\(metadata.regionID)-settings-reason", from: [
-                "Settings or options are visible here, so a steady focus may help viewers follow the change.",
-                "This looks like an options area; keeping it clear can make the edit easier to understand.",
-                "The viewer may benefit from seeing which setting is being adjusted."
+                "Viewers may need more time to follow this settings change.",
+                "The edit depends on this options area staying readable.",
+                "It may not be obvious which setting is being adjusted."
             ])
         case .menuInteraction:
             if let label {
-                return "The action appears to involve \(label), so a brief focus hold may help viewers follow the choice."
+                return "Viewers may need help following the \(label) choice."
             }
             return stableChoice(seed: "\(metadata.regionID)-menu-reason", from: [
-                "A menu appears to be involved, so keeping this moment clear can help the viewer follow the choice.",
-                "This looks like a menu step where a brief focus hold may improve clarity.",
-                "The viewer may need a clear look at this menu action."
+                "This menu choice appears important to the step.",
+                "The menu step may need more visual clarity.",
+                "The menu action may move past too quickly."
             ])
         case .dialogInteraction:
             if let label {
-                return "\(label) appears in this dialog, so keeping it clear can help the viewer understand the decision."
+                return "The viewer may need time to understand the \(label) decision."
             }
             return stableChoice(seed: "\(metadata.regionID)-dialog-reason", from: [
-                "This looks like a dialog or confirmation, so a clear hold may help the viewer understand the decision.",
-                "The screen appears to show a dialog; keeping it readable can make the step easier to follow.",
-                "This confirmation moment may be worth highlighting if it matters to the edit."
+                "This dialog decision appears to matter to the step.",
+                "The dialog needs to stay readable for the edit to make sense.",
+                "This confirmation may matter to the final story."
             ])
         case .textEditing:
             if let label {
-                return "\(label) appears to be the relevant text here, so keeping it readable may make the edit easier to follow."
+                return "\(label) needs to remain readable while the change happens."
             }
             return stableChoice(seed: "\(metadata.regionID)-text-reason", from: [
-                "Text appears to be changing here, so keeping the area steady may help the viewer read it.",
-                "This looks like a text edit; a clear focus moment can make the change easier to follow.",
-                "Readable text is central to this moment, so clarity matters."
+                "Viewers may need time to read the text change.",
+                "The text edit is easy to miss at the current pace.",
+                "The text may not stay readable long enough."
             ])
         case .formEntry:
             if let label {
                 let fieldLabel = formFieldLabelPhrase(label)
-                return "The \(fieldLabel) field appears to be in use, so a subtle focus hold may help viewers follow the entry."
+                return "Viewers may need help following the \(fieldLabel) entry."
             }
             return stableChoice(seed: "\(metadata.regionID)-form-reason", from: [
-                "This looks like a form or field, so a subtle focus hold may help the viewer follow the entry.",
-                "A field appears to be involved; keeping it clear can reduce confusion.",
-                "The viewer may benefit from seeing which input area is being used."
+                "This field entry may need to be clearer.",
+                "The input area may need more emphasis to reduce confusion.",
+                "It may not be obvious which field is being used."
             ])
         case .fileSelection:
             if let label {
-                return "\(label) appears to be part of the selection step, so keeping it clear may help the workflow make sense."
+                return "The \(label) selection step may need to be clearer."
             }
             return stableChoice(seed: "\(metadata.regionID)-file-reason", from: [
-                "This looks like a file or selection step, so keeping it clear may help the workflow make sense.",
-                "A file action appears to be happening here; a steady focus can help viewers follow the choice.",
-                "The viewer may need a clearer look at this selection moment."
+                "This file or selection step appears to matter to the workflow.",
+                "Viewers may need help following the file action.",
+                "The selection may move past too quickly."
             ])
         case .toolbarInteraction:
             if let label {
-                return "\(label) appears to be the control in use, so highlighting it can help viewers understand the action."
+                return "Viewers may need help understanding that \(label) is the control being used."
             }
             return stableChoice(seed: "\(metadata.regionID)-toolbar-reason", from: [
-                "This appears to involve a toolbar or control area, so highlighting it may make the action easier to follow.",
-                "A tool or control seems important here; a clear focus moment can help orientation.",
-                "The viewer may benefit from seeing which control is being used."
+                "This toolbar action is easy to miss.",
+                "The control may need to stay visible longer.",
+                "It may not be obvious which control is being used."
             ])
         case .sidebarInteraction:
             if let label {
-                return "\(label) appears in the side panel, so keeping it visible can help the viewer stay oriented."
+                return "The side-panel step around \(label) may need clearer emphasis."
             }
             return stableChoice(seed: "\(metadata.regionID)-sidebar-reason", from: [
-                "This looks like a sidebar or side panel step, so keeping that area clear may help orientation.",
-                "The action appears to happen in a side panel; a subtle focus can help the viewer track it.",
-                "The viewer may benefit from seeing the side-panel change clearly."
+                "This side-panel step may need clearer orientation.",
+                "Viewers may need more time to track the side-panel action.",
+                "The side-panel change may move past too quickly."
             ])
         case .contentEditing:
             if let label {
-                return "\(label) appears to be part of the work area, so keeping it clear may help viewers follow the change."
+                return "Viewers may need help following the change around \(label)."
             }
             return stableChoice(seed: "\(metadata.regionID)-content-reason", from: [
-                "This looks like work inside the main editing area, so keeping focus steady may help the viewer follow the change.",
-                "The workspace appears to change here; a clear focus moment can help the viewer stay oriented.",
-                "This content area may be worth keeping clear if the edit depends on it."
+                "This workspace change needs to stay clear.",
+                "Viewers may need help staying oriented in this content area.",
+                "This content change appears to matter to the edit."
             ])
         case .unknown:
             return screenContextSupportText(for: metadata)
+        }
+    }
+
+    private func visualChangeSupportedReason(
+        existingReason: String?,
+        metadata: SmartSuggestionOCRRegionMetadata?,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> String? {
+        guard let visualChangeMetadata,
+              visualChangeIsMeaningfulForWording(visualChangeMetadata) else {
+            return existingReason
+        }
+
+        let seed = "\(visualChangeMetadata.regionID)-visual-change-reason"
+        if let metadata,
+           let label = safeSupportingLabel(from: metadata) {
+            let target = visualChangeLabelPhrase(label, context: metadata.uiContext)
+            if visualChangeMetadata.likelyLargeTransition {
+                return stableChoice(seed: "\(seed)-label-large", from: [
+                    "The page transition happens quickly and may benefit from guidance around \(target).",
+                    "The larger screen change may be hard to follow without attention on \(target).",
+                    "The change around \(target) may move too quickly."
+                ])
+            }
+            if visualChangeMetadata.changeNearInteraction {
+                return stableChoice(seed: "\(seed)-label-near", from: [
+                    "The result around \(target) is easy to miss.",
+                    "Viewers may need more time to understand what happens to \(target).",
+                    "The result around \(target) may move past too quickly."
+                ])
+            }
+        }
+
+        if visualChangeMetadata.likelyLargeTransition {
+            return stableChoice(seed: "\(seed)-large", from: [
+                "The transition happens quickly and may benefit from additional visual guidance.",
+                "The larger screen change may be hard to follow without emphasis.",
+                "The screen change may move too quickly for viewers to stay oriented."
+            ])
+        }
+
+        if visualChangeMetadata.changeNearInteraction {
+            return stableChoice(seed: "\(seed)-near", from: [
+                "The result of this interaction is easy to miss.",
+                "Viewers may need more time to understand what changed.",
+                "The interaction result may move past too quickly."
+            ])
+        }
+
+        return existingReason
+    }
+
+    private func visualChangeIsMeaningfulForWording(_ metadata: SmartSuggestionVisualChangeMetadata) -> Bool {
+        guard metadata.hasVisibleChange else { return false }
+        guard metadata.changeNearInteraction || metadata.likelyLargeTransition else { return false }
+        return metadata.changeScore >= 0.12 || metadata.changedAreaPercentage >= 0.025 || metadata.likelyLargeTransition
+    }
+
+    private func visualChangeLabelPhrase(_ label: String, context: SmartSuggestionUIContext) -> String {
+        switch context {
+        case .formEntry:
+            return "the \(formFieldLabelPhrase(label)) field"
+        case .settingsPanel:
+            return label
+        default:
+            return label
         }
     }
 
@@ -565,10 +1053,11 @@ struct SmartSuggestionVisionAnalysisService {
         for region: ActivityRegion,
         observations: [SmartSuggestionOCRTextObservation],
         uniqueSnippets: [String],
-        contentCoordinateSize: CGSize
-    ) -> (context: SmartSuggestionUIContext, confidence: Double, supportingText: String?) {
+        contentCoordinateSize: CGSize,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> (context: SmartSuggestionUIContext, confidence: Double, supportingText: String?, supportingTextRole: SmartSuggestionOCRTextRole, supportingTextRoleReason: String?) {
         guard !observations.isEmpty || !region.sourceEvents.isEmpty else {
-            return (.unknown, 0, nil)
+            return (.unknown, 0, nil, .fallbackText, nil)
         }
 
         var scores: [SmartSuggestionUIContext: Double] = [:]
@@ -577,11 +1066,16 @@ struct SmartSuggestionVisionAnalysisService {
             from: region.sourceEvents,
             contentCoordinateSize: contentCoordinateSize
         )
-        let nearbyText = nearbyTextSnippet(
-            in: observations,
-            sourcePoints: sourcePoints
-        )
         let averageSourcePoint = averagePoint(sourcePoints)
+        let roleSelection = ocrRoleSelection(
+            in: observations,
+            region: region,
+            sourcePoints: sourcePoints,
+            averageSourcePoint: averageSourcePoint,
+            visualChangeMetadata: visualChangeMetadata
+        )
+        let nearbyText = roleSelection.text
+        let possibleSidebarNavigation = roleSelection.isLikelySidebarNavigation
         let changedText = hasTextChange(in: observations)
 
         func addScore(_ context: SmartSuggestionUIContext, _ amount: Double, supportingText: String? = nil) {
@@ -610,7 +1104,9 @@ struct SmartSuggestionVisionAnalysisService {
             addScore(definition.context, definition.baseScore + matchBoost, supportingText: matches.first)
         }
 
-        if let nearbyText {
+        if possibleSidebarNavigation {
+            addScore(.sidebarInteraction, 0.74, supportingText: nearbyText)
+        } else if let nearbyText {
             addScore(.contentEditing, 0.08, supportingText: nearbyText)
             if scores[.formEntry, default: 0] > 0 {
                 addScore(.formEntry, 0.08, supportingText: nearbyText)
@@ -623,7 +1119,7 @@ struct SmartSuggestionVisionAnalysisService {
             }
         }
 
-        if changedText {
+        if changedText && !possibleSidebarNavigation {
             addScore(.contentEditing, 0.09, supportingText: nearbyText ?? uniqueSnippets.first)
             if scores[.textEditing, default: 0] > 0 {
                 addScore(.textEditing, 0.06, supportingText: nearbyText ?? uniqueSnippets.first)
@@ -642,10 +1138,10 @@ struct SmartSuggestionVisionAnalysisService {
             }
         }
 
-        if observations.count >= 10 {
+        if observations.count >= 10 && !possibleSidebarNavigation {
             addScore(.contentEditing, 0.10, supportingText: uniqueSnippets.first)
         }
-        if region.kind == .clickSequence && observations.count >= 3 {
+        if region.kind == .clickSequence && observations.count >= 3 && !possibleSidebarNavigation {
             addScore(.contentEditing, 0.08, supportingText: nearbyText ?? uniqueSnippets.first)
         }
 
@@ -653,15 +1149,204 @@ struct SmartSuggestionVisionAnalysisService {
             .filter({ $0.key != .unknown })
             .sorted(by: contextScoreSort)
             .first else {
-            return (.unknown, 0, nil)
+            return (.unknown, 0, roleSelection.text, roleSelection.role, roleSelection.reason)
         }
 
         let confidence = min(best.value, 0.92)
         guard confidence >= 0.42 else {
-            return (.unknown, confidence, supportingTextByContext[best.key])
+            return (.unknown, confidence, supportingTextByContext[best.key], roleSelection.role, roleSelection.reason)
         }
 
-        return (best.key, confidence, supportingTextByContext[best.key])
+        return (best.key, confidence, supportingTextByContext[best.key], roleSelection.role, roleSelection.reason)
+    }
+
+    private struct OCRRoleSelection {
+        let text: String?
+        let role: SmartSuggestionOCRTextRole
+        let reason: String?
+        let isLikelySidebarNavigation: Bool
+    }
+
+    private func ocrRoleSelection(
+        in observations: [SmartSuggestionOCRTextObservation],
+        region: ActivityRegion,
+        sourcePoints: [CGPoint],
+        averageSourcePoint: CGPoint?,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> OCRRoleSelection {
+        let clickTarget = clickTargetObservation(in: observations, sourcePoints: sourcePoints, averageSourcePoint: averageSourcePoint)
+        let nearbyContext = nearbyContextObservation(in: observations, sourcePoints: sourcePoints, averageSourcePoint: averageSourcePoint)
+        let changedArea = changedAreaObservation(in: observations, visualChangeMetadata: visualChangeMetadata)
+        let pageContent = pageContentObservation(in: observations, averageSourcePoint: averageSourcePoint)
+        let sidebarNavigation = isLikelySidebarNavigation(
+            region: region,
+            averageSourcePoint: averageSourcePoint,
+            clickTarget: clickTarget ?? nearbyContext,
+            visualChangeMetadata: visualChangeMetadata
+        )
+
+        if sidebarNavigation {
+            if let clickTarget {
+                return OCRRoleSelection(
+                    text: clickTarget.text,
+                    role: .clickTargetText,
+                    reason: nil,
+                    isLikelySidebarNavigation: true
+                )
+            }
+            if let nearbyContext, isSidebarSideObservation(nearbyContext, averageSourcePoint: averageSourcePoint) {
+                return OCRRoleSelection(
+                    text: nearbyContext.text,
+                    role: .nearbyContextText,
+                    reason: nil,
+                    isLikelySidebarNavigation: true
+                )
+            }
+            return OCRRoleSelection(
+                text: nil,
+                role: pageContent == nil ? .fallbackText : .pageContentText,
+                reason: "pageContentText ignored because click looked like sidebar navigation",
+                isLikelySidebarNavigation: true
+            )
+        }
+
+        if let clickTarget {
+            return OCRRoleSelection(text: clickTarget.text, role: .clickTargetText, reason: nil, isLikelySidebarNavigation: false)
+        }
+        if let nearbyContext {
+            return OCRRoleSelection(text: nearbyContext.text, role: .nearbyContextText, reason: nil, isLikelySidebarNavigation: false)
+        }
+        if let changedArea {
+            return OCRRoleSelection(text: changedArea.text, role: .changedAreaText, reason: nil, isLikelySidebarNavigation: false)
+        }
+        if let pageContent {
+            return OCRRoleSelection(text: pageContent.text, role: .pageContentText, reason: nil, isLikelySidebarNavigation: false)
+        }
+        return OCRRoleSelection(text: observations.sorted(by: observationSort).first?.text, role: .fallbackText, reason: nil, isLikelySidebarNavigation: false)
+    }
+
+    private func clickTargetObservation(
+        in observations: [SmartSuggestionOCRTextObservation],
+        sourcePoints: [CGPoint],
+        averageSourcePoint: CGPoint?
+    ) -> SmartSuggestionOCRTextObservation? {
+        guard !sourcePoints.isEmpty else { return nil }
+        return observations
+            .filter { observation in
+                isSmallControlLikeObservation(observation)
+                    && isSameSideObservation(observation, averageSourcePoint: averageSourcePoint)
+                    && sourcePoints.contains { sourcePoint in
+                        let textCenter = CGPoint(x: observation.boundingBox.midX, y: observation.boundingBox.midY)
+                        return distance(from: sourcePoint, to: textCenter) <= 0.20
+                            || observation.boundingBox.insetBy(dx: -0.055, dy: -0.055).contains(sourcePoint)
+                    }
+            }
+            .sorted { lhs, rhs in
+                nearestDistance(to: lhs, sourcePoints: sourcePoints) < nearestDistance(to: rhs, sourcePoints: sourcePoints)
+            }
+            .first
+    }
+
+    private func nearbyContextObservation(
+        in observations: [SmartSuggestionOCRTextObservation],
+        sourcePoints: [CGPoint],
+        averageSourcePoint: CGPoint?
+    ) -> SmartSuggestionOCRTextObservation? {
+        guard !sourcePoints.isEmpty else { return nil }
+        return observations
+            .filter { observation in
+                isSameSideObservation(observation, averageSourcePoint: averageSourcePoint)
+                    && sourcePoints.contains { sourcePoint in
+                        let textCenter = CGPoint(x: observation.boundingBox.midX, y: observation.boundingBox.midY)
+                        return distance(from: sourcePoint, to: textCenter) <= nearbyTextDistance
+                            || observation.boundingBox.insetBy(dx: -0.04, dy: -0.04).contains(sourcePoint)
+                    }
+            }
+            .sorted { lhs, rhs in
+                nearestDistance(to: lhs, sourcePoints: sourcePoints) < nearestDistance(to: rhs, sourcePoints: sourcePoints)
+            }
+            .first
+    }
+
+    private func changedAreaObservation(
+        in observations: [SmartSuggestionOCRTextObservation],
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> SmartSuggestionOCRTextObservation? {
+        guard let changedRegion = visualChangeMetadata?.changedRegion,
+              !changedRegion.isEmpty else { return nil }
+        let expandedRegion = changedRegion.insetBy(dx: -0.08, dy: -0.08)
+        return observations
+            .filter { expandedRegion.intersects($0.boundingBox) || expandedRegion.contains(CGPoint(x: $0.boundingBox.midX, y: $0.boundingBox.midY)) }
+            .sorted(by: observationSort)
+            .first
+    }
+
+    private func pageContentObservation(
+        in observations: [SmartSuggestionOCRTextObservation],
+        averageSourcePoint: CGPoint?
+    ) -> SmartSuggestionOCRTextObservation? {
+        observations
+            .filter { observation in
+                guard let averageSourcePoint else { return true }
+                let center = CGPoint(x: observation.boundingBox.midX, y: observation.boundingBox.midY)
+                return distance(from: averageSourcePoint, to: center) > 0.28
+            }
+            .sorted(by: observationSort)
+            .first
+    }
+
+    private func isLikelySidebarNavigation(
+        region: ActivityRegion,
+        averageSourcePoint: CGPoint?,
+        clickTarget: SmartSuggestionOCRTextObservation?,
+        visualChangeMetadata: SmartSuggestionVisualChangeMetadata?
+    ) -> Bool {
+        guard region.kind == .click || region.kind == .clickSequence else { return false }
+        guard let averageSourcePoint, averageSourcePoint.x <= 0.30 else { return false }
+        let hasScreenChange = visualChangeMetadata?.likelyLargeTransition == true
+            || (visualChangeMetadata?.changedAreaPercentage ?? 0) >= 0.10
+            || visualChangeMetadata?.changeFarFromInteraction == true
+        guard hasScreenChange else { return false }
+
+        if let clickTarget {
+            return isSidebarSideObservation(clickTarget, averageSourcePoint: averageSourcePoint)
+        }
+        return true
+    }
+
+    private func isSmallControlLikeObservation(_ observation: SmartSuggestionOCRTextObservation) -> Bool {
+        let area = observation.boundingBox.width * observation.boundingBox.height
+        return area <= 0.08 && observation.boundingBox.height <= 0.18 && observation.boundingBox.width <= 0.55
+    }
+
+    private func isSameSideObservation(
+        _ observation: SmartSuggestionOCRTextObservation,
+        averageSourcePoint: CGPoint?
+    ) -> Bool {
+        guard let averageSourcePoint else { return true }
+        if averageSourcePoint.x <= 0.30 {
+            return observation.boundingBox.midX <= 0.45
+        }
+        if averageSourcePoint.x >= 0.70 {
+            return observation.boundingBox.midX >= 0.55
+        }
+        return true
+    }
+
+    private func isSidebarSideObservation(
+        _ observation: SmartSuggestionOCRTextObservation,
+        averageSourcePoint: CGPoint?
+    ) -> Bool {
+        guard let averageSourcePoint else { return false }
+        return averageSourcePoint.x <= 0.30 && observation.boundingBox.midX <= 0.45
+    }
+
+    private func nearestDistance(
+        to observation: SmartSuggestionOCRTextObservation,
+        sourcePoints: [CGPoint]
+    ) -> CGFloat {
+        let center = CGPoint(x: observation.boundingBox.midX, y: observation.boundingBox.midY)
+        return sourcePoints.map { distance(from: $0, to: center) }.min() ?? .greatestFiniteMagnitude
     }
 
     private func matchingSnippets(_ snippets: [String], terms: [String]) -> [String] {
@@ -862,16 +1547,16 @@ struct SmartSuggestionVisionAnalysisService {
     private func screenContextSupportText(for metadata: SmartSuggestionOCRRegionMetadata) -> String {
         if metadata.hasTextChange {
             return stableChoice(seed: "\(metadata.regionID)-content-change", from: [
-                "The screen content changes here, so this moment may be worth keeping clear.",
-                "Something on screen changes during this moment, which may help the viewer if it stays easy to follow.",
-                "This interaction changes what is visible, so a steady focus could help."
+                "Viewers may need more time to follow what changes here.",
+                "This moment is easy to miss at the current pace.",
+                "The change may move past too quickly."
             ])
         }
 
         return stableChoice(seed: "\(metadata.regionID)-readable-content", from: [
-            "There is readable content on screen, so a steadier focus may help.",
-            "This part may be easier to follow if the viewer can stay oriented.",
-            "The viewer may need a clear look at the screen content here."
+            "The important content may need more time on screen.",
+            "Viewers may lose orientation without a clearer focal point.",
+            "Viewers may need more time with this part of the screen."
         ])
     }
 

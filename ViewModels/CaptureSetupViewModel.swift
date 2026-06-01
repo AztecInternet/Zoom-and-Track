@@ -13,6 +13,7 @@ private struct SmartSetupAnalysisResult {
     let suggestions: [SmartSetupSuggestion]
     let frameDiagnostics: ActivityRegionFrameSamplingDiagnostics
     let ocrDiagnostics: SmartSuggestionOCRDiagnostics
+    let visualChangeDiagnostics: SmartSuggestionVisualChangeDiagnostics
     let regionMetadata: [String: SmartSuggestionOCRRegionMetadata]
 }
 
@@ -58,6 +59,8 @@ final class CaptureSetupViewModel: ObservableObject {
         let uiContext: SmartSuggestionUIContext
         let uiContextConfidence: Double
         let supportingText: String?
+        let supportingTextRole: SmartSuggestionOCRTextRole
+        let supportingTextRoleReason: String?
         let contextSpecificWordingEligible: Bool
         let contextSpecificWordingApplied: Bool
         let fallbackReason: String?
@@ -603,6 +606,7 @@ final class CaptureSetupViewModel: ObservableObject {
         latestSmartSuggestionContextDebug = contextDebugItems
         printSmartSuggestionContextDebug(contextDebugItems)
         printSmartSuggestionOCRDebug(result.ocrDiagnostics)
+        printSmartSuggestionVisualChangeDebug(result.visualChangeDiagnostics)
         pendingSmartSetupSuggestions = result.suggestions
         selectedSmartSetupSuggestionID = result.suggestions.first?.suggestionID
         activeSmartSuggestionPreviewEndTime = nil
@@ -712,6 +716,8 @@ final class CaptureSetupViewModel: ObservableObject {
                 uiContext: metadata?.uiContext ?? .unknown,
                 uiContextConfidence: metadata?.uiContextConfidence ?? 0,
                 supportingText: metadata?.supportingText,
+                supportingTextRole: metadata?.supportingTextRole ?? .fallbackText,
+                supportingTextRoleReason: metadata?.supportingTextRoleReason,
                 contextSpecificWordingEligible: eligible,
                 contextSpecificWordingApplied: applied,
                 fallbackReason: smartSuggestionContextFallbackReason(
@@ -749,10 +755,11 @@ final class CaptureSetupViewModel: ObservableObject {
         for item in items {
             let confidence = String(format: "%.2f", item.uiContextConfidence)
             let supportingText = item.supportingText ?? "none"
+            let roleReason = item.supportingTextRoleReason.map { " | \($0)" } ?? ""
             let wording = item.contextSpecificWordingApplied
                 ? "applied"
                 : "fallback: \(item.fallbackReason ?? "not applied")"
-            print("[SmartSuggestionContext] \(item.timeRange) | \(item.title) | \(item.uiContext.rawValue) | \(confidence) | supporting: \(supportingText) | eligible: \(item.contextSpecificWordingEligible) | \(wording)")
+            print("[SmartSuggestionContext] \(item.timeRange) | \(item.title) | \(item.uiContext.rawValue) | \(confidence) | supporting: \(supportingText) | labelRole: \(item.supportingTextRole.debugLabel)\(roleReason) | eligible: \(item.contextSpecificWordingEligible) | \(wording)")
         }
     }
 
@@ -761,6 +768,18 @@ final class CaptureSetupViewModel: ObservableObject {
             ? "none"
             : diagnostics.previewStrings.joined(separator: " | ")
         print("[SmartSuggestionOCR] frames: \(diagnostics.analyzedFrameCount), crop observations: \(diagnostics.cropTextObservationCount), full-frame fallback observations: \(diagnostics.fullFrameFallbackTextObservationCount), failed: \(diagnostics.failedOCRCount), preview: \(previewText)")
+    }
+
+    private func printSmartSuggestionVisualChangeDebug(_ diagnostics: SmartSuggestionVisualChangeDiagnostics) {
+        print("[SmartSuggestionVisualChange] regions: \(diagnostics.analyzedRegionCount), frame pairs: \(diagnostics.comparedFramePairCount), visible changes: \(diagnostics.visibleChangeRegionCount), large transitions: \(diagnostics.largeTransitionRegionCount)")
+        guard !diagnostics.previewLines.isEmpty else {
+            print("[SmartSuggestionVisualChange] no region diagnostics")
+            return
+        }
+
+        for line in diagnostics.previewLines {
+            print("[SmartSuggestionVisualChange] \(line)")
+        }
     }
 
     private func smartSuggestionDebugTimeRange(for suggestion: SmartSetupSuggestion) -> String {
@@ -885,36 +904,8 @@ final class CaptureSetupViewModel: ObservableObject {
 
     private func smartSetupPreviewRange(for suggestion: SmartSetupSuggestion) -> (startTime: Double, endTime: Double) {
         let duration = max(recordingSummary?.duration ?? recordingSummary?.lastEventTimestamp ?? 0, 0)
-        let sourceRange = suggestion.sourceTimeRange ?? fallbackSmartSetupPreviewRange(for: suggestion)
-        let clampedStart = min(max(sourceRange.startTime, 0), max(duration, 0))
-        var clampedEnd = min(max(sourceRange.endTime, clampedStart), max(duration, clampedStart))
-        clampedEnd = min(clampedEnd, clampedStart + 8.0)
-
-        if clampedEnd - clampedStart < 1.0 {
-            clampedEnd = min(max(clampedStart + 1.0, clampedEnd), max(duration, clampedEnd))
-        }
-
-        return (clampedStart, max(clampedEnd, clampedStart))
-    }
-
-    private func fallbackSmartSetupPreviewRange(for suggestion: SmartSetupSuggestion) -> SmartSetupSourceTimeRange {
-        let duration = max(recordingSummary?.duration ?? recordingSummary?.lastEventTimestamp ?? 0, 0)
-        let sourceTime: Double
-        switch suggestion.proposal {
-        case .zoom(let proposal):
-            sourceTime = proposal.sourceEventTimestamp
-        case .zoomAdjustment(let proposal):
-            sourceTime = proposal.startTime
-        case .effect(let proposal):
-            sourceTime = proposal.sourceEventTimestamp
-        case .regionTighten(let proposal):
-            sourceTime = proposal.sourceTime
-        }
-
-        return SmartSetupSourceTimeRange(
-            startTime: max(sourceTime - 0.5, 0),
-            endTime: min(sourceTime + 1.5, max(duration, sourceTime))
-        )
+        let range = suggestion.reviewPlaybackRange(recordingDuration: duration)
+        return (range.startTime, range.endTime)
     }
 
     func exportRecording() {
@@ -3474,6 +3465,13 @@ private func makeSmartSetupAnalysis(
     )
     try Task.checkCancellation()
 
+    let visualChangeResult = SmartSuggestionVisualChangeService().analyzeChanges(
+        in: frameSamplingResult.samples,
+        regions: activityRegions,
+        contentCoordinateSize: context.contentCoordinateSize
+    )
+    try Task.checkCancellation()
+
     let visionAnalysisService = SmartSuggestionVisionAnalysisService()
     let ocrAnalysisResult = await visionAnalysisService.analyzeText(
         in: frameSamplingResult.samples,
@@ -3484,11 +3482,13 @@ private func makeSmartSetupAnalysis(
     let regionMetadata = visionAnalysisService.regionMetadata(
         for: activityRegions,
         analysisResult: ocrAnalysisResult,
-        contentCoordinateSize: context.contentCoordinateSize
+        contentCoordinateSize: context.contentCoordinateSize,
+        visualChangeMetadataByID: visualChangeResult.metadataByRegionID
     )
     let suggestions = visionAnalysisService.visionTunedSuggestions(
         from: heuristicSuggestions,
-        regionMetadataByID: regionMetadata
+        regionMetadataByID: regionMetadata,
+        visualChangeMetadataByID: visualChangeResult.metadataByRegionID
     )
 
     return SmartSetupAnalysisResult(
@@ -3496,6 +3496,7 @@ private func makeSmartSetupAnalysis(
         suggestions: suggestions,
         frameDiagnostics: frameSamplingResult.diagnostics,
         ocrDiagnostics: ocrAnalysisResult.diagnostics,
+        visualChangeDiagnostics: visualChangeResult.diagnostics,
         regionMetadata: regionMetadata
     )
 }

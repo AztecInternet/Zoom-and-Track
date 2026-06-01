@@ -1,11 +1,11 @@
 # Project Map
 
-Generated: 2026-05-30 21:12:39
+Generated: 2026-06-01 05:55:50
 
 ## Swift Files
 
 ### App/ContentView.swift
-- Lines: 1658
+- Lines: 1634
 - Imports:
 - import AppKit
 - import AVFoundation
@@ -26,10 +26,10 @@ Generated: 2026-05-30 21:12:39
 - Line 196:    enum CaptureInfoField: Hashable {
 - Line 202:    enum MotionTuning {
 - Line 210:    struct LibraryFilterOption: Identifiable {
-- Line 1588:struct SharingAnchorView: NSViewRepresentable {
-- Line 1610:enum ReviewHeaderAction {
-- Line 1616:enum AppTab: String, CaseIterable, Identifiable {
-- Line 1651:struct MarkerListEntry: Identifiable {
+- Line 1564:struct SharingAnchorView: NSViewRepresentable {
+- Line 1586:enum ReviewHeaderAction {
+- Line 1592:enum AppTab: String, CaseIterable, Identifiable {
+- Line 1627:struct MarkerListEntry: Identifiable {
 - Functions / Vars:
 - Line 98:        let point: CGPoint
 - Line 99:        let fittedRect: CGRect
@@ -566,7 +566,7 @@ Generated: 2026-05-30 21:12:39
 - Line 333:    var id: UUID { captureID }
 
 ### Models/SmartSetupModels.swift
-- Lines: 222
+- Lines: 363
 - Imports:
 - import Foundation
 - Types:
@@ -583,6 +583,7 @@ Generated: 2026-05-30 21:12:39
 - Line 168:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
 - Line 187:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
 - Line 205:struct SmartSetupRegionTightenProposal: Codable, Equatable {
+- Line 224:extension SmartSetupSuggestion {
 - Functions / Vars:
 - Line 4:    var schemaVersion: Int
 - Line 5:    var source: String
@@ -654,6 +655,16 @@ Generated: 2026-05-30 21:12:39
 - Line 207:    var originalRegion: EffectFocusRegion
 - Line 208:    var proposedRegion: EffectFocusRegion
 - Line 209:    var confidence: Double
+- Line 225:    func reviewPlaybackRange(recordingDuration: Double) -> SmartSetupSourceTimeRange {
+- Line 226:        let safeDuration = max(recordingDuration, 0)
+- Line 227:        let rawFocusMoment = self.focusMoment
+- Line 228:        let focusMoment = clampedReviewTime(rawFocusMoment, duration: safeDuration)
+- Line 229:        let eventTimes = sourceEvents
+- Line 233:        let preRoll = 2.0
+- Line 234:        let postRoll = 1.5
+- Line 235:        let eventPaddingBefore = 0.25
+- Line 236:        let eventPaddingAfter = 0.60
+- Line 237:        let minimumDuration = 1.5
 
 ### Services/CreatorEffectDefaultsService.swift
 - Lines: 64
@@ -1291,7 +1302,7 @@ Generated: 2026-05-30 21:12:39
 - Line 402:    private func cacheKey(recordingURL: URL, regionID: String, requestedTime: Double) -> String {
 
 ### Services/SmartSuggestionProviders.swift
-- Lines: 1206
+- Lines: 2579
 - Imports:
 - import CoreGraphics
 - import Foundation
@@ -1299,10 +1310,11 @@ Generated: 2026-05-30 21:12:39
 - Line 4:struct SmartSuggestionContext {
 - Line 12:protocol SmartSuggestionProvider {
 - Line 18:struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 91:struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 450:struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 585:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
-- Line 672:struct SmartSuggestionAggregator {
+- Line 91:struct ExistingEditReviewSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 710:struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 1069:struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 1204:struct TemplateSmartSuggestionProvider: SmartSuggestionProvider {
+- Line 1291:struct SmartSuggestionAggregator {
 - Functions / Vars:
 - Line 5:    let events: [RecordedEvent]
 - Line 6:    let duration: Double
@@ -1317,76 +1329,76 @@ Generated: 2026-05-30 21:12:39
 - Line 36:            var markedSuggestion = suggestion
 - Line 44:    private func title(for suggestion: SmartSetupSuggestion) -> String {
 - Line 67:    private func reason(for suggestion: SmartSetupSuggestion) -> String {
-- Line 92:    let providerID = "click-clusters"
-- Line 94:    private let maxClusters = 5
-- Line 95:    private let maxEmittedSuggestions = 8
-- Line 96:    private let maximumTimeGap = 4.0
-- Line 97:    private let maximumNormalizedDistance = 0.12
-- Line 98:    private let existingZoomTimeTolerance = 0.65
-- Line 99:    private let clusterLeadInTime = 0.35
-- Line 100:    private let clusterZoomDuration = 0.35
-- Line 101:    private let minimumClusterHold = 0.45
-- Line 102:    private let finalClusterTail = 0.65
-- Line 104:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
-- Line 107:        let clickEvents = sortedClickEvents(from: context.events)
-- Line 110:        let safeContentSize = CGSize(
-- Line 114:        let clusters = clickClusters(from: clickEvents, contentCoordinateSize: safeContentSize)
-- Line 115:        var suggestions: [SmartSetupSuggestion] = []
-- Line 116:        var acceptedClusterCount = 0
-- Line 123:            let remainingSuggestionSlots = maxEmittedSuggestions - suggestions.count
-- Line 142:    private func sortedClickEvents(from events: [RecordedEvent]) -> [RecordedEvent] {
-- Line 155:    private func clickClusters(from events: [RecordedEvent], contentCoordinateSize: CGSize) -> [[RecordedEvent]] {
-- Line 156:        var clusters: [[RecordedEvent]] = []
-- Line 157:        var currentCluster: [RecordedEvent] = []
-- Line 159:        func flushCurrentCluster() {
-- Line 172:            let timeGap = event.timestamp - previous.timestamp
-- Line 173:            let distance = normalizedDistance(from: previous, to: event, contentCoordinateSize: contentCoordinateSize)
-- Line 186:    private func clusterSuggestions(for cluster: [RecordedEvent], contentCoordinateSize: CGSize, duration: Double, limit: Int) -> [SmartSetupSuggestion] {
-- Line 187:        let selectedEvents = selectedEventsForSequence(from: cluster, limit: limit)
-- Line 200:    private func selectedEventsForSequence(from cluster: [RecordedEvent], limit: Int) -> [RecordedEvent] {
-- Line 205:        let middleLimit = max(limit - 2, 0)
-- Line 206:        let middleEvents = cluster.dropFirst().dropLast().prefix(middleLimit)
-- Line 210:    private func suggestion(
-- Line 218:        let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
-- Line 219:        let zoomType = zoomType(for: index, count: sequenceCount)
-- Line 220:        let timing = markerTiming(
-- Line 227:        let proposal = SmartSetupZoomMarkerProposal(
-- Line 277:    private func markerTiming(
-- Line 284:        let zoomType = zoomType(for: index, count: sequenceCount)
-- Line 285:        let nextTimestamp = nextClusterTimestamp(after: event, in: cluster)
-- Line 286:        let previousTimestamp = previousClusterTimestamp(before: event, in: cluster)
-- Line 290:            let holdUntil = min(nextTimestamp ?? event.timestamp + minimumClusterHold, duration)
-- Line 291:            let holdDuration = max(holdUntil - event.timestamp, minimumClusterHold)
-- Line 301:            let previousGap = previousTimestamp.map { max(event.timestamp - $0, 0) } ?? minimumClusterHold
-- Line 302:            let nextGap = nextTimestamp.map { max($0 - event.timestamp, 0) } ?? minimumClusterHold
-- Line 303:            let localWindow = min(previousGap, nextGap, 1.0)
-- Line 333:    private func timing(
-- Line 341:        let timelineEnd = max(duration, 0)
-- Line 342:        let safeEventTimestamp = min(max(eventTimestamp, 0), timelineEnd)
-- Line 343:        let safeLeadIn = max(min(leadInTime, safeEventTimestamp), 0)
-- Line 344:        let safeZoomInDuration = max(zoomInDuration, 0)
-- Line 345:        let requestedZoomOutDuration = max(zoomOutDuration, 0)
-- Line 346:        let requestedHoldDuration = max(holdDuration, minimumClusterHold)
-- Line 347:        let availableAfterEvent = max(timelineEnd - safeEventTimestamp, 0)
-- Line 348:        let safeHoldDuration = min(requestedHoldDuration, availableAfterEvent)
-- Line 349:        let safeZoomOutDuration = min(requestedZoomOutDuration, max(availableAfterEvent - safeHoldDuration, 0))
-- Line 350:        let endTime = safeEventTimestamp + safeHoldDuration + safeZoomOutDuration
-- Line 361:    private func zoomType(for index: Int, count: Int) -> ZoomType {
-- Line 371:    private func previousClusterTimestamp(before event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
-- Line 377:    private func nextClusterTimestamp(after event: RecordedEvent, in cluster: [RecordedEvent]) -> Double? {
-- Line 383:    private func isCoveredByExistingZoomMarker(_ cluster: [RecordedEvent], existingZoomMarkers: [ZoomPlanItem]) -> Bool {
-- Line 385:        let startTime = first.timestamp - existingZoomTimeTolerance
-- Line 386:        let endTime = last.timestamp + existingZoomTimeTolerance
-- Line 394:    private func averagePoint(for events: [RecordedEvent], contentCoordinateSize: CGSize) -> CGPoint {
-- Line 396:        let total = events.reduce(CGPoint.zero) { partialResult, event in
-- Line 397:            let point = clampedContentPoint(for: event, contentCoordinateSize: contentCoordinateSize)
-- Line 403:    private func normalizedDistance(from lhs: RecordedEvent, to rhs: RecordedEvent, contentCoordinateSize: CGSize) -> Double {
-- Line 404:        let lhsPoint = normalizedPoint(clampedContentPoint(for: lhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
-- Line 405:        let rhsPoint = normalizedPoint(clampedContentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
-- Line 406:        let deltaX = lhsPoint.x - rhsPoint.x
+- Line 92:    let providerID = "existing-edits"
+- Line 94:    private let maxSuggestions = 6
+- Line 95:    private let shortZoomDurationThreshold = 1.15
+- Line 96:    private let shortZoomHoldThreshold = 0.45
+- Line 97:    private let zoomInteractionDistance = 0.17
+- Line 99:    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+- Line 102:        let safeContentSize = CGSize(
+- Line 106:        let realZoomMarkerIDs = Set(context.existingZoomMarkers.map(\.id))
+- Line 107:        let realEffectMarkerIDs = Set(context.existingEffectMarkers.map(\.id))
+- Line 108:        var zoomSuggestions: [SmartSetupSuggestion] = []
+- Line 109:        var effectSuggestions: [SmartSetupSuggestion] = []
+- Line 137:        let sortedEffects = sortedSuggestions(effectSuggestions)
+- Line 138:        let remainingSlots = max(maxSuggestions - sortedEffects.count, 0)
+- Line 139:        let selectedZooms = Array(sortedSuggestions(zoomSuggestions).prefix(remainingSlots))
+- Line 140:        let selectedSuggestions = sortedSuggestions(sortedEffects + selectedZooms)
+- Line 159:    private func zoomSuggestion(
+- Line 166:        let sourceEvents = events(
+- Line 171:        let alignedEvents = sourceEvents.filter {
+- Line 179:        let alignsWithInteraction = !alignedEvents.isEmpty
+- Line 180:        let markerDuration = marker.endTime - marker.startTime
+- Line 181:        let mayBeTooShort = (markerDuration < shortZoomDurationThreshold || marker.holdDuration < shortZoomHoldThreshold) && !sourceEvents.isEmpty
+- Line 182:        let title: String
+- Line 183:        let reason: String
+- Line 184:        let evidenceReason: String
+- Line 203:        let proposal = SmartSetupZoomMarkerProposal(
+- Line 221:        let score = existingEditScore(
+- Line 227:        let reasons = existingEditReasons(
+- Line 233:        let suggestion = SmartSetupSuggestion(
+- Line 249:    private func effectSuggestion(
+- Line 256:        let sourceEvents = events(
+- Line 261:        let focusRect = marker.focusRegion.map(rect(for:))
+- Line 262:        let eventRelationships = sourceEvents.map { event in
+- Line 269:        let eventsNearFocus = eventRelationships.filter { $0.relationship == "inside" || $0.relationship == "near" }
+- Line 270:        let hasFocusRegion = marker.focusRegion != nil
+- Line 271:        let coversActiveArea = hasFocusRegion ? !eventsNearFocus.isEmpty : !sourceEvents.isEmpty
+- Line 272:        let markerDuration = marker.endTime - marker.startTime
+- Line 273:        let activityDuration = activitySpanDuration(sourceEvents)
+- Line 274:        let activityOutsideFocus = hasFocusRegion && !sourceEvents.isEmpty && eventsNearFocus.isEmpty
+- Line 275:        let mayBeTooShort = coversActiveArea
+- Line 278:        let title: String
+- Line 279:        let reason: String
+- Line 280:        let evidenceReason: String
+- Line 303:        let proposal = SmartSetupEffectMarkerProposal(
+- Line 320:        let score = existingEditScore(
+- Line 326:        let reasons = existingEditReasons(
+- Line 339:        let suggestion = SmartSetupSuggestion(
+- Line 355:    private func sortedSuggestions(_ suggestions: [SmartSetupSuggestion]) -> [SmartSetupSuggestion] {
+- Line 360:            let lhsTime = lhs.sourceTimeRange?.startTime ?? lhs.sourceEvents.first?.timestamp ?? 0
+- Line 361:            let rhsTime = rhs.sourceTimeRange?.startTime ?? rhs.sourceEvents.first?.timestamp ?? 0
+- Line 369:    private func activitySpanDuration(_ events: [RecordedEvent]) -> Double {
+- Line 371:              let last = events.last?.timestamp else {
+- Line 377:    private func focusRelationship(
+- Line 382:        let point = normalizedPoint(for: event, contentCoordinateSize: contentCoordinateSize)
+- Line 395:    private func normalizedPoint(for event: RecordedEvent, contentCoordinateSize: CGSize) -> CGPoint {
+- Line 402:    private func events(in range: ClosedRange<Double>, from events: [RecordedEvent], limit: Int) -> [RecordedEvent] {
+- Line 414:    private func existingEditScore(
+- Line 420:        var value = base
+- Line 425:        var components = [
+- Line 457:    private func existingEditReasons(
+- Line 462:        var reasons: [SmartSetupSuggestionReason] = [.manualRegion]
+- Line 469:    private func normalizedDistance(
+- Line 475:        let eventX = min(max(event.x / contentCoordinateSize.width, 0), 1)
+- Line 476:        let eventY = min(max(event.y / contentCoordinateSize.height, 0), 1)
+- Line 477:        let deltaX = eventX - min(max(normalizedX, 0), 1)
+- Line 478:        let deltaY = eventY - min(max(normalizedY, 0), 1)
+- Line 482:    private func rect(for region: EffectFocusRegion) -> CGRect {
+- Line 491:    private func debugProviderInput(_ context: SmartSuggestionContext) {
 
 ### Services/SmartSuggestionVisionAnalysisService.swift
-- Lines: 1132
+- Lines: 1817
 - Imports:
 - import CoreGraphics
 - import Foundation
@@ -1396,8 +1408,9 @@ Generated: 2026-05-30 21:12:39
 - Line 13:struct SmartSuggestionOCRDiagnostics {
 - Line 25:struct SmartSuggestionOCRAnalysisResult {
 - Line 30:enum SmartSuggestionUIContext: String, CaseIterable {
-- Line 68:struct SmartSuggestionOCRRegionMetadata {
-- Line 88:struct SmartSuggestionVisionAnalysisService {
+- Line 68:enum SmartSuggestionOCRTextRole: String {
+- Line 78:struct SmartSuggestionOCRRegionMetadata {
+- Line 100:struct SmartSuggestionVisionAnalysisService {
 - Functions / Vars:
 - Line 6:    let regionID: String
 - Line 7:    let frameTimestamp: Double
@@ -1416,203 +1429,295 @@ Generated: 2026-05-30 21:12:39
 - Line 26:    let observations: [SmartSuggestionOCRTextObservation]
 - Line 27:    let diagnostics: SmartSuggestionOCRDiagnostics
 - Line 42:    var displayName: String {
-- Line 69:    let regionID: String
-- Line 70:    let textCount: Int
-- Line 71:    let uniqueTextSnippets: [String]
-- Line 72:    let hasTextNearSourceEvent: Bool
-- Line 73:    let hasTextChange: Bool
-- Line 74:    let uiContext: SmartSuggestionUIContext
-- Line 75:    let uiContextConfidence: Double
-- Line 76:    let supportingText: String?
-- Line 77:    let supportingTextConfidence: Float?
-- Line 79:    var appearsVisuallyMeaningful: Bool {
-- Line 83:    var hasUsefulUIContext: Bool {
-- Line 89:    private let maximumFramesToAnalyze = 60
-- Line 90:    private let maximumPreviewStrings = 4
-- Line 91:    private let minimumTextHeight: Float = 0.018
-- Line 92:    private let nearbyTextDistance: CGFloat = 0.18
-- Line 93:    private let cropPadding: CGFloat = 0.16
-- Line 95:    private static let textRecognitionQueue = DispatchQueue(
-- Line 100:    func analyzeText(
-- Line 104:        let startDate = Date()
-- Line 122:        var observations: [SmartSuggestionOCRTextObservation] = []
-- Line 123:        var cropFrameCount = 0
-- Line 124:        var cropTextObservationCount = 0
-- Line 125:        var fullFrameFallbackFrameCount = 0
-- Line 126:        var fullFrameFallbackTextObservationCount = 0
-- Line 127:        var failedOCRCount = 0
-- Line 128:        let sampledFrames = Array(samples.prefix(maximumFramesToAnalyze))
-- Line 129:        let regionsByID = Dictionary(uniqueKeysWithValues: regions.map { ($0.id, $0) })
-- Line 134:                let cropObservations = try await cropTextObservations(
-- Line 143:                    let fallbackObservations = try await recognizedTextObservations(
-- Line 173:    func regionMetadata(
-- Line 178:        let observationsByRegionID = Dictionary(grouping: analysisResult.observations, by: \.regionID)
-- Line 180:            let observations = observationsByRegionID[region.id] ?? []
-- Line 189:    func visionTunedSuggestions(
-- Line 194:            let metadata = regionMetadataByID["suggestion-\(suggestion.suggestionID)"]
-- Line 201:            let lhsTime = lhs.sourceTimeRange?.startTime ?? lhs.sourceEvents.first?.timestamp ?? 0
-- Line 202:            let rhsTime = rhs.sourceTimeRange?.startTime ?? rhs.sourceEvents.first?.timestamp ?? 0
-- Line 210:    private func metadata(
-- Line 215:        let uniqueSnippets = uniqueTextSnippets(from: observations)
-- Line 216:        let classification = uiContextClassification(
-- Line 242:    private func visionTunedSuggestion(
-- Line 248:        var tunedSuggestion = suggestion
-- Line 249:        let baseScore = tunedSuggestion.score.value
-- Line 250:        var scoreAdjustment = 0.0
-- Line 266:        let tunedScore = min(max(baseScore + scoreAdjustment, 0), 1)
-- Line 287:    private func shouldSoftlyDowngrade(
-- Line 299:    private func shouldSuppress(
-- Line 310:    private func visionSupportedReason(
-- Line 321:        let supportText = screenContextSupportText(for: metadata)
-- Line 325:    private func contextSupportedTitle(
-- Line 331:        let label = safeSupportingLabel(from: metadata)
-- Line 388:                let fieldLabel = formFieldLabelPhrase(label)
-- Line 457:    private func fallbackTitle(for suggestion: SmartSetupSuggestion) -> String {
-- Line 470:    private func contextSupportedReason(_ metadata: SmartSuggestionOCRRegionMetadata) -> String {
-- Line 471:        let label = safeSupportingLabel(from: metadata)
-- Line 515:                let fieldLabel = formFieldLabelPhrase(label)
-- Line 564:    private func uiContextClassification(
-- Line 574:        var scores: [SmartSuggestionUIContext: Double] = [:]
-- Line 575:        var supportingTextByContext: [SmartSuggestionUIContext: String] = [:]
-- Line 576:        let sourcePoints = normalizedSourcePoints(
-- Line 580:        let nearbyText = nearbyTextSnippet(
-- Line 584:        let averageSourcePoint = averagePoint(sourcePoints)
-- Line 585:        let changedText = hasTextChange(in: observations)
-- Line 587:        func addScore(_ context: SmartSuggestionUIContext, _ amount: Double, supportingText: String? = nil) {
+- Line 75:    var debugLabel: String { rawValue }
+- Line 79:    let regionID: String
+- Line 80:    let textCount: Int
+- Line 81:    let uniqueTextSnippets: [String]
+- Line 82:    let hasTextNearSourceEvent: Bool
+- Line 83:    let hasTextChange: Bool
+- Line 84:    let uiContext: SmartSuggestionUIContext
+- Line 85:    let uiContextConfidence: Double
+- Line 86:    let supportingText: String?
+- Line 87:    let supportingTextConfidence: Float?
+- Line 88:    let supportingTextRole: SmartSuggestionOCRTextRole
+- Line 89:    let supportingTextRoleReason: String?
+- Line 91:    var appearsVisuallyMeaningful: Bool {
+- Line 95:    var hasUsefulUIContext: Bool {
+- Line 101:    private let maximumFramesToAnalyze = 60
+- Line 102:    private let maximumPreviewStrings = 4
+- Line 103:    private let minimumTextHeight: Float = 0.018
+- Line 104:    private let nearbyTextDistance: CGFloat = 0.18
+- Line 105:    private let cropPadding: CGFloat = 0.16
+- Line 107:    private static let textRecognitionQueue = DispatchQueue(
+- Line 112:    func analyzeText(
+- Line 116:        let startDate = Date()
+- Line 134:        var observations: [SmartSuggestionOCRTextObservation] = []
+- Line 135:        var cropFrameCount = 0
+- Line 136:        var cropTextObservationCount = 0
+- Line 137:        var fullFrameFallbackFrameCount = 0
+- Line 138:        var fullFrameFallbackTextObservationCount = 0
+- Line 139:        var failedOCRCount = 0
+- Line 140:        let sampledFrames = Array(samples.prefix(maximumFramesToAnalyze))
+- Line 141:        let regionsByID = Dictionary(uniqueKeysWithValues: regions.map { ($0.id, $0) })
+- Line 146:                let cropObservations = try await cropTextObservations(
+- Line 155:                    let fallbackObservations = try await recognizedTextObservations(
+- Line 185:    func regionMetadata(
+- Line 191:        let observationsByRegionID = Dictionary(grouping: analysisResult.observations, by: \.regionID)
+- Line 193:            let observations = observationsByRegionID[region.id] ?? []
+- Line 203:    func visionTunedSuggestions(
+- Line 209:            let regionID = "suggestion-\(suggestion.suggestionID)"
+- Line 210:            let metadata = regionMetadataByID[regionID]
+- Line 211:            let visualChangeMetadata = visualChangeMetadataByID[regionID]
+- Line 222:            let lhsTime = lhs.sourceTimeRange?.startTime ?? lhs.sourceEvents.first?.timestamp ?? 0
+- Line 223:            let rhsTime = rhs.sourceTimeRange?.startTime ?? rhs.sourceEvents.first?.timestamp ?? 0
+- Line 231:    private func metadata(
+- Line 237:        let uniqueSnippets = uniqueTextSnippets(from: observations)
+- Line 238:        let classification = uiContextClassification(
+- Line 267:    private func visionTunedSuggestion(
+- Line 272:        var tunedSuggestion = suggestion
+- Line 273:        let baseScore = tunedSuggestion.score.value
+- Line 274:        var scoreAdjustment = 0.0
+- Line 302:        let tunedScore = min(max(baseScore + scoreAdjustment, 0), 1)
+- Line 359:    private func existingEditEvidenceScoreAdjustment(
+- Line 366:        var adjustment = 0.0
+- Line 398:    private func visualChangeScoreAdjustment(
+- Line 407:        var adjustment = 0.0
+- Line 422:    private func shouldSoftlyDowngrade(
+- Line 434:    private func shouldSuppress(
+- Line 445:    private func shouldSuppressEmptyExistingEdit(
+- Line 452:        let hasTextEvidence = metadata?.appearsVisuallyMeaningful == true || metadata?.hasUsefulUIContext == true
+- Line 453:        let hasVisualEvidence = visualChangeMetadata?.hasVisibleChange == true
+- Line 462:    private func shouldSuppressWeakProposedSuggestion(
+- Line 470:        let hasTextEvidence = metadata?.appearsVisuallyMeaningful == true || metadata?.hasUsefulUIContext == true
+- Line 471:        let hasVisualEvidence = visualChangeMetadata.map(visualChangeIsMeaningfulForWording) ?? false
+- Line 472:        let hasSourceEvents = !suggestion.sourceEvents.isEmpty
+- Line 476:    private func editIntentName(for suggestion: SmartSetupSuggestion) -> String {
+
+### Services/SmartSuggestionVisualChangeService.swift
+- Lines: 327
+- Imports:
+- import CoreGraphics
+- import Foundation
+- Types:
+- Line 4:struct SmartSuggestionVisualChangeMetadata {
+- Line 21:struct SmartSuggestionVisualChangeDiagnostics {
+- Line 30:struct SmartSuggestionVisualChangeAnalysisResult {
+- Line 35:struct SmartSuggestionVisualChangeService {
+- Functions / Vars:
+- Line 5:    let regionID: String
+- Line 6:    let representativeTime: Double
+- Line 7:    let changeScore: Double
+- Line 8:    let changedRegion: CGRect?
+- Line 9:    let changedAreaPercentage: Double
+- Line 10:    let changeNearInteraction: Bool
+- Line 11:    let changeFarFromInteraction: Bool
+- Line 12:    let likelyPanelOpen: Bool
+- Line 13:    let likelyPanelClose: Bool
+- Line 14:    let likelyLargeTransition: Bool
+- Line 16:    var hasVisibleChange: Bool {
+- Line 22:    let analyzedRegionCount: Int
+- Line 23:    let comparedFramePairCount: Int
+- Line 24:    let visibleChangeRegionCount: Int
+- Line 25:    let largeTransitionRegionCount: Int
+- Line 26:    let elapsedSeconds: Double
+- Line 27:    let previewLines: [String]
+- Line 31:    let metadataByRegionID: [String: SmartSuggestionVisualChangeMetadata]
+- Line 32:    let diagnostics: SmartSuggestionVisualChangeDiagnostics
+- Line 37:        let regionID: String
+- Line 38:        let actualTime: Double
+- Line 39:        let width: Int
+- Line 40:        let height: Int
+- Line 41:        let luminance: [UInt8]
+- Line 45:        let startTime: Double
+- Line 46:        let endTime: Double
+- Line 47:        let changeScore: Double
+- Line 48:        let changedRegion: CGRect?
+- Line 49:        let changedAreaPercentage: Double
+- Line 52:    private let sampleWidth = 64
+- Line 53:    private let sampleHeight = 36
+- Line 54:    private let pixelDifferenceThreshold: Double = 0.11
+- Line 55:    private let maximumPreviewLines = 12
+- Line 57:    func analyzeChanges(
+- Line 62:        let startDate = Date()
+- Line 63:        let samplesByRegionID = Dictionary(grouping: samples, by: \.regionID)
+- Line 64:        var metadataByRegionID: [String: SmartSuggestionVisualChangeMetadata] = [:]
+- Line 65:        var comparedFramePairCount = 0
+- Line 69:            let regionSamples = (samplesByRegionID[region.id] ?? [])
+- Line 77:            let frames = regionSamples.compactMap { sample in
+- Line 80:            let pairChanges = adjacentPairs(from: frames).compactMap { before, after -> FramePairChange? in
+- Line 85:            let strongestChange = pairChanges.max { lhs, rhs in
+- Line 100:        let visibleChangeRegionCount = metadataByRegionID.values.filter(\.hasVisibleChange).count
+- Line 101:        let largeTransitionRegionCount = metadataByRegionID.values.filter(\.likelyLargeTransition).count
+- Line 115:    private func metadata(
+- Line 121:        let changeScore = strongestChange?.changeScore ?? 0
+- Line 122:        let changedRegion = strongestChange?.changedRegion
+- Line 123:        let changedAreaPercentage = strongestChange?.changedAreaPercentage ?? 0
+- Line 124:        let hasVisibleChange = changeScore >= 0.08 || changedAreaPercentage >= 0.015
+- Line 125:        let changeNearInteraction = hasVisibleChange && isChangeNearInteraction(
+- Line 130:        let changeFarFromInteraction = hasVisibleChange && !changeNearInteraction && changedAreaPercentage >= 0.02
+- Line 131:        let moderateLocalizedChange = hasVisibleChange
+- Line 150:    private func downsample(_ image: CGImage, regionID: String, actualTime: Double) -> DownsampledFrame? {
+- Line 151:        let bytesPerPixel = 4
+- Line 152:        let bytesPerRow = sampleWidth * bytesPerPixel
+- Line 153:        var pixels = [UInt8](repeating: 0, count: sampleHeight * bytesPerRow)
+- Line 154:        let colorSpace = CGColorSpaceCreateDeviceRGB()
+- Line 155:        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+- Line 172:        var luminance = [UInt8](repeating: 0, count: sampleWidth * sampleHeight)
+- Line 174:            let pixelIndex = index * bytesPerPixel
+- Line 175:            let red = Double(pixels[pixelIndex])
+- Line 176:            let green = Double(pixels[pixelIndex + 1])
+- Line 177:            let blue = Double(pixels[pixelIndex + 2])
+- Line 190:    private func compare(before: DownsampledFrame, after: DownsampledFrame) -> FramePairChange? {
+- Line 197:        var changedPixelCount = 0
+- Line 198:        var changedDifferenceTotal = 0.0
+- Line 199:        var minX = before.width
+- Line 200:        var minY = before.height
+- Line 201:        var maxX = 0
+- Line 202:        var maxY = 0
+- Line 205:            let difference = abs(Double(before.luminance[index]) - Double(after.luminance[index])) / 255.0
+- Line 208:            let x = index % before.width
+- Line 209:            let y = index / before.width
+- Line 228:        let totalPixelCount = Double(before.luminance.count)
+- Line 229:        let changedAreaPercentage = Double(changedPixelCount) / totalPixelCount
+- Line 230:        let averageChangedDifference = changedDifferenceTotal / Double(changedPixelCount)
+- Line 231:        let changeScore = min(max((changedAreaPercentage * 2.6) + (averageChangedDifference * 0.55), 0), 1)
+- Line 232:        let changedRegion = CGRect(
+- Line 248:    private func isChangeNearInteraction(
+- Line 254:        let expandedChangedRegion = changedRegion.insetBy(dx: -0.12, dy: -0.12)
 
 ### ViewModels/CaptureSetupViewModel.swift
-- Lines: 3501
+- Lines: 3502
 - Imports:
 - import Combine
 - import AppKit
 - import AVKit
 - import Foundation
 - Types:
-- Line 21:    enum PlaybackPresentationMode {
-- Line 28:    enum PlaybackTransitionPlateState {
-- Line 35:    enum ExportState: Equatable {
+- Line 22:    enum PlaybackPresentationMode {
+- Line 29:    enum PlaybackTransitionPlateState {
+- Line 36:    enum ExportState: Equatable {
 - Functions / Vars:
 - Line 12:    let heuristicSuggestions: [SmartSetupSuggestion]
 - Line 13:    let suggestions: [SmartSetupSuggestion]
 - Line 14:    let frameDiagnostics: ActivityRegionFrameSamplingDiagnostics
 - Line 15:    let ocrDiagnostics: SmartSuggestionOCRDiagnostics
-- Line 16:    let regionMetadata: [String: SmartSuggestionOCRRegionMetadata]
-- Line 44:        var isInProgress: Bool {
-- Line 55:        let suggestionID: String
-- Line 56:        let title: String
-- Line 57:        let timeRange: String
-- Line 58:        let uiContext: SmartSuggestionUIContext
-- Line 59:        let uiContextConfidence: Double
-- Line 60:        let supportingText: String?
-- Line 61:        let contextSpecificWordingEligible: Bool
-- Line 62:        let contextSpecificWordingApplied: Bool
-- Line 63:        let fallbackReason: String?
-- Line 124:    private var latestSmartSuggestionContextDebug: [SmartSuggestionContextDebugItem] = []
-- Line 125:    private var smartSetupRunTask: Task<Void, Never>?
-- Line 126:    private var smartSetupRunRevision = 0
-- Line 127:    private var hasRestoredLastRecording = false
-- Line 128:    private var activePlaybackScopeURL: URL?
-- Line 129:    private var mainPlaybackTimeObserver: Any?
-- Line 130:    private var previewPlaybackTimeObserver: Any?
-- Line 131:    private var manualSelectionSuppressionUntil: Date?
-- Line 132:    private var isEffectMarkerSelectionPinned = false
-- Line 133:    private var previewMarkerID: String?
-- Line 134:    private var previewEndTime: Double?
-- Line 135:    private var previewEffectMarkerID: String?
-- Line 136:    private var previewEffectEndTime: Double?
-- Line 137:    private var wasPlayingBeforeTimelineScrub = false
-- Line 138:    private var isTimelineScrubbing = false
-- Line 139:    private var markerPreviewRenderTask: Task<Void, Never>?
-- Line 140:    private var previewSurfaceTeardownTask: Task<Void, Never>?
-- Line 141:    private var playbackTransitionTask: Task<Void, Never>?
-- Line 142:    private var activeRenderedPreviewURL: URL?
-- Line 143:    private var activeRenderedPreviewShouldDelete = false
-- Line 144:    private var renderedPreviewSourceStartTime: Double?
-- Line 145:    private var renderingPreviewMarkerID: String?
-- Line 146:    private var renderingPreviewEffectMarkerID: String?
-- Line 147:    private var targetRefreshTask: Task<Void, Never>?
-- Line 148:    private var distortionLoupeRenderTask: Task<Void, Never>?
-- Line 149:    private var distortionLoupeRevision = 0
-- Line 150:    private var distortionOverlayImageCache: [String: NSImage] = [:]
-- Line 151:    private let timelineMarkerNudgeInterval = 0.1
-- Line 153:    private let permissionsService = PermissionsService()
-- Line 154:    private let screenCaptureService = ScreenCaptureService()
-- Line 155:    private let mediaWriterService = MediaWriterService()
-- Line 156:    private let projectBundleService = ProjectBundleService()
-- Line 162:    private let captureMetadataManager: CaptureMetadataManager
-- Line 163:    private let playbackTransportManager = PlaybackTransportManager()
-- Line 164:    private let timelineScrubManager = TimelineScrubManager()
-- Line 165:    private let inputEventCaptureService = InputEventCaptureService()
-- Line 166:    private let markerPreviewRenderService = MarkerPreviewRenderService()
-- Line 167:    private let markerPreviewCacheService = MarkerPreviewCacheService()
-- Line 168:    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
-- Line 169:    private let smartSuggestionAggregator = SmartSuggestionAggregator.defaultAggregator()
-- Line 170:    private let smartSuggestionFrameSampler = SmartSuggestionFrameSamplerService()
-- Line 171:    private let smartSuggestionVisionAnalysisService = SmartSuggestionVisionAnalysisService()
-- Line 172:    private let exportManager = ExportManager()
-- Line 173:    private let previewTransitionFadeInDuration: TimeInterval = 0.12
-- Line 174:    private let previewTransitionHoldDuration: TimeInterval = 1.0
-- Line 175:    private let previewTransitionFadeOutDuration: TimeInterval = 0.16
-- Line 176:    private let lastCollectionNameKey = "LastCollectionName"
-- Line 177:    private let lastProjectNameKey = "LastProjectName"
-- Line 178:    private let lastCaptureTypeKey = "LastCaptureType"
-- Line 179:    private let defaultNoZoomFallbackModeKey = "DefaultNoZoomFallbackMode"
-- Line 222:    var selectedTarget: ShareableCaptureTarget? {
-- Line 226:    var canStartRecording: Bool {
-- Line 230:    var canStopRecording: Bool {
-- Line 234:    var selectedZoomMarker: ZoomPlanItem? {
-- Line 238:    var selectedEffectMarker: EffectPlanItem? {
-- Line 242:    var activePreviewMarkerID: String? {
-- Line 246:    var isRenderedPreviewActive: Bool {
-- Line 250:    var canExportRecording: Bool {
-- Line 254:    var isExportSheetPresented: Bool {
-- Line 258:    var canTriggerMarkerPreview: Bool {
-- Line 267:    var canEditClickFocusMarkers: Bool {
-- Line 275:    var canUsePlaybackTransport: Bool {
-- Line 284:    var isSelectedEffectDistortion: Bool {
-- Line 289:    var canShowSelectedDistortionMapOverlay: Bool {
-- Line 299:    var selectedEffectDistortionOverlayImage: NSImage? {
+- Line 16:    let visualChangeDiagnostics: SmartSuggestionVisualChangeDiagnostics
+- Line 17:    let regionMetadata: [String: SmartSuggestionOCRRegionMetadata]
+- Line 45:        var isInProgress: Bool {
+- Line 56:        let suggestionID: String
+- Line 57:        let title: String
+- Line 58:        let timeRange: String
+- Line 59:        let uiContext: SmartSuggestionUIContext
+- Line 60:        let uiContextConfidence: Double
+- Line 61:        let supportingText: String?
+- Line 62:        let supportingTextRole: SmartSuggestionOCRTextRole
+- Line 63:        let supportingTextRoleReason: String?
+- Line 64:        let contextSpecificWordingEligible: Bool
+- Line 65:        let contextSpecificWordingApplied: Bool
+- Line 66:        let fallbackReason: String?
+- Line 127:    private var latestSmartSuggestionContextDebug: [SmartSuggestionContextDebugItem] = []
+- Line 128:    private var smartSetupRunTask: Task<Void, Never>?
+- Line 129:    private var smartSetupRunRevision = 0
+- Line 130:    private var hasRestoredLastRecording = false
+- Line 131:    private var activePlaybackScopeURL: URL?
+- Line 132:    private var mainPlaybackTimeObserver: Any?
+- Line 133:    private var previewPlaybackTimeObserver: Any?
+- Line 134:    private var manualSelectionSuppressionUntil: Date?
+- Line 135:    private var isEffectMarkerSelectionPinned = false
+- Line 136:    private var previewMarkerID: String?
+- Line 137:    private var previewEndTime: Double?
+- Line 138:    private var previewEffectMarkerID: String?
+- Line 139:    private var previewEffectEndTime: Double?
+- Line 140:    private var wasPlayingBeforeTimelineScrub = false
+- Line 141:    private var isTimelineScrubbing = false
+- Line 142:    private var markerPreviewRenderTask: Task<Void, Never>?
+- Line 143:    private var previewSurfaceTeardownTask: Task<Void, Never>?
+- Line 144:    private var playbackTransitionTask: Task<Void, Never>?
+- Line 145:    private var activeRenderedPreviewURL: URL?
+- Line 146:    private var activeRenderedPreviewShouldDelete = false
+- Line 147:    private var renderedPreviewSourceStartTime: Double?
+- Line 148:    private var renderingPreviewMarkerID: String?
+- Line 149:    private var renderingPreviewEffectMarkerID: String?
+- Line 150:    private var targetRefreshTask: Task<Void, Never>?
+- Line 151:    private var distortionLoupeRenderTask: Task<Void, Never>?
+- Line 152:    private var distortionLoupeRevision = 0
+- Line 153:    private var distortionOverlayImageCache: [String: NSImage] = [:]
+- Line 154:    private let timelineMarkerNudgeInterval = 0.1
+- Line 156:    private let permissionsService = PermissionsService()
+- Line 157:    private let screenCaptureService = ScreenCaptureService()
+- Line 158:    private let mediaWriterService = MediaWriterService()
+- Line 159:    private let projectBundleService = ProjectBundleService()
+- Line 165:    private let captureMetadataManager: CaptureMetadataManager
+- Line 166:    private let playbackTransportManager = PlaybackTransportManager()
+- Line 167:    private let timelineScrubManager = TimelineScrubManager()
+- Line 168:    private let inputEventCaptureService = InputEventCaptureService()
+- Line 169:    private let markerPreviewRenderService = MarkerPreviewRenderService()
+- Line 170:    private let markerPreviewCacheService = MarkerPreviewCacheService()
+- Line 171:    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
+- Line 172:    private let smartSuggestionAggregator = SmartSuggestionAggregator.defaultAggregator()
+- Line 173:    private let smartSuggestionFrameSampler = SmartSuggestionFrameSamplerService()
+- Line 174:    private let smartSuggestionVisionAnalysisService = SmartSuggestionVisionAnalysisService()
+- Line 175:    private let exportManager = ExportManager()
+- Line 176:    private let previewTransitionFadeInDuration: TimeInterval = 0.12
+- Line 177:    private let previewTransitionHoldDuration: TimeInterval = 1.0
+- Line 178:    private let previewTransitionFadeOutDuration: TimeInterval = 0.16
+- Line 179:    private let lastCollectionNameKey = "LastCollectionName"
+- Line 180:    private let lastProjectNameKey = "LastProjectName"
+- Line 181:    private let lastCaptureTypeKey = "LastCaptureType"
+- Line 182:    private let defaultNoZoomFallbackModeKey = "DefaultNoZoomFallbackMode"
+- Line 225:    var selectedTarget: ShareableCaptureTarget? {
+- Line 229:    var canStartRecording: Bool {
+- Line 233:    var canStopRecording: Bool {
+- Line 237:    var selectedZoomMarker: ZoomPlanItem? {
+- Line 241:    var selectedEffectMarker: EffectPlanItem? {
+- Line 245:    var activePreviewMarkerID: String? {
+- Line 249:    var isRenderedPreviewActive: Bool {
+- Line 253:    var canExportRecording: Bool {
+- Line 257:    var isExportSheetPresented: Bool {
+- Line 261:    var canTriggerMarkerPreview: Bool {
+- Line 270:    var canEditClickFocusMarkers: Bool {
+- Line 278:    var canUsePlaybackTransport: Bool {
 - SwiftUI State:
-- Line 66:    @Published var displays: [ShareableCaptureTarget] = []
-- Line 67:    @Published var windows: [ShareableCaptureTarget] = []
-- Line 68:    @Published var selectedTargetID: String?
-- Line 69:    @Published var collectionName: String = "Default Collection" {
-- Line 72:    @Published var projectName: String = "General Project" {
-- Line 75:    @Published var captureType: CaptureType = .tutorial {
-- Line 78:    @Published var captureTitle: String = ""
-- Line 79:    @Published var compositionLayout: CompositionLayout = .default
-- Line 80:    @Published private(set) var libraryItems: [CaptureLibraryItem] = []
-- Line 81:    @Published private(set) var libraryStatusMessage: String?
-- Line 82:    @Published var sessionState: RecordingSessionState = .idle
-- Line 83:    @Published var statusMessage = "Choose one display or one window."
-- Line 84:    @Published var hasScreenRecordingPermission = false
-- Line 85:    @Published var isBusy = false
-- Line 86:    @Published var recordingSummary: RecordingInspectionSummary?
-- Line 87:    @Published var selectedOutputFolderPath: String?
-- Line 88:    @Published var mainPlayer: AVPlayer?
-- Line 89:    @Published var previewPlayer: AVPlayer?
-- Line 90:    @Published var activeRecordingTargetName: String?
-- Line 91:    @Published var recordingStartedAt: Date?
-- Line 92:    @Published var selectedZoomMarkerID: String?
-- Line 93:    @Published var selectedEffectMarkerID: String? {
-- Line 100:    @Published var currentPlaybackTime: Double = 0
-- Line 101:    @Published var isPlaybackActive = false
-- Line 102:    @Published var isRenderingMarkerPreview = false
-- Line 103:    @Published var markerPreviewStatusMessage: String?
-- Line 104:    @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
-- Line 105:    @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
-- Line 106:    @Published private(set) var exportState: ExportState = .idle
-- Line 107:    @Published private(set) var exportProgress: Double = 0
-- Line 108:    @Published private(set) var exportStatusMessage: String?
-- Line 109:    @Published private(set) var exportedRecordingURL: URL?
-- Line 110:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
-- Line 111:    @Published private(set) var distortionPresetLibrary: DistortionPresetLibrary = .empty
-- Line 112:    @Published var selectedDistortionPresetLibraryID: String?
-- Line 113:    @Published var distortionLoupeNormalizedPoint: CGPoint?
-- Line 114:    @Published var distortionLoupeImage: NSImage?
-- Line 115:    @Published var isRenderingDistortionLoupe = false
-- Line 116:    @Published var isShowingDistortionMapOverlay = false
-- Line 117:    @Published private(set) var pendingSmartSetupSuggestions: [SmartSetupSuggestion] = []
+- Line 69:    @Published var displays: [ShareableCaptureTarget] = []
+- Line 70:    @Published var windows: [ShareableCaptureTarget] = []
+- Line 71:    @Published var selectedTargetID: String?
+- Line 72:    @Published var collectionName: String = "Default Collection" {
+- Line 75:    @Published var projectName: String = "General Project" {
+- Line 78:    @Published var captureType: CaptureType = .tutorial {
+- Line 81:    @Published var captureTitle: String = ""
+- Line 82:    @Published var compositionLayout: CompositionLayout = .default
+- Line 83:    @Published private(set) var libraryItems: [CaptureLibraryItem] = []
+- Line 84:    @Published private(set) var libraryStatusMessage: String?
+- Line 85:    @Published var sessionState: RecordingSessionState = .idle
+- Line 86:    @Published var statusMessage = "Choose one display or one window."
+- Line 87:    @Published var hasScreenRecordingPermission = false
+- Line 88:    @Published var isBusy = false
+- Line 89:    @Published var recordingSummary: RecordingInspectionSummary?
+- Line 90:    @Published var selectedOutputFolderPath: String?
+- Line 91:    @Published var mainPlayer: AVPlayer?
+- Line 92:    @Published var previewPlayer: AVPlayer?
+- Line 93:    @Published var activeRecordingTargetName: String?
+- Line 94:    @Published var recordingStartedAt: Date?
+- Line 95:    @Published var selectedZoomMarkerID: String?
+- Line 96:    @Published var selectedEffectMarkerID: String? {
+- Line 103:    @Published var currentPlaybackTime: Double = 0
+- Line 104:    @Published var isPlaybackActive = false
+- Line 105:    @Published var isRenderingMarkerPreview = false
+- Line 106:    @Published var markerPreviewStatusMessage: String?
+- Line 107:    @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
+- Line 108:    @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
+- Line 109:    @Published private(set) var exportState: ExportState = .idle
+- Line 110:    @Published private(set) var exportProgress: Double = 0
+- Line 111:    @Published private(set) var exportStatusMessage: String?
+- Line 112:    @Published private(set) var exportedRecordingURL: URL?
+- Line 113:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
+- Line 114:    @Published private(set) var distortionPresetLibrary: DistortionPresetLibrary = .empty
+- Line 115:    @Published var selectedDistortionPresetLibraryID: String?
+- Line 116:    @Published var distortionLoupeNormalizedPoint: CGPoint?
+- Line 117:    @Published var distortionLoupeImage: NSImage?
+- Line 118:    @Published var isRenderingDistortionLoupe = false
+- Line 119:    @Published var isShowingDistortionMapOverlay = false
+- Line 120:    @Published private(set) var pendingSmartSetupSuggestions: [SmartSetupSuggestion] = []
 
 ### Views/Capture/CaptureSetupViews.swift
 - Lines: 707
@@ -2588,7 +2693,7 @@ Generated: 2026-05-30 21:12:39
 - Line 294:        let laneHeight: CGFloat = 9
 
 ### Views/Review/SmartSetupViews.swift
-- Lines: 375
+- Lines: 719
 - Imports:
 - import SwiftUI
 - Types:
@@ -2603,29 +2708,67 @@ Generated: 2026-05-30 21:12:39
 - Line 101:    let onSelect: () -> Void
 - Line 102:    let onDismiss: () -> Void
 - Line 104:    var body: some View {
-- Line 105:        let accentColor = FlowTrackAccent.color(for: .zoomAndClicks, theme: flowTrackTheme)
-- Line 163:    private func providerBadge(_ title: String, accentColor: Color) -> some View {
-- Line 182:    var providerBadgeTitle: String? {
-- Line 210:    private var hasTextChangeSupport: Bool {
-- Line 217:    private var hasScreenTextSupport: Bool {
-- Line 226:    var headline: String {
-- Line 244:    var reviewStateLabel: String {
-- Line 253:    var adviceBody: String {
-- Line 261:    private var fallbackAdviceBody: String {
-- Line 304:    var displayTimeRange: String {
-- Line 309:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
-- Line 313:    var displayMetadata: String {
-- Line 319:    private var opportunitySummary: String {
-- Line 335:    private var confidenceText: String? {
-- Line 346:    private var proposalTime: Double {
-- Line 359:    private func stableChoice(from options: [String]) -> String {
-- Line 361:        let value = suggestionID.unicodeScalars.reduce(0) { partialResult, scalar in
-- Line 367:    static func timeString(_ seconds: Double) -> String {
-- Line 368:        let clampedSeconds = max(seconds, 0)
-- Line 369:        let wholeSeconds = Int(clampedSeconds)
-- Line 370:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
-- Line 371:        let minutes = wholeSeconds / 60
-- Line 372:        let secondsRemainder = wholeSeconds % 60
+- Line 105:        let badgeTitle = suggestion.providerBadgeTitle
+- Line 106:        let metadataText = suggestion.displayMetadata
+- Line 107:        let accentRole = suggestion.accentRole
+- Line 108:        let accentColor = FlowTrackAccent.color(for: accentRole, theme: flowTrackTheme)
+- Line 175:    private func providerBadge(_ title: String, accentColor: Color) -> some View {
+- Line 194:    var debugName: String {
+- Line 217:    var badgeTitle: String? {
+- Line 234:    var accentRole: FlowTrackAccentRole {
+- Line 241:    var providerBadgeTitle: String? {
+- Line 285:    fileprivate var editIntent: SmartSuggestionEditIntent {
+- Line 292:        let title = (userTitle ?? headlineFallbackTitle).trimmingCharacters(in: .whitespacesAndNewlines)
+- Line 293:        let lowercasedTitle = title.lowercased()
+- Line 313:    private var isExistingEffectReviewSuggestion: Bool {
+- Line 325:    private var isExistingZoomReviewSuggestion: Bool {
+- Line 339:    private var isProposedEffectIdea: Bool {
+- Line 349:    func debugVisibleIdentity(
+- Line 355:        let sourceIDs = sourceMarkerIDs
+- Line 356:        let sourceText = sourceIDs.isEmpty ? "none" : sourceIDs.joined(separator: ",")
+- Line 357:        let badgeText = badgeTitle ?? "none"
+- Line 358:        let existingState = providerID == "existing-edits" ? "existing" : "new"
+- Line 363:    private var sourceMarkerIDs: [String] {
+- Line 373:    private var proposalCaseName: String {
+- Line 386:    private var hasTextChangeSupport: Bool {
+- Line 395:    private var hasScreenTextSupport: Bool {
+- Line 404:    var headline: String {
+- Line 408:    private var headlineFallbackTitle: String {
+- Line 421:    private var authoritativeHeadline: String {
+- Line 422:        let rawTitle = userTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+- Line 437:    private var addHeadline: String {
+- Line 459:    private var keepHeadline: String {
+- Line 469:    private var adjustHeadline: String {
+- Line 480:    private var removeHeadline: String {
+- Line 490:    var reviewStateLabel: String? {
+- Line 494:    var adviceBody: String {
+- Line 503:    private var fallbackAdviceBody: String {
+- Line 518:    private var addFallbackAdviceBody: String {
+- Line 561:    private var keepFallbackAdviceBody: String {
+- Line 579:    private var adjustFallbackAdviceBody: String {
+- Line 580:        let title = headline.lowercased()
+- Line 598:    private var removeFallbackAdviceBody: String {
+- Line 608:    private func titleMatchingIntent(_ title: String, allowedPrefixes: [String]) -> String? {
+- Line 610:        let normalizedTitle = title.lowercased()
+- Line 614:    private func bodyMatchesIntent(_ body: String) -> Bool {
+- Line 615:        let normalizedBody = body.lowercased()
+- Line 630:    private func containsAny(_ text: String, prefixesOrPhrases: [String]) -> Bool {
+- Line 634:    var displayTimeRange: String {
+- Line 639:        let time = sourceTimeRange?.startTime ?? sourceEvents.first?.timestamp ?? proposalTime
+- Line 643:    var displayMetadata: String {
+- Line 649:    private var opportunitySummary: String {
+- Line 668:    private var zoomReviewSummary: String {
+- Line 669:        let title = userTitle ?? ""
+- Line 679:    private var confidenceText: String? {
+- Line 690:    private var proposalTime: Double {
+- Line 703:    private func stableChoice(from options: [String]) -> String {
+- Line 705:        let value = suggestionID.unicodeScalars.reduce(0) { partialResult, scalar in
+- Line 711:    static func timeString(_ seconds: Double) -> String {
+- Line 712:        let clampedSeconds = max(seconds, 0)
+- Line 713:        let wholeSeconds = Int(clampedSeconds)
+- Line 714:        let tenths = Int((clampedSeconds - Double(wholeSeconds)) * 10.0)
+- Line 715:        let minutes = wholeSeconds / 60
+- Line 716:        let secondsRemainder = wholeSeconds % 60
 - SwiftUI State:
 - Line 4:    @Environment(\.flowTrackTheme) private var flowTrackTheme
 - Line 5:    @ObservedObject var viewModel: CaptureSetupViewModel

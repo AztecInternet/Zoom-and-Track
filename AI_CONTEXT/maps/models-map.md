@@ -1,6 +1,6 @@
 # Models Map
 
-Generated: 2026-05-30 21:12:39
+Generated: 2026-06-01 05:55:50
 
 ## Files
 
@@ -143,7 +143,7 @@ Generated: 2026-05-30 21:12:39
 - Line 333:    var id: UUID { captureID }
 
 ### Models/SmartSetupModels.swift
-- Lines: 222
+- Lines: 363
 - Imports:
 - import Foundation
 - Types:
@@ -160,6 +160,7 @@ Generated: 2026-05-30 21:12:39
 - Line 168:struct SmartSetupZoomMarkerProposal: Codable, Equatable {
 - Line 187:struct SmartSetupEffectMarkerProposal: Codable, Equatable {
 - Line 205:struct SmartSetupRegionTightenProposal: Codable, Equatable {
+- Line 224:extension SmartSetupSuggestion {
 - Functions / Vars:
 - Line 4:    var schemaVersion: Int
 - Line 5:    var source: String
@@ -231,138 +232,148 @@ Generated: 2026-05-30 21:12:39
 - Line 207:    var originalRegion: EffectFocusRegion
 - Line 208:    var proposedRegion: EffectFocusRegion
 - Line 209:    var confidence: Double
+- Line 225:    func reviewPlaybackRange(recordingDuration: Double) -> SmartSetupSourceTimeRange {
+- Line 226:        let safeDuration = max(recordingDuration, 0)
+- Line 227:        let rawFocusMoment = self.focusMoment
+- Line 228:        let focusMoment = clampedReviewTime(rawFocusMoment, duration: safeDuration)
+- Line 229:        let eventTimes = sourceEvents
+- Line 233:        let preRoll = 2.0
+- Line 234:        let postRoll = 1.5
+- Line 235:        let eventPaddingBefore = 0.25
+- Line 236:        let eventPaddingAfter = 0.60
+- Line 237:        let minimumDuration = 1.5
 
 ### ViewModels/CaptureSetupViewModel.swift
-- Lines: 3501
+- Lines: 3502
 - Imports:
 - import Combine
 - import AppKit
 - import AVKit
 - import Foundation
 - Types:
-- Line 21:    enum PlaybackPresentationMode {
-- Line 28:    enum PlaybackTransitionPlateState {
-- Line 35:    enum ExportState: Equatable {
+- Line 22:    enum PlaybackPresentationMode {
+- Line 29:    enum PlaybackTransitionPlateState {
+- Line 36:    enum ExportState: Equatable {
 - Functions / Vars:
 - Line 12:    let heuristicSuggestions: [SmartSetupSuggestion]
 - Line 13:    let suggestions: [SmartSetupSuggestion]
 - Line 14:    let frameDiagnostics: ActivityRegionFrameSamplingDiagnostics
 - Line 15:    let ocrDiagnostics: SmartSuggestionOCRDiagnostics
-- Line 16:    let regionMetadata: [String: SmartSuggestionOCRRegionMetadata]
-- Line 44:        var isInProgress: Bool {
-- Line 55:        let suggestionID: String
-- Line 56:        let title: String
-- Line 57:        let timeRange: String
-- Line 58:        let uiContext: SmartSuggestionUIContext
-- Line 59:        let uiContextConfidence: Double
-- Line 60:        let supportingText: String?
-- Line 61:        let contextSpecificWordingEligible: Bool
-- Line 62:        let contextSpecificWordingApplied: Bool
-- Line 63:        let fallbackReason: String?
-- Line 124:    private var latestSmartSuggestionContextDebug: [SmartSuggestionContextDebugItem] = []
-- Line 125:    private var smartSetupRunTask: Task<Void, Never>?
-- Line 126:    private var smartSetupRunRevision = 0
-- Line 127:    private var hasRestoredLastRecording = false
-- Line 128:    private var activePlaybackScopeURL: URL?
-- Line 129:    private var mainPlaybackTimeObserver: Any?
-- Line 130:    private var previewPlaybackTimeObserver: Any?
-- Line 131:    private var manualSelectionSuppressionUntil: Date?
-- Line 132:    private var isEffectMarkerSelectionPinned = false
-- Line 133:    private var previewMarkerID: String?
-- Line 134:    private var previewEndTime: Double?
-- Line 135:    private var previewEffectMarkerID: String?
-- Line 136:    private var previewEffectEndTime: Double?
-- Line 137:    private var wasPlayingBeforeTimelineScrub = false
-- Line 138:    private var isTimelineScrubbing = false
-- Line 139:    private var markerPreviewRenderTask: Task<Void, Never>?
-- Line 140:    private var previewSurfaceTeardownTask: Task<Void, Never>?
-- Line 141:    private var playbackTransitionTask: Task<Void, Never>?
-- Line 142:    private var activeRenderedPreviewURL: URL?
-- Line 143:    private var activeRenderedPreviewShouldDelete = false
-- Line 144:    private var renderedPreviewSourceStartTime: Double?
-- Line 145:    private var renderingPreviewMarkerID: String?
-- Line 146:    private var renderingPreviewEffectMarkerID: String?
-- Line 147:    private var targetRefreshTask: Task<Void, Never>?
-- Line 148:    private var distortionLoupeRenderTask: Task<Void, Never>?
-- Line 149:    private var distortionLoupeRevision = 0
-- Line 150:    private var distortionOverlayImageCache: [String: NSImage] = [:]
-- Line 151:    private let timelineMarkerNudgeInterval = 0.1
-- Line 153:    private let permissionsService = PermissionsService()
-- Line 154:    private let screenCaptureService = ScreenCaptureService()
-- Line 155:    private let mediaWriterService = MediaWriterService()
-- Line 156:    private let projectBundleService = ProjectBundleService()
-- Line 162:    private let captureMetadataManager: CaptureMetadataManager
-- Line 163:    private let playbackTransportManager = PlaybackTransportManager()
-- Line 164:    private let timelineScrubManager = TimelineScrubManager()
-- Line 165:    private let inputEventCaptureService = InputEventCaptureService()
-- Line 166:    private let markerPreviewRenderService = MarkerPreviewRenderService()
-- Line 167:    private let markerPreviewCacheService = MarkerPreviewCacheService()
-- Line 168:    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
-- Line 169:    private let smartSuggestionAggregator = SmartSuggestionAggregator.defaultAggregator()
-- Line 170:    private let smartSuggestionFrameSampler = SmartSuggestionFrameSamplerService()
-- Line 171:    private let smartSuggestionVisionAnalysisService = SmartSuggestionVisionAnalysisService()
-- Line 172:    private let exportManager = ExportManager()
-- Line 173:    private let previewTransitionFadeInDuration: TimeInterval = 0.12
-- Line 174:    private let previewTransitionHoldDuration: TimeInterval = 1.0
-- Line 175:    private let previewTransitionFadeOutDuration: TimeInterval = 0.16
-- Line 176:    private let lastCollectionNameKey = "LastCollectionName"
-- Line 177:    private let lastProjectNameKey = "LastProjectName"
-- Line 178:    private let lastCaptureTypeKey = "LastCaptureType"
-- Line 179:    private let defaultNoZoomFallbackModeKey = "DefaultNoZoomFallbackMode"
-- Line 222:    var selectedTarget: ShareableCaptureTarget? {
-- Line 226:    var canStartRecording: Bool {
-- Line 230:    var canStopRecording: Bool {
-- Line 234:    var selectedZoomMarker: ZoomPlanItem? {
-- Line 238:    var selectedEffectMarker: EffectPlanItem? {
-- Line 242:    var activePreviewMarkerID: String? {
-- Line 246:    var isRenderedPreviewActive: Bool {
-- Line 250:    var canExportRecording: Bool {
-- Line 254:    var isExportSheetPresented: Bool {
-- Line 258:    var canTriggerMarkerPreview: Bool {
-- Line 267:    var canEditClickFocusMarkers: Bool {
-- Line 275:    var canUsePlaybackTransport: Bool {
-- Line 284:    var isSelectedEffectDistortion: Bool {
-- Line 289:    var canShowSelectedDistortionMapOverlay: Bool {
-- Line 299:    var selectedEffectDistortionOverlayImage: NSImage? {
+- Line 16:    let visualChangeDiagnostics: SmartSuggestionVisualChangeDiagnostics
+- Line 17:    let regionMetadata: [String: SmartSuggestionOCRRegionMetadata]
+- Line 45:        var isInProgress: Bool {
+- Line 56:        let suggestionID: String
+- Line 57:        let title: String
+- Line 58:        let timeRange: String
+- Line 59:        let uiContext: SmartSuggestionUIContext
+- Line 60:        let uiContextConfidence: Double
+- Line 61:        let supportingText: String?
+- Line 62:        let supportingTextRole: SmartSuggestionOCRTextRole
+- Line 63:        let supportingTextRoleReason: String?
+- Line 64:        let contextSpecificWordingEligible: Bool
+- Line 65:        let contextSpecificWordingApplied: Bool
+- Line 66:        let fallbackReason: String?
+- Line 127:    private var latestSmartSuggestionContextDebug: [SmartSuggestionContextDebugItem] = []
+- Line 128:    private var smartSetupRunTask: Task<Void, Never>?
+- Line 129:    private var smartSetupRunRevision = 0
+- Line 130:    private var hasRestoredLastRecording = false
+- Line 131:    private var activePlaybackScopeURL: URL?
+- Line 132:    private var mainPlaybackTimeObserver: Any?
+- Line 133:    private var previewPlaybackTimeObserver: Any?
+- Line 134:    private var manualSelectionSuppressionUntil: Date?
+- Line 135:    private var isEffectMarkerSelectionPinned = false
+- Line 136:    private var previewMarkerID: String?
+- Line 137:    private var previewEndTime: Double?
+- Line 138:    private var previewEffectMarkerID: String?
+- Line 139:    private var previewEffectEndTime: Double?
+- Line 140:    private var wasPlayingBeforeTimelineScrub = false
+- Line 141:    private var isTimelineScrubbing = false
+- Line 142:    private var markerPreviewRenderTask: Task<Void, Never>?
+- Line 143:    private var previewSurfaceTeardownTask: Task<Void, Never>?
+- Line 144:    private var playbackTransitionTask: Task<Void, Never>?
+- Line 145:    private var activeRenderedPreviewURL: URL?
+- Line 146:    private var activeRenderedPreviewShouldDelete = false
+- Line 147:    private var renderedPreviewSourceStartTime: Double?
+- Line 148:    private var renderingPreviewMarkerID: String?
+- Line 149:    private var renderingPreviewEffectMarkerID: String?
+- Line 150:    private var targetRefreshTask: Task<Void, Never>?
+- Line 151:    private var distortionLoupeRenderTask: Task<Void, Never>?
+- Line 152:    private var distortionLoupeRevision = 0
+- Line 153:    private var distortionOverlayImageCache: [String: NSImage] = [:]
+- Line 154:    private let timelineMarkerNudgeInterval = 0.1
+- Line 156:    private let permissionsService = PermissionsService()
+- Line 157:    private let screenCaptureService = ScreenCaptureService()
+- Line 158:    private let mediaWriterService = MediaWriterService()
+- Line 159:    private let projectBundleService = ProjectBundleService()
+- Line 165:    private let captureMetadataManager: CaptureMetadataManager
+- Line 166:    private let playbackTransportManager = PlaybackTransportManager()
+- Line 167:    private let timelineScrubManager = TimelineScrubManager()
+- Line 168:    private let inputEventCaptureService = InputEventCaptureService()
+- Line 169:    private let markerPreviewRenderService = MarkerPreviewRenderService()
+- Line 170:    private let markerPreviewCacheService = MarkerPreviewCacheService()
+- Line 171:    private let creatorEffectDefaultsService = CreatorEffectDefaultsService()
+- Line 172:    private let smartSuggestionAggregator = SmartSuggestionAggregator.defaultAggregator()
+- Line 173:    private let smartSuggestionFrameSampler = SmartSuggestionFrameSamplerService()
+- Line 174:    private let smartSuggestionVisionAnalysisService = SmartSuggestionVisionAnalysisService()
+- Line 175:    private let exportManager = ExportManager()
+- Line 176:    private let previewTransitionFadeInDuration: TimeInterval = 0.12
+- Line 177:    private let previewTransitionHoldDuration: TimeInterval = 1.0
+- Line 178:    private let previewTransitionFadeOutDuration: TimeInterval = 0.16
+- Line 179:    private let lastCollectionNameKey = "LastCollectionName"
+- Line 180:    private let lastProjectNameKey = "LastProjectName"
+- Line 181:    private let lastCaptureTypeKey = "LastCaptureType"
+- Line 182:    private let defaultNoZoomFallbackModeKey = "DefaultNoZoomFallbackMode"
+- Line 225:    var selectedTarget: ShareableCaptureTarget? {
+- Line 229:    var canStartRecording: Bool {
+- Line 233:    var canStopRecording: Bool {
+- Line 237:    var selectedZoomMarker: ZoomPlanItem? {
+- Line 241:    var selectedEffectMarker: EffectPlanItem? {
+- Line 245:    var activePreviewMarkerID: String? {
+- Line 249:    var isRenderedPreviewActive: Bool {
+- Line 253:    var canExportRecording: Bool {
+- Line 257:    var isExportSheetPresented: Bool {
+- Line 261:    var canTriggerMarkerPreview: Bool {
+- Line 270:    var canEditClickFocusMarkers: Bool {
+- Line 278:    var canUsePlaybackTransport: Bool {
 - SwiftUI State:
-- Line 66:    @Published var displays: [ShareableCaptureTarget] = []
-- Line 67:    @Published var windows: [ShareableCaptureTarget] = []
-- Line 68:    @Published var selectedTargetID: String?
-- Line 69:    @Published var collectionName: String = "Default Collection" {
-- Line 72:    @Published var projectName: String = "General Project" {
-- Line 75:    @Published var captureType: CaptureType = .tutorial {
-- Line 78:    @Published var captureTitle: String = ""
-- Line 79:    @Published var compositionLayout: CompositionLayout = .default
-- Line 80:    @Published private(set) var libraryItems: [CaptureLibraryItem] = []
-- Line 81:    @Published private(set) var libraryStatusMessage: String?
-- Line 82:    @Published var sessionState: RecordingSessionState = .idle
-- Line 83:    @Published var statusMessage = "Choose one display or one window."
-- Line 84:    @Published var hasScreenRecordingPermission = false
-- Line 85:    @Published var isBusy = false
-- Line 86:    @Published var recordingSummary: RecordingInspectionSummary?
-- Line 87:    @Published var selectedOutputFolderPath: String?
-- Line 88:    @Published var mainPlayer: AVPlayer?
-- Line 89:    @Published var previewPlayer: AVPlayer?
-- Line 90:    @Published var activeRecordingTargetName: String?
-- Line 91:    @Published var recordingStartedAt: Date?
-- Line 92:    @Published var selectedZoomMarkerID: String?
-- Line 93:    @Published var selectedEffectMarkerID: String? {
-- Line 100:    @Published var currentPlaybackTime: Double = 0
-- Line 101:    @Published var isPlaybackActive = false
-- Line 102:    @Published var isRenderingMarkerPreview = false
-- Line 103:    @Published var markerPreviewStatusMessage: String?
-- Line 104:    @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
-- Line 105:    @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
-- Line 106:    @Published private(set) var exportState: ExportState = .idle
-- Line 107:    @Published private(set) var exportProgress: Double = 0
-- Line 108:    @Published private(set) var exportStatusMessage: String?
-- Line 109:    @Published private(set) var exportedRecordingURL: URL?
-- Line 110:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
-- Line 111:    @Published private(set) var distortionPresetLibrary: DistortionPresetLibrary = .empty
-- Line 112:    @Published var selectedDistortionPresetLibraryID: String?
-- Line 113:    @Published var distortionLoupeNormalizedPoint: CGPoint?
-- Line 114:    @Published var distortionLoupeImage: NSImage?
-- Line 115:    @Published var isRenderingDistortionLoupe = false
-- Line 116:    @Published var isShowingDistortionMapOverlay = false
-- Line 117:    @Published private(set) var pendingSmartSetupSuggestions: [SmartSetupSuggestion] = []
+- Line 69:    @Published var displays: [ShareableCaptureTarget] = []
+- Line 70:    @Published var windows: [ShareableCaptureTarget] = []
+- Line 71:    @Published var selectedTargetID: String?
+- Line 72:    @Published var collectionName: String = "Default Collection" {
+- Line 75:    @Published var projectName: String = "General Project" {
+- Line 78:    @Published var captureType: CaptureType = .tutorial {
+- Line 81:    @Published var captureTitle: String = ""
+- Line 82:    @Published var compositionLayout: CompositionLayout = .default
+- Line 83:    @Published private(set) var libraryItems: [CaptureLibraryItem] = []
+- Line 84:    @Published private(set) var libraryStatusMessage: String?
+- Line 85:    @Published var sessionState: RecordingSessionState = .idle
+- Line 86:    @Published var statusMessage = "Choose one display or one window."
+- Line 87:    @Published var hasScreenRecordingPermission = false
+- Line 88:    @Published var isBusy = false
+- Line 89:    @Published var recordingSummary: RecordingInspectionSummary?
+- Line 90:    @Published var selectedOutputFolderPath: String?
+- Line 91:    @Published var mainPlayer: AVPlayer?
+- Line 92:    @Published var previewPlayer: AVPlayer?
+- Line 93:    @Published var activeRecordingTargetName: String?
+- Line 94:    @Published var recordingStartedAt: Date?
+- Line 95:    @Published var selectedZoomMarkerID: String?
+- Line 96:    @Published var selectedEffectMarkerID: String? {
+- Line 103:    @Published var currentPlaybackTime: Double = 0
+- Line 104:    @Published var isPlaybackActive = false
+- Line 105:    @Published var isRenderingMarkerPreview = false
+- Line 106:    @Published var markerPreviewStatusMessage: String?
+- Line 107:    @Published private(set) var playbackPresentationMode: PlaybackPresentationMode = .normal
+- Line 108:    @Published private(set) var playbackTransitionPlateState: PlaybackTransitionPlateState = .hidden
+- Line 109:    @Published private(set) var exportState: ExportState = .idle
+- Line 110:    @Published private(set) var exportProgress: Double = 0
+- Line 111:    @Published private(set) var exportStatusMessage: String?
+- Line 112:    @Published private(set) var exportedRecordingURL: URL?
+- Line 113:    @Published var defaultNoZoomFallbackMode: NoZoomFallbackMode = .pan
+- Line 114:    @Published private(set) var distortionPresetLibrary: DistortionPresetLibrary = .empty
+- Line 115:    @Published var selectedDistortionPresetLibraryID: String?
+- Line 116:    @Published var distortionLoupeNormalizedPoint: CGPoint?
+- Line 117:    @Published var distortionLoupeImage: NSImage?
+- Line 118:    @Published var isRenderingDistortionLoupe = false
+- Line 119:    @Published var isShowingDistortionMapOverlay = false
+- Line 120:    @Published private(set) var pendingSmartSetupSuggestions: [SmartSetupSuggestion] = []
 

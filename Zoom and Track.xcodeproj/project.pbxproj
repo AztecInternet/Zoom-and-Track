@@ -12,6 +12,7 @@
 		DD2512D02FCA39FD0043ED21 /* SmartSuggestionProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512CF2FCA39FD0043ED21 /* SmartSuggestionProviders.swift */; };
 		DD2512D22FCB48FE0043ED21 /* SmartSuggestionFrameSamplerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512D12FCB48FE0043ED21 /* SmartSuggestionFrameSamplerService.swift */; };
 		DD2512D42FCB50640043ED21 /* SmartSuggestionVisionAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512D32FCB50640043ED21 /* SmartSuggestionVisionAnalysisService.swift */; };
+		DD2512D62FCB7FDE0043ED21 /* SmartSuggestionVisualChangeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2512D52FCB7FDE0043ED21 /* SmartSuggestionVisualChangeService.swift */; };
 		DD367DF52FBCD8A000F44877 /* HelpModeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */; };
 		DD367DF72FBCE4AC00F44877 /* FlowTrackCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF62FBCE4AC00F44877 /* FlowTrackCommands.swift */; };
 		DD367DF92FBF034000F44877 /* FlowTrackTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD367DF82FBF034000F44877 /* FlowTrackTheme.swift */; };
@@ -68,6 +69,7 @@
 		DD2512CF2FCA39FD0043ED21 /* SmartSuggestionProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionProviders.swift; sourceTree = "<group>"; };
 		DD2512D12FCB48FE0043ED21 /* SmartSuggestionFrameSamplerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionFrameSamplerService.swift; sourceTree = "<group>"; };
 		DD2512D32FCB50640043ED21 /* SmartSuggestionVisionAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionVisionAnalysisService.swift; sourceTree = "<group>"; };
+		DD2512D52FCB7FDE0043ED21 /* SmartSuggestionVisualChangeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionVisualChangeService.swift; sourceTree = "<group>"; };
 		DD367DF42FBCD8A000F44877 /* HelpModeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpModeViews.swift; sourceTree = "<group>"; };
 		DD367DF62FBCE4AC00F44877 /* FlowTrackCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackCommands.swift; sourceTree = "<group>"; };
 		DD367DF82FBF034000F44877 /* FlowTrackTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTrackTheme.swift; sourceTree = "<group>"; };
@@ -196,6 +198,7 @@
 				DD2512CF2FCA39FD0043ED21 /* SmartSuggestionProviders.swift */,
 				DD2512D12FCB48FE0043ED21 /* SmartSuggestionFrameSamplerService.swift */,
 				DD2512D32FCB50640043ED21 /* SmartSuggestionVisionAnalysisService.swift */,
+				DD2512D52FCB7FDE0043ED21 /* SmartSuggestionVisualChangeService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -412,6 +415,7 @@
 				DD88BC5B2FA8562800BFFBBF /* Models.swift in Sources */,
 				DD88BC5C2FA8562800BFFBBF /* PermissionsService.swift in Sources */,
 				DD88BC5D2FA8562800BFFBBF /* ProjectBundleService.swift in Sources */,
+				DD2512D62FCB7FDE0043ED21 /* SmartSuggestionVisualChangeService.swift in Sources */,
 				DD88BC6B2FAA9FA000BFFBBF /* ReviewMarkerInspectorViews.swift in Sources */,
 				DD88BC7B2FAB0BEC00BFFBBF /* ReviewPlaybackMainViews.swift in Sources */,
 				DD88BC5E2FA8562800BFFBBF /* RecordingCoordinator.swift in Sources */,

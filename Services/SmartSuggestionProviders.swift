@@ -45,21 +45,21 @@ struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
         switch suggestion.proposal {
         case .zoomAdjustment:
             return suggestion.stableChoice(from: [
-                "Keep this interaction in focus",
-                "Smooth out this focus sequence",
-                "Hold attention on this area"
+                "Extend this zoom hold by about 0.5 seconds",
+                "Refine this focus sequence",
+                "Tighten this interaction sequence"
             ])
         case .effect:
             return suggestion.stableChoice(from: [
-                "Soften the surroundings here",
-                "Guide attention to this moment",
-                "Consider a subtle focus effect"
+                "Add a subtle focus effect here",
+                "Add a focus effect to this moment",
+                "Add a gentle visual cue here"
             ])
         case .zoom, .regionTighten:
             return suggestion.stableChoice(from: [
-                "Review this editing moment",
-                "This part may be worth highlighting",
-                "Check this moment for emphasis"
+                "Add a short focus hold here",
+                "Add a short focus hold for this moment",
+                "Add a short focus hold around this action"
             ])
         }
     }
@@ -68,23 +68,642 @@ struct RuleSmartSuggestionProvider: SmartSuggestionProvider {
         switch suggestion.proposal {
         case .zoomAdjustment:
             return suggestion.stableChoice(from: [
-                "Several actions happened close together here.",
-                "The viewer may benefit from one steadier focus move.",
-                "This looks like one interaction that should stay in view."
+                "Viewers may need more time to follow the full sequence.",
+                "The sequence may read better as one controlled focus move.",
+                "This interaction works best when it stays visible as one clear step."
             ])
         case .effect:
             return suggestion.stableChoice(from: [
-                "You spent a moment working in this area.",
-                "Activity was concentrated around this part of the screen.",
-                "This moment may read more clearly with gentle emphasis."
+                "This area may need a little more visual weight.",
+                "The viewer's attention may need to stay on this part of the screen.",
+                "A gentle visual cue can help this moment read more clearly."
             ])
         case .zoom, .regionTighten:
             return suggestion.stableChoice(from: [
-                "This looks like a useful moment to review.",
-                "The viewer may benefit from seeing this more clearly.",
-                "This part may deserve a little more attention."
+                "Viewers may need a clearer look at this moment.",
+                "This part is easy to miss at the current pace.",
+                "The surrounding edit may move past this action too quickly."
             ])
         }
+    }
+}
+
+struct ExistingEditReviewSmartSuggestionProvider: SmartSuggestionProvider {
+    let providerID = "existing-edits"
+
+    private let maxSuggestions = 6
+    private let shortZoomDurationThreshold = 1.15
+    private let shortZoomHoldThreshold = 0.45
+    private let zoomInteractionDistance = 0.17
+
+    func generateSuggestions(context: SmartSuggestionContext) -> [SmartSetupSuggestion] {
+        debugProviderInput(context)
+
+        let safeContentSize = CGSize(
+            width: max(context.contentCoordinateSize.width, 1),
+            height: max(context.contentCoordinateSize.height, 1)
+        )
+        let realZoomMarkerIDs = Set(context.existingZoomMarkers.map(\.id))
+        let realEffectMarkerIDs = Set(context.existingEffectMarkers.map(\.id))
+        var zoomSuggestions: [SmartSetupSuggestion] = []
+        var effectSuggestions: [SmartSetupSuggestion] = []
+
+        for marker in context.existingZoomMarkers {
+            debugMarkerInput(type: "zoom", markerID: marker.id, markerName: marker.markerName, style: nil, startTime: marker.startTime, endTime: marker.endTime, enabled: marker.enabled)
+            guard marker.enabled else {
+                debugSkippedMarker(type: "zoom", markerID: marker.id, reason: "disabled")
+                continue
+            }
+            if let suggestion = zoomSuggestion(for: marker, context: context, contentCoordinateSize: safeContentSize) {
+                zoomSuggestions.append(suggestion)
+            } else {
+                debugSkippedMarker(type: "zoom", markerID: marker.id, reason: "invalid time range")
+            }
+        }
+
+        for marker in context.existingEffectMarkers {
+            debugMarkerInput(type: "effect", markerID: marker.id, markerName: marker.markerName, style: marker.style.rawValue, startTime: marker.startTime, endTime: marker.endTime, enabled: marker.enabled)
+            guard marker.enabled else {
+                debugSkippedMarker(type: "effect", markerID: marker.id, reason: "disabled")
+                continue
+            }
+            if let suggestion = effectSuggestion(for: marker, context: context, contentCoordinateSize: safeContentSize) {
+                effectSuggestions.append(suggestion)
+            } else {
+                debugSkippedMarker(type: "effect", markerID: marker.id, reason: "invalid time range")
+            }
+        }
+
+        let sortedEffects = sortedSuggestions(effectSuggestions)
+        let remainingSlots = max(maxSuggestions - sortedEffects.count, 0)
+        let selectedZooms = Array(sortedSuggestions(zoomSuggestions).prefix(remainingSlots))
+        let selectedSuggestions = sortedSuggestions(sortedEffects + selectedZooms)
+        for suggestion in selectedSuggestions {
+            debugCreatedSuggestion(
+                suggestion,
+                realZoomMarkerIDs: realZoomMarkerIDs,
+                realEffectMarkerIDs: realEffectMarkerIDs
+            )
+        }
+        debugExistingEffectReviewCardCount(
+            effectMarkerCount: context.existingEffectMarkers.count,
+            suggestions: selectedSuggestions,
+            realEffectMarkerIDs: realEffectMarkerIDs
+        )
+        for suggestion in zoomSuggestions where !selectedSuggestions.contains(where: { $0.suggestionID == suggestion.suggestionID }) {
+            debugSkippedSuggestion(suggestion, reason: "provider cap reserved review slots for real effect markers")
+        }
+        return selectedSuggestions
+    }
+
+    private func zoomSuggestion(
+        for marker: ZoomPlanItem,
+        context: SmartSuggestionContext,
+        contentCoordinateSize: CGSize
+    ) -> SmartSetupSuggestion? {
+        guard marker.endTime > marker.startTime else { return nil }
+
+        let sourceEvents = events(
+            in: marker.startTime...marker.endTime,
+            from: context.events,
+            limit: 8
+        )
+        let alignedEvents = sourceEvents.filter {
+            normalizedDistance(
+                from: $0,
+                toNormalizedX: marker.centerX / contentCoordinateSize.width,
+                normalizedY: marker.centerY / contentCoordinateSize.height,
+                contentCoordinateSize: contentCoordinateSize
+            ) <= zoomInteractionDistance
+        }
+        let alignsWithInteraction = !alignedEvents.isEmpty
+        let markerDuration = marker.endTime - marker.startTime
+        let mayBeTooShort = (markerDuration < shortZoomDurationThreshold || marker.holdDuration < shortZoomHoldThreshold) && !sourceEvents.isEmpty
+        let title: String
+        let reason: String
+        let evidenceReason: String
+        if mayBeTooShort {
+            title = "Extend this zoom hold by about 0.5 seconds"
+            reason = "Viewers may need more time to absorb the information before the zoom ends."
+            evidenceReason = "zoom-hold-too-short"
+        } else if alignsWithInteraction {
+            title = "Keep this zoom"
+            reason = "The zoom appears to follow the action and guide attention to the right area."
+            evidenceReason = "zoom-covers-active-area"
+        } else if sourceEvents.isEmpty {
+            title = "Consider removing this zoom"
+            reason = "There may not be enough visible action here for this zoom to clarify the edit."
+            evidenceReason = "zoom-no-clear-activity"
+        } else {
+            title = "Move this zoom"
+            reason = "The focus point may not land on the most important part of the screen."
+            evidenceReason = "zoom-region-far-from-activity"
+        }
+
+        let proposal = SmartSetupZoomMarkerProposal(
+            sourceEventTimestamp: marker.sourceEventTimestamp,
+            rawX: marker.rawX,
+            rawY: marker.rawY,
+            centerX: marker.centerX,
+            centerY: marker.centerY,
+            zoomScale: marker.zoomScale,
+            leadInTime: marker.leadInTime,
+            zoomInDuration: marker.zoomInDuration,
+            holdDuration: marker.holdDuration,
+            zoomOutDuration: marker.zoomOutDuration,
+            easeStyle: marker.easeStyle,
+            zoomType: marker.zoomType,
+            bounceAmount: marker.bounceAmount,
+            clickPulse: marker.clickPulse,
+            noZoomFallbackMode: marker.noZoomFallbackMode,
+            noZoomOverflowRegion: marker.noZoomOverflowRegion
+        )
+        let score = existingEditScore(
+            base: mayBeTooShort ? 0.82 : 0.76,
+            hasActivity: !sourceEvents.isEmpty,
+            alignsWithActivity: alignsWithInteraction,
+            hasTimingConcern: mayBeTooShort
+        )
+        let reasons = existingEditReasons(
+            hasActivity: !sourceEvents.isEmpty,
+            alignsWithActivity: alignsWithInteraction,
+            hasTimingConcern: mayBeTooShort
+        )
+
+        let suggestion = SmartSetupSuggestion(
+            suggestionID: "existing-zoom-\(marker.id)",
+            providerID: providerID,
+            userTitle: title,
+            userReason: reason,
+            kind: .zoomMarker,
+            sourceTimeRange: SmartSetupSourceTimeRange(startTime: marker.startTime, endTime: marker.endTime),
+            sourceEvents: sourceEvents.map(SmartSetupSourceEventReference.init(event:)),
+            proposal: .zoom(proposal),
+            score: score,
+            reasons: reasons
+        )
+        debugCandidateSuggestion(suggestion, markerID: marker.id, markerType: "zoom", evidenceReason: evidenceReason)
+        return suggestion
+    }
+
+    private func effectSuggestion(
+        for marker: EffectPlanItem,
+        context: SmartSuggestionContext,
+        contentCoordinateSize: CGSize
+    ) -> SmartSetupSuggestion? {
+        guard marker.endTime > marker.startTime else { return nil }
+
+        let sourceEvents = events(
+            in: marker.startTime...marker.endTime,
+            from: context.events,
+            limit: 8
+        )
+        let focusRect = marker.focusRegion.map(rect(for:))
+        let eventRelationships = sourceEvents.map { event in
+            focusRelationship(
+                for: event,
+                focusRect: focusRect,
+                contentCoordinateSize: contentCoordinateSize
+            )
+        }
+        let eventsNearFocus = eventRelationships.filter { $0.relationship == "inside" || $0.relationship == "near" }
+        let hasFocusRegion = marker.focusRegion != nil
+        let coversActiveArea = hasFocusRegion ? !eventsNearFocus.isEmpty : !sourceEvents.isEmpty
+        let markerDuration = marker.endTime - marker.startTime
+        let activityDuration = activitySpanDuration(sourceEvents)
+        let activityOutsideFocus = hasFocusRegion && !sourceEvents.isEmpty && eventsNearFocus.isEmpty
+        let mayBeTooShort = coversActiveArea
+            && markerDuration < 0.70
+            && activityDuration > markerDuration + 0.35
+        let title: String
+        let reason: String
+        let evidenceReason: String
+        if activityOutsideFocus {
+            title = "Expand this effect region to include the changing content"
+            reason = "The highlighted area may not fully cover the information changing on screen."
+            evidenceReason = "effect-region-far-from-activity"
+        } else if mayBeTooShort {
+            title = "Extend this effect"
+            reason = "Viewers may need more time to understand the highlighted area."
+            evidenceReason = "effect-too-short-for-activity"
+        } else if coversActiveArea {
+            title = "Keep this effect"
+            reason = "The effect appears to cover active content and guide attention without obvious distraction."
+            evidenceReason = "effect-covers-active-area"
+        } else if hasFocusRegion {
+            title = "Consider removing this effect"
+            reason = "The highlighted area may not add enough guidance for this step."
+            evidenceReason = "effect-no-clear-activity"
+        } else {
+            title = "Keep this effect"
+            reason = "The effect can stay if it still helps the viewer understand the moment."
+            evidenceReason = "effect-review-neutral"
+        }
+
+        let proposal = SmartSetupEffectMarkerProposal(
+            sourceEventTimestamp: marker.sourceEventTimestamp,
+            startTime: marker.startTime,
+            holdStartTime: marker.holdStartTime,
+            holdEndTime: marker.holdEndTime,
+            endTime: marker.endTime,
+            style: marker.style,
+            amount: marker.amount,
+            blurAmount: marker.blurAmount,
+            darkenAmount: marker.darkenAmount,
+            tintAmount: marker.tintAmount,
+            cornerRadius: marker.cornerRadius,
+            feather: marker.feather,
+            tintColor: marker.tintColor,
+            focusRegion: marker.focusRegion,
+            distortion: marker.distortion
+        )
+        let score = existingEditScore(
+            base: mayBeTooShort ? 0.84 : 0.78,
+            hasActivity: !sourceEvents.isEmpty,
+            alignsWithActivity: coversActiveArea,
+            hasTimingConcern: mayBeTooShort
+        )
+        let reasons = existingEditReasons(
+            hasActivity: !sourceEvents.isEmpty,
+            alignsWithActivity: coversActiveArea,
+            hasTimingConcern: mayBeTooShort
+        )
+
+        debugEffectRegionEvidence(
+            marker: marker,
+            focusRect: focusRect,
+            relationships: eventRelationships,
+            evidenceReason: evidenceReason
+        )
+
+        let suggestion = SmartSetupSuggestion(
+            suggestionID: "existing-effect-\(marker.id)",
+            providerID: providerID,
+            userTitle: title,
+            userReason: reason,
+            kind: .effectMarker,
+            sourceTimeRange: SmartSetupSourceTimeRange(startTime: marker.startTime, endTime: marker.endTime),
+            sourceEvents: sourceEvents.map(SmartSetupSourceEventReference.init(event:)),
+            proposal: .effect(proposal),
+            score: score,
+            reasons: reasons
+        )
+        debugCandidateSuggestion(suggestion, markerID: marker.id, markerType: "effect", evidenceReason: evidenceReason)
+        return suggestion
+    }
+
+    private func sortedSuggestions(_ suggestions: [SmartSetupSuggestion]) -> [SmartSetupSuggestion] {
+        suggestions.sorted { lhs, rhs in
+            if lhs.score.value != rhs.score.value {
+                return lhs.score.value > rhs.score.value
+            }
+            let lhsTime = lhs.sourceTimeRange?.startTime ?? lhs.sourceEvents.first?.timestamp ?? 0
+            let rhsTime = rhs.sourceTimeRange?.startTime ?? rhs.sourceEvents.first?.timestamp ?? 0
+            if lhsTime != rhsTime {
+                return lhsTime < rhsTime
+            }
+            return lhs.suggestionID < rhs.suggestionID
+        }
+    }
+
+    private func activitySpanDuration(_ events: [RecordedEvent]) -> Double {
+        guard let first = events.first?.timestamp,
+              let last = events.last?.timestamp else {
+            return 0
+        }
+        return max(last - first, 0)
+    }
+
+    private func focusRelationship(
+        for event: RecordedEvent,
+        focusRect: CGRect?,
+        contentCoordinateSize: CGSize
+    ) -> (timestamp: Double, point: CGPoint, relationship: String) {
+        let point = normalizedPoint(for: event, contentCoordinateSize: contentCoordinateSize)
+        guard let focusRect else {
+            return (event.timestamp, point, "no-region")
+        }
+        if focusRect.insetBy(dx: -0.04, dy: -0.04).contains(point) {
+            return (event.timestamp, point, "inside")
+        }
+        if focusRect.insetBy(dx: -0.16, dy: -0.16).contains(point) {
+            return (event.timestamp, point, "near")
+        }
+        return (event.timestamp, point, "outside")
+    }
+
+    private func normalizedPoint(for event: RecordedEvent, contentCoordinateSize: CGSize) -> CGPoint {
+        CGPoint(
+            x: min(max(event.x / contentCoordinateSize.width, 0), 1),
+            y: min(max(event.y / contentCoordinateSize.height, 0), 1)
+        )
+    }
+
+    private func events(in range: ClosedRange<Double>, from events: [RecordedEvent], limit: Int) -> [RecordedEvent] {
+        Array(events
+            .filter { range.contains($0.timestamp) }
+            .sorted { lhs, rhs in
+                if lhs.timestamp != rhs.timestamp {
+                    return lhs.timestamp < rhs.timestamp
+                }
+                return lhs.type.rawValue < rhs.type.rawValue
+            }
+            .prefix(limit))
+    }
+
+    private func existingEditScore(
+        base: Double,
+        hasActivity: Bool,
+        alignsWithActivity: Bool,
+        hasTimingConcern: Bool
+    ) -> SmartSetupCandidateScore {
+        var value = base
+        if hasActivity { value += 0.035 }
+        if alignsWithActivity { value += 0.045 }
+        if hasTimingConcern { value += 0.035 }
+
+        var components = [
+            SmartSetupScoreComponent(
+                reason: .manualRegion,
+                weight: 0.66,
+                detail: "Existing edit shows editor intent."
+            )
+        ]
+        if hasActivity {
+            components.append(SmartSetupScoreComponent(
+                reason: .click,
+                weight: 0.12,
+                detail: "Recorded interaction occurs during this edit."
+            ))
+        }
+        if alignsWithActivity {
+            components.append(SmartSetupScoreComponent(
+                reason: .denseActivity,
+                weight: 0.10,
+                detail: "The edit overlaps the active area."
+            ))
+        }
+        if hasTimingConcern {
+            components.append(SmartSetupScoreComponent(
+                reason: .timelineGap,
+                weight: 0.10,
+                detail: "The edit may end before the action is easy to follow."
+            ))
+        }
+
+        return SmartSetupCandidateScore(value: min(value, 0.93), components: components)
+    }
+
+    private func existingEditReasons(
+        hasActivity: Bool,
+        alignsWithActivity: Bool,
+        hasTimingConcern: Bool
+    ) -> [SmartSetupSuggestionReason] {
+        var reasons: [SmartSetupSuggestionReason] = [.manualRegion]
+        if hasActivity { reasons.append(.click) }
+        if alignsWithActivity { reasons.append(.denseActivity) }
+        if hasTimingConcern { reasons.append(.timelineGap) }
+        return reasons
+    }
+
+    private func normalizedDistance(
+        from event: RecordedEvent,
+        toNormalizedX normalizedX: Double,
+        normalizedY: Double,
+        contentCoordinateSize: CGSize
+    ) -> Double {
+        let eventX = min(max(event.x / contentCoordinateSize.width, 0), 1)
+        let eventY = min(max(event.y / contentCoordinateSize.height, 0), 1)
+        let deltaX = eventX - min(max(normalizedX, 0), 1)
+        let deltaY = eventY - min(max(normalizedY, 0), 1)
+        return ((deltaX * deltaX) + (deltaY * deltaY)).squareRoot()
+    }
+
+    private func rect(for region: EffectFocusRegion) -> CGRect {
+        CGRect(
+            x: region.centerX - region.width / 2,
+            y: region.centerY - region.height / 2,
+            width: region.width,
+            height: region.height
+        )
+    }
+
+    private func debugProviderInput(_ context: SmartSuggestionContext) {
+        #if DEBUG
+        print("[ExistingEditReview] input zoomCount=\(context.existingZoomMarkers.count) effectCount=\(context.existingEffectMarkers.count)")
+        #endif
+    }
+
+    private func debugMarkerInput(
+        type: String,
+        markerID: String,
+        markerName: String?,
+        style: String?,
+        startTime: Double,
+        endTime: Double,
+        enabled: Bool
+    ) {
+        #if DEBUG
+        let nameText = markerName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? markerName! : "none"
+        let styleText = style ?? "n/a"
+        print("[ExistingEditReview] marker type=\(type) id=\(markerID) range=\(timeRangeText(startTime: startTime, endTime: endTime)) name=\(nameText) style=\(styleText) enabled=\(enabled) origin=existing-marker proposal=false")
+        #endif
+    }
+
+    private func debugSkippedMarker(type: String, markerID: String, reason: String) {
+        #if DEBUG
+        print("[ExistingEditReview] skipped marker type=\(type) id=\(markerID) reason=\(reason) origin=existing-marker proposal=false")
+        #endif
+    }
+
+    private func debugEffectRegionEvidence(
+        marker: EffectPlanItem,
+        focusRect: CGRect?,
+        relationships: [(timestamp: Double, point: CGPoint, relationship: String)],
+        evidenceReason: String
+    ) {
+        #if DEBUG
+        let regionText: String
+        if let focusRect {
+            regionText = String(
+                format: "x=%.3f y=%.3f w=%.3f h=%.3f",
+                focusRect.minX,
+                focusRect.minY,
+                focusRect.width,
+                focusRect.height
+            )
+        } else {
+            regionText = "none"
+        }
+        let pointsText = relationships.map { item in
+            String(
+                format: "%.2f:(%.3f,%.3f):%@",
+                item.timestamp,
+                item.point.x,
+                item.point.y,
+                item.relationship
+            )
+        }.joined(separator: ",")
+        print("[ExistingEditReview] effect-region markerID=\(marker.id) range=\(timeRangeText(startTime: marker.startTime, endTime: marker.endTime)) focusRegion=\(regionText) activityPoints=[\(pointsText)] reason=\(evidenceReason)")
+        #endif
+    }
+
+    private func debugCandidateSuggestion(
+        _ suggestion: SmartSetupSuggestion,
+        markerID: String,
+        markerType: String,
+        evidenceReason: String
+    ) {
+        #if DEBUG
+        let range = suggestion.sourceTimeRange.map { timeRangeText(startTime: $0.startTime, endTime: $0.endTime) } ?? "n/a"
+        let title = suggestion.userTitle ?? "n/a"
+        print("[ExistingEditReview] candidate markerID=\(markerID) markerType=\(markerType) markerRange=\(range) suggestionID=\(suggestion.suggestionID) title=\(title) reason=\(evidenceReason) origin=existing-marker proposal=false")
+        #endif
+    }
+
+    private func debugCreatedSuggestion(
+        _ suggestion: SmartSetupSuggestion,
+        realZoomMarkerIDs: Set<String>,
+        realEffectMarkerIDs: Set<String>
+    ) {
+        #if DEBUG
+        let markerType: String
+        let markerID: String
+        if let effectMarkerID = existingEffectMarkerID(from: suggestion.suggestionID) {
+            markerType = "effect"
+            markerID = effectMarkerID
+        } else if let zoomMarkerID = existingZoomMarkerID(from: suggestion.suggestionID) {
+            markerType = "zoom"
+            markerID = zoomMarkerID
+        } else {
+            markerType = "unknown"
+            markerID = "unknown"
+        }
+        let range = suggestion.sourceTimeRange.map { timeRangeText(startTime: $0.startTime, endTime: $0.endTime) } ?? "n/a"
+        let title = suggestion.userTitle ?? "n/a"
+        let evidenceReason = debugEvidenceReason(for: suggestion)
+        let realZoom = isExistingZoomReviewSuggestion(suggestion, realZoomMarkerIDs: realZoomMarkerIDs)
+        let realEffect = isExistingEffectReviewSuggestion(suggestion, realEffectMarkerIDs: realEffectMarkerIDs)
+        print("[ExistingEditReview] created markerID=\(markerID) markerType=\(markerType) markerRange=\(range) suggestionID=\(suggestion.suggestionID) title=\(title) reason=\(evidenceReason) realZoom=\(realZoom) realEffect=\(realEffect) origin=existing-marker proposal=false")
+        #endif
+    }
+
+    private func debugExistingEffectReviewCardCount(
+        effectMarkerCount: Int,
+        suggestions: [SmartSetupSuggestion],
+        realEffectMarkerIDs: Set<String>
+    ) {
+        #if DEBUG
+        let reviewCount = suggestions.filter {
+            isExistingEffectReviewSuggestion($0, realEffectMarkerIDs: realEffectMarkerIDs)
+        }.count
+        if reviewCount > effectMarkerCount {
+            print("[ExistingEditReview] WARNING effectMarkers=\(effectMarkerCount) existingEffectReviewCards=\(reviewCount)")
+        } else {
+            print("[ExistingEditReview] effectMarkers=\(effectMarkerCount) existingEffectReviewCards=\(reviewCount) OK")
+        }
+        #endif
+    }
+
+    private func isExistingEffectReviewSuggestion(
+        _ suggestion: SmartSetupSuggestion,
+        realEffectMarkerIDs: Set<String>
+    ) -> Bool {
+        guard suggestion.providerID == providerID,
+              suggestion.kind == .effectMarker,
+              let markerID = existingEffectMarkerID(from: suggestion.suggestionID),
+              realEffectMarkerIDs.contains(markerID) else {
+            return false
+        }
+        if case .effect = suggestion.proposal {
+            return true
+        }
+        return false
+    }
+
+    private func isExistingZoomReviewSuggestion(
+        _ suggestion: SmartSetupSuggestion,
+        realZoomMarkerIDs: Set<String>
+    ) -> Bool {
+        guard suggestion.providerID == providerID,
+              suggestion.kind == .zoomMarker,
+              let markerID = existingZoomMarkerID(from: suggestion.suggestionID),
+              realZoomMarkerIDs.contains(markerID) else {
+            return false
+        }
+        switch suggestion.proposal {
+        case .zoom, .zoomAdjustment:
+            return true
+        case .effect, .regionTighten:
+            return false
+        }
+    }
+
+    private func existingEffectMarkerID(from suggestionID: String) -> String? {
+        guard suggestionID.hasPrefix("existing-effect-") else { return nil }
+        return String(suggestionID.dropFirst("existing-effect-".count))
+    }
+
+    private func existingZoomMarkerID(from suggestionID: String) -> String? {
+        guard suggestionID.hasPrefix("existing-zoom-") else { return nil }
+        return String(suggestionID.dropFirst("existing-zoom-".count))
+    }
+
+    private func debugEvidenceReason(for suggestion: SmartSetupSuggestion) -> String {
+        guard let title = suggestion.userTitle else { return "existing-edit-review" }
+        switch title {
+        case "Keep this effect":
+            return suggestion.sourceEvents.isEmpty ? "effect-review-neutral" : "effect-covers-active-area"
+        case "Extend this effect":
+            return "effect-too-short-for-activity"
+        case "Resize this effect region", "Expand this effect region to include the changing content":
+            return "effect-region-far-from-activity"
+        case "Consider removing this effect":
+            return "effect-no-clear-activity"
+        case "Keep this zoom":
+            return suggestion.sourceEvents.isEmpty ? "zoom-no-clear-activity" : "zoom-covers-active-area"
+        case "Extend this zoom hold", "Extend this zoom hold by about 0.5 seconds":
+            return "zoom-hold-too-short"
+        case "Move this zoom":
+            return "zoom-region-far-from-activity"
+        case "Consider removing this zoom":
+            return "zoom-no-clear-activity"
+        case "Review this focus effect":
+            return suggestion.sourceEvents.isEmpty ? "effect-no-clear-activity" : "effect-covers-active-area"
+        case "Check this effect timing":
+            return "effect-too-short-for-activity"
+        case "Check this effect region":
+            return "effect-region-far-from-activity"
+        case "Review this visual effect":
+            return "effect-review-neutral"
+        case "Review this focus zoom":
+            return suggestion.sourceEvents.isEmpty ? "zoom-no-clear-activity" : "zoom-covers-active-area"
+        case "Check this zoom hold":
+            return "zoom-hold-too-short"
+        case "Check this zoom framing":
+            return "zoom-region-far-from-activity"
+        default:
+            return "existing-edit-review"
+        }
+    }
+
+    private func debugSkippedSuggestion(_ suggestion: SmartSetupSuggestion, reason: String) {
+        #if DEBUG
+        let range = suggestion.sourceTimeRange.map { timeRangeText(startTime: $0.startTime, endTime: $0.endTime) } ?? "n/a"
+        let title = suggestion.userTitle ?? "n/a"
+        print("[ExistingEditReview] skipped suggestionID=\(suggestion.suggestionID) markerRange=\(range) title=\(title) reason=\(reason) origin=existing-marker proposal=false")
+        #endif
+    }
+
+    private func timeRangeText(startTime: Double, endTime: Double) -> String {
+        "\(timeText(startTime))-\(timeText(endTime))"
+    }
+
+    private func timeText(_ time: Double) -> String {
+        let clamped = max(time, 0)
+        let minutes = Int(clamped) / 60
+        let seconds = clamped - Double(minutes * 60)
+        return String(format: "%02d:%04.1f", minutes, seconds)
     }
 }
 
@@ -432,17 +1051,17 @@ struct ClickClusterSmartSuggestionProvider: SmartSuggestionProvider {
 
     private func clusterTitle(for cluster: [RecordedEvent], event: RecordedEvent) -> String {
         stableSuggestionChoice(seed: "\(providerID)-title-\(cluster.count)-\(event.timestamp)", from: [
-            "Keep these \(cluster.count) actions in view",
-            "Focus this \(cluster.count)-step interaction",
-            "Hold attention through these \(cluster.count) actions"
+            "Add a zoom hold covering these \(cluster.count) clicks",
+            "Add a short focus hold for this \(cluster.count)-step interaction",
+            "Add a zoom hold through these \(cluster.count) actions"
         ])
     }
 
     private func clusterReason(for cluster: [RecordedEvent], event: RecordedEvent) -> String {
         stableSuggestionChoice(seed: "\(providerID)-reason-\(cluster.count)-\(event.timestamp)", from: [
-            "Several actions happened close together here.",
-            "This looks like one short interaction worth highlighting.",
-            "The viewer may benefit from following this area without extra movement."
+            "Viewers may need more time to follow this short sequence.",
+            "This interaction is easy to miss at the current pace.",
+            "The steps may move too quickly without a brief hold."
         ])
     }
 }
@@ -517,14 +1136,14 @@ struct ClickHeuristicSmartSuggestionProvider: SmartSuggestionProvider {
             suggestionID: stableID(for: event, point: point),
             providerID: providerID,
             userTitle: stableSuggestionChoice(seed: "\(providerID)-title-\(event.timestamp)", from: [
-                "Highlight this click",
-                "Focus on this interaction",
-                "Review this quick action"
+                "Add a short focus hold for this click",
+                "Add a brief zoom hold for this interaction",
+                "Add a small click emphasis here"
             ]),
             userReason: stableSuggestionChoice(seed: "\(providerID)-reason-\(event.timestamp)", from: [
-                "This looks like a useful click to highlight.",
-                "The viewer may benefit from seeing this action clearly.",
-                "This moment may be worth a little extra focus."
+                "This click is easy to miss at the current pace.",
+                "The viewer may need a clearer look at this action.",
+                "The edit may move past this click too quickly."
             ]),
             kind: .zoomMarker,
             sourceTimeRange: SmartSetupSourceTimeRange(
@@ -694,6 +1313,7 @@ struct SmartSuggestionAggregator {
 
     static func defaultAggregator() -> SmartSuggestionAggregator {
         SmartSuggestionAggregator(providers: [
+            ExistingEditReviewSmartSuggestionProvider(),
             RuleSmartSuggestionProvider(),
             ClickClusterSmartSuggestionProvider(),
             ClickHeuristicSmartSuggestionProvider(),
@@ -723,8 +1343,12 @@ struct SmartSuggestionAggregator {
             from: tunedSuggestions,
             contentCoordinateSize: context.contentCoordinateSize
         )
+        let consolidatedSuggestions = consolidatedSuggestions(
+            from: curatedSuggestions,
+            contentCoordinateSize: context.contentCoordinateSize
+        )
 
-        let sortedSuggestions = curatedSuggestions.sorted { lhs, rhs in
+        let sortedSuggestions = consolidatedSuggestions.sorted { lhs, rhs in
             if lhs.score.value != rhs.score.value {
                 return lhs.score.value > rhs.score.value
             }
@@ -739,8 +1363,747 @@ struct SmartSuggestionAggregator {
         return Array(sortedSuggestions.prefix(maxVisibleSuggestions))
     }
 
+    private enum ConsolidationIntent: Int {
+        case adjust = 4
+        case add = 3
+        case keep = 2
+        case remove = 1
+        case fallback = 0
+    }
+
+    private enum ConsolidationRelation {
+        case duplicateExistingMarker
+        case duplicateInteractionCluster
+        case duplicateSidebarAction
+        case duplicateContextLabel
+        case duplicateVisualMoment
+        case sameVisibleMoment
+        case competesWithExistingEditAdjustment
+        case competesWithExistingEffectAdjustment
+        case genericClickLowValue
+        case newProposalCannotBeKeep
+        case genericAddDuplicate
+        case weakKeep
+        case weakGenericAdd
+
+        var reason: String {
+            switch self {
+            case .duplicateExistingMarker:
+                return "duplicate-existing-marker"
+            case .duplicateInteractionCluster:
+                return "duplicate-interaction-cluster"
+            case .duplicateSidebarAction:
+                return "duplicate-sidebar-action"
+            case .duplicateContextLabel:
+                return "duplicate-context-label"
+            case .duplicateVisualMoment:
+                return "duplicate-visual-moment"
+            case .sameVisibleMoment:
+                return "same-visible-moment"
+            case .competesWithExistingEditAdjustment:
+                return "competes-with-existing-edit-adjustment"
+            case .competesWithExistingEffectAdjustment:
+                return "competes-with-existing-effect-adjustment"
+            case .genericClickLowValue:
+                return "generic-click-low-value"
+            case .newProposalCannotBeKeep:
+                return "new-proposal-cannot-be-keep"
+            case .genericAddDuplicate:
+                return "generic-add-duplicate"
+            case .weakKeep:
+                return "weak-keep"
+            case .weakGenericAdd:
+                return "weak-generic-add"
+            }
+        }
+    }
+
+    private struct ConsolidationSuppression {
+        let suggestionID: String
+        let reason: String
+        let keptSuggestionID: String
+    }
+
     private func sortTime(for suggestion: SmartSetupSuggestion) -> Double {
         suggestion.sourceTimeRange?.startTime ?? suggestion.sourceEvents.first?.timestamp ?? 0
+    }
+
+    private func consolidatedSuggestions(
+        from suggestions: [SmartSetupSuggestion],
+        contentCoordinateSize: CGSize
+    ) -> [SmartSetupSuggestion] {
+        debugSuggestionConsolidationInputs(suggestions, contentCoordinateSize: contentCoordinateSize)
+        debugSuggestionConsolidationPairs(suggestions, contentCoordinateSize: contentCoordinateSize)
+
+        guard suggestions.count > 1 else {
+            debugSuggestionConsolidation(before: suggestions.count, after: suggestions.count, suppressions: [])
+            return suggestions
+        }
+
+        let rankedSuggestions = suggestions.sorted { lhs, rhs in
+            let lhsValue = consolidationValue(for: lhs)
+            let rhsValue = consolidationValue(for: rhs)
+            if lhsValue != rhsValue {
+                return lhsValue > rhsValue
+            }
+            if sortTime(for: lhs) != sortTime(for: rhs) {
+                return sortTime(for: lhs) < sortTime(for: rhs)
+            }
+            return lhs.suggestionID < rhs.suggestionID
+        }
+
+        var acceptedSuggestions: [SmartSetupSuggestion] = []
+        var acceptedSuggestionIDs = Set<String>()
+        var suppressions: [ConsolidationSuppression] = []
+
+        for suggestion in rankedSuggestions {
+            if let suppressionReason = qualitySuppressionReason(for: suggestion, acceptedSuggestions: acceptedSuggestions) {
+                suppressions.append(
+                    ConsolidationSuppression(
+                        suggestionID: suggestion.suggestionID,
+                        reason: suppressionReason.reason,
+                        keptSuggestionID: "quality-filter"
+                    )
+                )
+                continue
+            }
+
+            if let duplicate = acceptedSuggestions.compactMap({ acceptedSuggestion -> (SmartSetupSuggestion, ConsolidationRelation)? in
+                guard let relation = consolidationRelation(
+                    between: acceptedSuggestion,
+                    and: suggestion,
+                    contentCoordinateSize: contentCoordinateSize
+                ) else {
+                    return nil
+                }
+                return (acceptedSuggestion, relation)
+            }).first {
+                suppressions.append(
+                    ConsolidationSuppression(
+                        suggestionID: suggestion.suggestionID,
+                        reason: duplicate.1.reason,
+                        keptSuggestionID: duplicate.0.suggestionID
+                    )
+                )
+                continue
+            }
+
+            acceptedSuggestions.append(suggestion)
+            acceptedSuggestionIDs.insert(suggestion.suggestionID)
+        }
+
+        let result = suggestions.filter { acceptedSuggestionIDs.contains($0.suggestionID) }
+        debugSuggestionConsolidation(before: suggestions.count, after: result.count, suppressions: suppressions)
+        return result
+    }
+
+    private func consolidationValue(for suggestion: SmartSetupSuggestion) -> Double {
+        let intentPriority = Double(consolidationIntent(for: suggestion).rawValue) * 0.20
+        let sourceEventBoost = min(Double(suggestion.sourceEvents.count) * 0.01, 0.05)
+        let existingAdjustmentBoost = isExistingEditAdjustment(suggestion) ? 0.18 : 0
+        return opportunityValue(for: suggestion) + intentPriority + sourceEventBoost + existingAdjustmentBoost
+    }
+
+    private func qualitySuppressionReason(
+        for suggestion: SmartSetupSuggestion,
+        acceptedSuggestions: [SmartSetupSuggestion]
+    ) -> ConsolidationRelation? {
+        if providerIDIsNewProposalKeep(suggestion) {
+            return .newProposalCannotBeKeep
+        }
+
+        let intent = consolidationIntent(for: suggestion)
+        if intent == .keep,
+           suggestion.providerID == "existing-edits",
+           isPlainKeepSuggestion(suggestion),
+           !hasStrongKeepEvidence(suggestion) {
+            return .weakKeep
+        }
+
+        if isLowValueGenericClick(suggestion) {
+            return .genericClickLowValue
+        }
+
+        if intent == .add,
+           normalizedContextLabel(for: suggestion) == nil,
+           sidebarNavigationKey(for: suggestion) == nil,
+           suggestion.sourceEvents.isEmpty,
+           suggestion.score.value < 0.75 {
+            return .weakGenericAdd
+        }
+
+        return nil
+    }
+
+    private func providerIDIsNewProposalKeep(_ suggestion: SmartSetupSuggestion) -> Bool {
+        guard suggestion.providerID != "existing-edits",
+              existingSourceMarkerKey(for: suggestion) == nil,
+              let title = suggestion.userTitle?.lowercased() else {
+            return false
+        }
+        return title.hasPrefix("keep this")
+    }
+
+    private func isLowValueGenericClick(_ suggestion: SmartSetupSuggestion) -> Bool {
+        suggestion.providerID == "clicks"
+            && suggestion.sourceEvents.count <= 1
+            && normalizedContextLabel(for: suggestion) == nil
+            && sidebarNavigationKey(for: suggestion) == nil
+            && suggestion.score.value <= 0.78
+    }
+
+    private func isPlainKeepSuggestion(_ suggestion: SmartSetupSuggestion) -> Bool {
+        guard let title = suggestion.userTitle?.lowercased() else { return false }
+        return title == "keep this zoom"
+            || title == "keep this effect"
+            || title == "keep this focus hold"
+    }
+
+    private func hasStrongKeepEvidence(_ suggestion: SmartSetupSuggestion) -> Bool {
+        suggestion.score.value >= 0.90
+            && suggestion.sourceEvents.count >= 2
+            && suggestion.reasons.contains(.denseActivity)
+            && suggestion.reasons.contains(.click)
+    }
+
+    private func consolidationIntent(for suggestion: SmartSetupSuggestion) -> ConsolidationIntent {
+        if case .zoomAdjustment = suggestion.proposal {
+            return .adjust
+        }
+
+        guard suggestion.providerID == "existing-edits" else {
+            return .add
+        }
+
+        let visibleText = "\(suggestion.userTitle ?? "") \(suggestion.userReason ?? "")"
+            .lowercased()
+
+        if visibleText.contains("consider removing") || visibleText.contains("remove this") {
+            return .remove
+        }
+        if visibleText.contains("extend this")
+            || visibleText.contains("expand this")
+            || visibleText.contains("resize this")
+            || visibleText.contains("move this")
+            || visibleText.contains("shorten this")
+            || visibleText.contains("refine this")
+            || visibleText.contains("adjust this")
+            || visibleText.contains("tighten this") {
+            return .adjust
+        }
+        if visibleText.contains("keep this") {
+            return .keep
+        }
+        if visibleText.contains("add ") {
+            return .add
+        }
+
+        return .fallback
+    }
+
+    private func consolidationRelation(
+        between acceptedSuggestion: SmartSetupSuggestion,
+        and candidate: SmartSetupSuggestion,
+        contentCoordinateSize: CGSize
+    ) -> ConsolidationRelation? {
+        guard acceptedSuggestion.suggestionID != candidate.suggestionID else {
+            return .duplicateExistingMarker
+        }
+
+        if let crossMarkerRelation = crossMarkerExistingEffectAdjustmentRelation(
+            between: acceptedSuggestion,
+            and: candidate
+        ) {
+            return crossMarkerRelation
+        }
+
+        if let acceptedMarkerKey = existingSourceMarkerKey(for: acceptedSuggestion),
+           acceptedMarkerKey == existingSourceMarkerKey(for: candidate) {
+            return .duplicateExistingMarker
+        }
+
+        if sourceEventsOverlap(acceptedSuggestion.sourceEvents, candidate.sourceEvents, contentCoordinateSize: contentCoordinateSize),
+           visibleOpportunityTimesCompete(acceptedSuggestion, candidate) {
+            return .duplicateInteractionCluster
+        }
+
+        if sidebarNavigationKey(for: acceptedSuggestion) != nil,
+           sidebarNavigationKey(for: candidate) != nil,
+           sameIntent(acceptedSuggestion, candidate, intent: .add),
+           existingSourceMarkerKey(for: acceptedSuggestion) == nil,
+           existingSourceMarkerKey(for: candidate) == nil,
+           abs(sortTime(for: acceptedSuggestion) - sortTime(for: candidate)) <= 3.0 {
+            return .genericAddDuplicate
+        }
+
+        if let acceptedLabel = normalizedContextLabel(for: acceptedSuggestion),
+           let candidateLabel = normalizedContextLabel(for: candidate),
+           contextLabelsCompete(acceptedLabel, candidateLabel),
+           intentsCompete(acceptedSuggestion, candidate),
+           proposalsCompete(acceptedSuggestion, candidate),
+           abs(sortTime(for: acceptedSuggestion) - sortTime(for: candidate)) <= 3.0 {
+            return .duplicateContextLabel
+        }
+
+        if let editorialRelation = editorialVisibleMomentRelation(
+            between: acceptedSuggestion,
+            and: candidate,
+            contentCoordinateSize: contentCoordinateSize
+        ) {
+            return editorialRelation
+        }
+
+        guard canConsolidateVisibleMoment(acceptedSuggestion, candidate),
+              visibleOpportunityTimesCompete(acceptedSuggestion, candidate),
+              opportunityPointsAreNear(acceptedSuggestion, candidate, contentCoordinateSize: contentCoordinateSize, tolerance: finalOpportunityDistanceTolerance) else {
+            return nil
+        }
+
+        return .duplicateVisualMoment
+    }
+
+    private func canConsolidateVisibleMoment(_ lhs: SmartSetupSuggestion, _ rhs: SmartSetupSuggestion) -> Bool {
+        if lhs.providerID == "existing-edits", rhs.providerID == "existing-edits" {
+            return false
+        }
+
+        if visibleOpportunityCategory(for: lhs) == visibleOpportunityCategory(for: rhs) {
+            return true
+        }
+
+        let lhsIntent = consolidationIntent(for: lhs)
+        let rhsIntent = consolidationIntent(for: rhs)
+        return lhsIntent == .add || rhsIntent == .add
+    }
+
+    private func editorialVisibleMomentRelation(
+        between acceptedSuggestion: SmartSetupSuggestion,
+        and candidate: SmartSetupSuggestion,
+        contentCoordinateSize: CGSize
+    ) -> ConsolidationRelation? {
+        guard editorialTimesCompete(acceptedSuggestion, candidate),
+              attentionSuggestionsCompete(acceptedSuggestion, candidate),
+              opportunityPointsAreNear(acceptedSuggestion, candidate, contentCoordinateSize: contentCoordinateSize, tolerance: 0.22) else {
+            return nil
+        }
+
+        let acceptedIntent = consolidationIntent(for: acceptedSuggestion)
+        let candidateIntent = consolidationIntent(for: candidate)
+        guard acceptedIntent == .adjust || acceptedIntent == .add || candidateIntent == .adjust || candidateIntent == .add else {
+            return nil
+        }
+
+        if isExistingEffectAdjustment(acceptedSuggestion), candidate.providerID != "existing-edits" {
+            return .competesWithExistingEffectAdjustment
+        }
+        if isExistingEffectAdjustment(candidate), acceptedSuggestion.providerID != "existing-edits" {
+            return .competesWithExistingEffectAdjustment
+        }
+
+        if isExistingEditAdjustment(acceptedSuggestion), candidate.providerID != "existing-edits" {
+            return .competesWithExistingEditAdjustment
+        }
+        if isExistingEditAdjustment(candidate), acceptedSuggestion.providerID != "existing-edits" {
+            return .competesWithExistingEditAdjustment
+        }
+
+        if (acceptedIntent == .adjust && candidateIntent == .add)
+            || (acceptedIntent == .add && candidateIntent == .adjust) {
+            return .sameVisibleMoment
+        }
+
+        if acceptedIntent == .add, candidateIntent == .add {
+            return .genericAddDuplicate
+        }
+
+        guard acceptedIntent == .adjust, candidateIntent == .adjust else {
+            return nil
+        }
+
+        if effectAndZoomAdjustmentsCanCoexist(acceptedSuggestion, candidate) {
+            return nil
+        }
+        return .sameVisibleMoment
+    }
+
+    private func crossMarkerExistingEffectAdjustmentRelation(
+        between lhs: SmartSetupSuggestion,
+        and rhs: SmartSetupSuggestion
+    ) -> ConsolidationRelation? {
+        guard crossMarkerEditorialCandidate(lhs, rhs),
+              overlapStrength(lhs.sourceTimeRange, rhs.sourceTimeRange) >= 0.50 else {
+            return nil
+        }
+
+        if isExistingEffectAdjustment(lhs), isGeneratedZoomAdjustment(rhs) {
+            return .competesWithExistingEffectAdjustment
+        }
+        if isExistingEffectAdjustment(rhs), isGeneratedZoomAdjustment(lhs) {
+            return .competesWithExistingEffectAdjustment
+        }
+
+        return nil
+    }
+
+    private func crossMarkerEditorialCandidate(_ lhs: SmartSetupSuggestion, _ rhs: SmartSetupSuggestion) -> Bool {
+        guard existingSourceMarkerKey(for: lhs) != existingSourceMarkerKey(for: rhs),
+              editorialTimesCompete(lhs, rhs),
+              attentionSuggestionsCompete(lhs, rhs) else {
+            return false
+        }
+
+        let lhsIntent = consolidationIntent(for: lhs)
+        let rhsIntent = consolidationIntent(for: rhs)
+        return lhsIntent == .adjust || lhsIntent == .add || rhsIntent == .adjust || rhsIntent == .add
+    }
+
+    private func editorialTimesCompete(_ lhs: SmartSetupSuggestion, _ rhs: SmartSetupSuggestion) -> Bool {
+        if abs(sortTime(for: lhs) - sortTime(for: rhs)) <= 1.5 {
+            return true
+        }
+        return rangesOverlapSubstantially(lhs.sourceTimeRange, rhs.sourceTimeRange)
+    }
+
+    private func attentionSuggestionsCompete(_ lhs: SmartSetupSuggestion, _ rhs: SmartSetupSuggestion) -> Bool {
+        let lhsFamily = proposalFamily(for: lhs)
+        let rhsFamily = proposalFamily(for: rhs)
+        return (lhsFamily == "zoom" || lhsFamily == "effect")
+            && (rhsFamily == "zoom" || rhsFamily == "effect")
+    }
+
+    private func isExistingEditAdjustment(_ suggestion: SmartSetupSuggestion) -> Bool {
+        suggestion.providerID == "existing-edits" && consolidationIntent(for: suggestion) == .adjust
+    }
+
+    private func isExistingEffectAdjustment(_ suggestion: SmartSetupSuggestion) -> Bool {
+        isExistingEditAdjustment(suggestion)
+            && suggestion.suggestionID.hasPrefix("existing-effect-")
+            && proposalFamily(for: suggestion) == "effect"
+    }
+
+    private func isGeneratedZoomAdjustment(_ suggestion: SmartSetupSuggestion) -> Bool {
+        guard suggestion.providerID != "existing-edits" else { return false }
+        if case .zoomAdjustment = suggestion.proposal {
+            return true
+        }
+        return false
+    }
+
+    private func effectAndZoomAdjustmentsCanCoexist(_ lhs: SmartSetupSuggestion, _ rhs: SmartSetupSuggestion) -> Bool {
+        guard proposalFamily(for: lhs) != proposalFamily(for: rhs) else { return false }
+        guard lhs.providerID == "existing-edits", rhs.providerID == "existing-edits" else { return false }
+        guard lhs.score.value >= 0.90, rhs.score.value >= 0.90 else { return false }
+        return !rangesOverlapSubstantially(lhs.sourceTimeRange, rhs.sourceTimeRange)
+    }
+
+    private func sameIntent(
+        _ lhs: SmartSetupSuggestion,
+        _ rhs: SmartSetupSuggestion,
+        intent: ConsolidationIntent
+    ) -> Bool {
+        consolidationIntent(for: lhs) == intent && consolidationIntent(for: rhs) == intent
+    }
+
+    private func intentsCompete(_ lhs: SmartSetupSuggestion, _ rhs: SmartSetupSuggestion) -> Bool {
+        let lhsIntent = consolidationIntent(for: lhs)
+        let rhsIntent = consolidationIntent(for: rhs)
+        return lhsIntent == rhsIntent || lhsIntent == .adjust || rhsIntent == .adjust
+    }
+
+    private func proposalsCompete(_ lhs: SmartSetupSuggestion, _ rhs: SmartSetupSuggestion) -> Bool {
+        proposalFamily(for: lhs) == proposalFamily(for: rhs)
+            || consolidationIntent(for: lhs) == .add
+            || consolidationIntent(for: rhs) == .add
+    }
+
+    private func proposalFamily(for suggestion: SmartSetupSuggestion) -> String {
+        switch suggestion.proposal {
+        case .zoom, .zoomAdjustment:
+            return "zoom"
+        case .effect, .regionTighten:
+            return "effect"
+        }
+    }
+
+    private func existingSourceMarkerKey(for suggestion: SmartSetupSuggestion) -> String? {
+        if suggestion.providerID == "existing-edits" {
+            if suggestion.suggestionID.hasPrefix("existing-effect-") {
+                return suggestion.suggestionID
+                    .replacingOccurrences(of: "existing-effect-", with: "effect:")
+            }
+            if suggestion.suggestionID.hasPrefix("existing-zoom-") {
+                return suggestion.suggestionID
+                    .replacingOccurrences(of: "existing-zoom-", with: "zoom:")
+            }
+        }
+
+        if case .zoomAdjustment(let proposal) = suggestion.proposal,
+           let markerID = proposal.targetMarkerIDs.first {
+            return "zoom:\(markerID)"
+        }
+
+        return nil
+    }
+
+    private func sourceEventsOverlap(
+        _ lhs: [SmartSetupSourceEventReference],
+        _ rhs: [SmartSetupSourceEventReference],
+        contentCoordinateSize: CGSize
+    ) -> Bool {
+        guard !lhs.isEmpty, !rhs.isEmpty else { return false }
+
+        let lhsKeys = Set(lhs.map(sourceEventKey))
+        let rhsKeys = Set(rhs.map(sourceEventKey))
+        if !lhsKeys.isDisjoint(with: rhsKeys) {
+            return true
+        }
+
+        let safeWidth = max(contentCoordinateSize.width, 1)
+        let safeHeight = max(contentCoordinateSize.height, 1)
+        return lhs.contains { lhsEvent in
+            rhs.contains { rhsEvent in
+                guard abs(lhsEvent.timestamp - rhsEvent.timestamp) <= 0.45 else { return false }
+                let deltaX = (lhsEvent.x / safeWidth) - (rhsEvent.x / safeWidth)
+                let deltaY = (lhsEvent.y / safeHeight) - (rhsEvent.y / safeHeight)
+                return (deltaX * deltaX + deltaY * deltaY).squareRoot() <= 0.08
+            }
+        }
+    }
+
+    private func sourceEventKey(for event: SmartSetupSourceEventReference) -> String {
+        let timeKey = Int((event.timestamp * 100).rounded())
+        let xKey = Int(event.x.rounded())
+        let yKey = Int(event.y.rounded())
+        return "\(event.type.rawValue)-\(timeKey)-\(xKey)-\(yKey)"
+    }
+
+    private func opportunityPointsAreNear(
+        _ lhs: SmartSetupSuggestion,
+        _ rhs: SmartSetupSuggestion,
+        contentCoordinateSize: CGSize,
+        tolerance: Double
+    ) -> Bool {
+        guard let lhsPoint = normalizedOpportunityPoint(for: lhs, contentCoordinateSize: contentCoordinateSize),
+              let rhsPoint = normalizedOpportunityPoint(for: rhs, contentCoordinateSize: contentCoordinateSize) else {
+            return true
+        }
+
+        let deltaX = lhsPoint.x - rhsPoint.x
+        let deltaY = lhsPoint.y - rhsPoint.y
+        return (deltaX * deltaX + deltaY * deltaY).squareRoot() <= tolerance
+    }
+
+    private func sidebarNavigationKey(for suggestion: SmartSetupSuggestion) -> String? {
+        let text = "\(suggestion.userTitle ?? "") \(suggestion.userReason ?? "")"
+            .lowercased()
+        if text.contains("sidebar")
+            || text.contains("side panel")
+            || text.contains("navigation")
+            || text.contains("nav ") {
+            return "sidebar-navigation"
+        }
+        return nil
+    }
+
+    private func normalizedContextLabel(for suggestion: SmartSetupSuggestion) -> String? {
+        guard let title = suggestion.userTitle?.lowercased() else { return nil }
+        let prefixes = [
+            "add a zoom hold covering ",
+            "add a zoom hold through ",
+            "add a short zoom hold around ",
+            "add a short zoom hold for ",
+            "add a short focus hold around ",
+            "add a short focus hold for ",
+            "add a focus hold around ",
+            "add a focus hold through ",
+            "add a focus hold for ",
+            "add a brief zoom hold for ",
+            "add a small click emphasis here",
+            "add a subtle focus effect to ",
+            "add a subtle focus effect around ",
+            "add a focus effect to ",
+            "add subtle emphasis during ",
+            "add extra attention to ",
+            "add emphasis around ",
+            "add emphasis to ",
+            "add focus around ",
+            "add focus to ",
+            "extend this zoom hold around ",
+            "resize this effect region around ",
+            "move this zoom around ",
+            "keep this zoom around ",
+            "keep this effect around ",
+            "consider removing this zoom around ",
+            "consider removing this effect around "
+        ]
+
+        var label = title
+        for prefix in prefixes where label.hasPrefix(prefix) {
+            label.removeFirst(prefix.count)
+            break
+        }
+
+        let punctuation = CharacterSet.alphanumerics.union(.whitespaces).inverted
+        label = label
+            .components(separatedBy: punctuation)
+            .joined(separator: " ")
+
+        let ignoredWords: Set<String> = [
+            "a", "an", "and", "around", "brief", "clearer", "click", "clicks",
+            "covering", "effect", "emphasis", "focus", "for", "hold", "if",
+            "in", "it", "moment", "region", "short", "small", "subtle",
+            "the", "these", "this", "through", "to", "zoom"
+        ]
+        let tokens = label
+            .split(separator: " ")
+            .map(String.init)
+            .filter { !ignoredWords.contains($0) }
+
+        guard !tokens.isEmpty else { return nil }
+        let normalizedLabel = tokens.joined(separator: " ")
+        let genericLabels: Set<String> = [
+            "action", "active content", "area", "content", "information",
+            "interaction", "screen", "step", "transition"
+        ]
+        guard !genericLabels.contains(normalizedLabel) else { return nil }
+        return normalizedLabel
+    }
+
+    private func contextLabelsCompete(_ lhs: String, _ rhs: String) -> Bool {
+        if lhs == rhs { return true }
+        if lhs.contains(rhs) || rhs.contains(lhs) {
+            return min(lhs.count, rhs.count) >= 4
+        }
+
+        let lhsTokens = Set(lhs.split(separator: " ").map(String.init))
+        let rhsTokens = Set(rhs.split(separator: " ").map(String.init))
+        guard !lhsTokens.isEmpty, !rhsTokens.isEmpty else { return false }
+        let sharedCount = lhsTokens.intersection(rhsTokens).count
+        return sharedCount >= 2 || Double(sharedCount) / Double(min(lhsTokens.count, rhsTokens.count)) >= 0.75
+    }
+
+    private func normalizedTimeKey(for suggestion: SmartSetupSuggestion) -> String {
+        String(Int((sortTime(for: suggestion) * 2).rounded()))
+    }
+
+    private func timeRangeText(for suggestion: SmartSetupSuggestion) -> String {
+        guard let range = suggestion.sourceTimeRange else {
+            return String(format: "%.2f", sortTime(for: suggestion))
+        }
+        return String(format: "%.2f-%.2f", range.startTime, range.endTime)
+    }
+
+    private func proposalTypeText(for suggestion: SmartSetupSuggestion) -> String {
+        switch suggestion.proposal {
+        case .zoom:
+            return "zoom"
+        case .zoomAdjustment:
+            return "zoomAdjustment"
+        case .effect:
+            return "effect"
+        case .regionTighten:
+            return "regionTighten"
+        }
+    }
+
+    private func relationMissReason(
+        lhs: SmartSetupSuggestion,
+        rhs: SmartSetupSuggestion,
+        contentCoordinateSize: CGSize
+    ) -> String {
+        let timeDelta = abs(sortTime(for: lhs) - sortTime(for: rhs))
+        if timeDelta > 3.0 {
+            return "outside-near-time-window"
+        }
+        if crossMarkerEditorialCandidate(lhs, rhs) {
+            return "cross-marker-editorial-not-strong-enough"
+        }
+        if existingSourceMarkerKey(for: lhs) != existingSourceMarkerKey(for: rhs) {
+            return "different-existing-marker"
+        }
+        if sidebarNavigationKey(for: lhs) != sidebarNavigationKey(for: rhs) {
+            return "different-sidebar-nav-key"
+        }
+        let lhsLabel = normalizedContextLabel(for: lhs)
+        let rhsLabel = normalizedContextLabel(for: rhs)
+        if lhsLabel == nil || rhsLabel == nil {
+            return "missing-context-label"
+        }
+        if let lhsLabel, let rhsLabel, !contextLabelsCompete(lhsLabel, rhsLabel) {
+            return "different-context-label"
+        }
+        if !sourceEventsOverlap(lhs.sourceEvents, rhs.sourceEvents, contentCoordinateSize: contentCoordinateSize) {
+            return "different-source-events"
+        }
+        if !opportunityPointsAreNear(lhs, rhs, contentCoordinateSize: contentCoordinateSize, tolerance: finalOpportunityDistanceTolerance) {
+            return "different-screen-area"
+        }
+        return "different-category-or-intent"
+    }
+
+    private func debugSuggestionConsolidationInputs(
+        _ suggestions: [SmartSetupSuggestion],
+        contentCoordinateSize: CGSize
+    ) {
+        #if DEBUG
+        for suggestion in suggestions {
+            print(
+                "[SuggestionConsolidation] input suggestionID=\(suggestion.suggestionID) providerID=\(suggestion.providerID) intent=\(consolidationIntent(for: suggestion)) title=\"\(suggestion.userTitle ?? "")\" timeRange=\(timeRangeText(for: suggestion)) sourceEvents=\(suggestion.sourceEvents.count) timeKey=\(normalizedTimeKey(for: suggestion)) labelKey=\(normalizedContextLabel(for: suggestion) ?? "none") sidebarKey=\(sidebarNavigationKey(for: suggestion) ?? "none") markerKey=\(existingSourceMarkerKey(for: suggestion) ?? "none") proposal=\(proposalTypeText(for: suggestion)) score=\(String(format: "%.3f", suggestion.score.value))"
+            )
+        }
+        #endif
+    }
+
+    private func debugSuggestionConsolidationPairs(
+        _ suggestions: [SmartSetupSuggestion],
+        contentCoordinateSize: CGSize
+    ) {
+        #if DEBUG
+        guard suggestions.count > 1 else { return }
+        for lhsIndex in suggestions.indices {
+            for rhsIndex in suggestions.index(after: lhsIndex)..<suggestions.endIndex {
+                let lhs = suggestions[lhsIndex]
+                let rhs = suggestions[rhsIndex]
+                guard abs(sortTime(for: lhs) - sortTime(for: rhs)) <= 3.0 else { continue }
+
+                let lhsLabel = normalizedContextLabel(for: lhs)
+                let rhsLabel = normalizedContextLabel(for: rhs)
+                let sameContextLabel = lhsLabel.flatMap { label in
+                    rhsLabel.map { contextLabelsCompete(label, $0) }
+                } ?? false
+                let sameSidebar = sidebarNavigationKey(for: lhs) != nil
+                    && sidebarNavigationKey(for: lhs) == sidebarNavigationKey(for: rhs)
+                let sameMarker = existingSourceMarkerKey(for: lhs) != nil
+                    && existingSourceMarkerKey(for: lhs) == existingSourceMarkerKey(for: rhs)
+                let sameEvents = sourceEventsOverlap(lhs.sourceEvents, rhs.sourceEvents, contentCoordinateSize: contentCoordinateSize)
+                let overlap = visibleOpportunityTimesCompete(lhs, rhs)
+                let relation = consolidationRelation(between: lhs, and: rhs, contentCoordinateSize: contentCoordinateSize)
+                let crossMarkerCandidate = crossMarkerEditorialCandidate(lhs, rhs)
+                let lhsRealExistingEffectAdjust = isExistingEffectAdjustment(lhs)
+                let rhsGeneratedZoomAdjustment = isGeneratedZoomAdjustment(rhs)
+                let strength = overlapStrength(lhs.sourceTimeRange, rhs.sourceTimeRange)
+                print(
+                    "[SuggestionConsolidation] pair lhs=\"\(lhs.userTitle ?? lhs.suggestionID)\" rhs=\"\(rhs.userTitle ?? rhs.suggestionID)\" timeOverlap=\(overlap) sameContextLabel=\(sameContextLabel) sameSidebarNav=\(sameSidebar) sameMarker=\(sameMarker) sameSourceEvents=\(sameEvents) crossMarkerEditorialCandidate=\(crossMarkerCandidate) lhsRealExistingEffectAdjust=\(lhsRealExistingEffectAdjust) rhsGeneratedZoomAdjustment=\(rhsGeneratedZoomAdjustment) overlapStrength=\(String(format: "%.3f", strength)) duplicateReason=\(relation?.reason ?? "none") finalDuplicateReason=\(relation?.reason ?? "none") notDuplicateReason=\(relation == nil ? relationMissReason(lhs: lhs, rhs: rhs, contentCoordinateSize: contentCoordinateSize) : "matched")"
+                )
+            }
+        }
+        #endif
+    }
+
+    private func debugSuggestionConsolidation(
+        before: Int,
+        after: Int,
+        suppressions: [ConsolidationSuppression]
+    ) {
+        #if DEBUG
+        print("[SuggestionConsolidation] before=\(before) after=\(after)")
+        print("[SuggestionConsolidation] after=\(after)")
+        for suppression in suppressions {
+            print(
+                "[SuggestionConsolidation] suppressed suggestionID=\(suppression.suggestionID) reason=\(suppression.reason) kept=\(suppression.keptSuggestionID)"
+            )
+        }
+        #endif
     }
 
     private func scoreTunedSuggestions(from suggestions: [SmartSetupSuggestion]) -> [SmartSetupSuggestion] {
@@ -808,14 +2171,14 @@ struct SmartSuggestionAggregator {
             representative.sourceTimeRange = combinedSourceTimeRange(for: orderedGroup)
             representative.score = highestScore(in: orderedGroup)
             representative.userTitle = stableSuggestionChoice(seed: "click-cluster-opportunity-title-\(key)", from: [
-                "Review this \(eventCount)-step interaction",
-                "Keep this \(eventCount)-step interaction in view",
-                "Focus this short interaction"
+                "Add a zoom hold covering this \(eventCount)-step interaction",
+                "Add a short focus hold for this \(eventCount)-step interaction",
+                "Add a zoom hold through this short interaction"
             ])
             representative.userReason = stableSuggestionChoice(seed: "click-cluster-opportunity-reason-\(key)", from: [
-                "Several actions happened close together here.",
-                "This looks like one interaction the viewer may need to follow.",
-                "Keeping this area in focus may make the sequence easier to understand."
+                "Viewers may need more time to follow these steps.",
+                "This interaction is easy to miss at the current pace.",
+                "The sequence may move too quickly without a brief hold."
             ])
             mergedClusterSuggestions[representative.suggestionID] = representative
         }
@@ -967,6 +2330,8 @@ struct SmartSuggestionAggregator {
 
     private func tunedScoreValue(for suggestion: SmartSetupSuggestion) -> Double {
         switch suggestion.providerID {
+        case "existing-edits":
+            return max(suggestion.score.value, 0.80)
         case "click-clusters":
             return max(suggestion.score.value, min(0.94, 0.86 + (Double(suggestion.sourceEvents.count) * 0.015)))
         case "clicks":
@@ -984,6 +2349,8 @@ struct SmartSuggestionAggregator {
 
     private func opportunityPriorityBoost(for suggestion: SmartSetupSuggestion) -> Double {
         switch suggestion.providerID {
+        case "existing-edits":
+            return 0.08
         case "click-clusters":
             return 0.10
         case "clicks":
@@ -1180,14 +2547,20 @@ struct SmartSuggestionAggregator {
     private func rangesOverlapSubstantially(_ lhs: SmartSetupSourceTimeRange?, _ rhs: SmartSetupSourceTimeRange?) -> Bool {
         guard let lhs, let rhs else { return false }
 
+        return overlapStrength(lhs, rhs) >= substantialOverlapRatio
+    }
+
+    private func overlapStrength(_ lhs: SmartSetupSourceTimeRange?, _ rhs: SmartSetupSourceTimeRange?) -> Double {
+        guard let lhs, let rhs else { return 0 }
+
         let overlapStart = max(lhs.startTime, rhs.startTime)
         let overlapEnd = min(lhs.endTime, rhs.endTime)
         let overlapDuration = max(overlapEnd - overlapStart, 0)
-        guard overlapDuration > 0 else { return false }
+        guard overlapDuration > 0 else { return 0 }
 
         let lhsDuration = max(lhs.endTime - lhs.startTime, 0.001)
         let rhsDuration = max(rhs.endTime - rhs.startTime, 0.001)
-        return overlapDuration / min(lhsDuration, rhsDuration) >= substantialOverlapRatio
+        return overlapDuration / min(lhsDuration, rhsDuration)
     }
 }
 

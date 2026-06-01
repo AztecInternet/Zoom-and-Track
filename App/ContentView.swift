@@ -865,16 +865,7 @@ struct ContentView: View {
         }
 
         let duration = max(viewModel.recordingSummary?.duration ?? viewModel.recordingSummary?.lastEventTimestamp ?? 0, 0)
-        let sourceRange = suggestion.sourceTimeRange ?? fallbackSmartSetupTimelineRange(for: suggestion, duration: duration)
-        let startTime = min(max(sourceRange.startTime, 0), max(duration, 0))
-        var endTime = min(max(sourceRange.endTime, startTime), max(duration, startTime))
-        endTime = min(endTime, startTime + 8.0)
-
-        if endTime - startTime < 1.0 {
-            endTime = min(max(startTime + 1.0, endTime), max(duration, endTime))
-        }
-
-        return SmartSetupSourceTimeRange(startTime: startTime, endTime: max(endTime, startTime))
+        return suggestion.reviewPlaybackRange(recordingDuration: duration)
     }
 
     func selectedSmartSetupTimelineEventTimes() -> [Double] {
@@ -884,11 +875,15 @@ struct ContentView: View {
         }
 
         let duration = max(viewModel.recordingSummary?.duration ?? viewModel.recordingSummary?.lastEventTimestamp ?? 0, 0)
+        let reviewRange = suggestion.reviewPlaybackRange(recordingDuration: duration)
         var seenEventTimes = Set<Int>()
         return suggestion.sourceEvents
             .map(\.timestamp)
             .filter { timestamp in
-                timestamp >= 0 && (duration == 0 || timestamp <= duration)
+                timestamp >= reviewRange.startTime
+                    && timestamp <= reviewRange.endTime
+                    && timestamp >= 0
+                    && (duration == 0 || timestamp <= duration)
             }
             .sorted()
             .filter { timestamp in
@@ -897,25 +892,6 @@ struct ContentView: View {
                 seenEventTimes.insert(timeKey)
                 return true
             }
-    }
-
-    private func fallbackSmartSetupTimelineRange(for suggestion: SmartSetupSuggestion, duration: Double) -> SmartSetupSourceTimeRange {
-        let sourceTime: Double
-        switch suggestion.proposal {
-        case .zoom(let proposal):
-            sourceTime = proposal.sourceEventTimestamp
-        case .zoomAdjustment(let proposal):
-            sourceTime = proposal.startTime
-        case .effect(let proposal):
-            sourceTime = proposal.sourceEventTimestamp
-        case .regionTighten(let proposal):
-            sourceTime = proposal.sourceTime
-        }
-
-        return SmartSetupSourceTimeRange(
-            startTime: max(sourceTime - 0.5, 0),
-            endTime: min(sourceTime + 1.5, max(duration, sourceTime))
-        )
     }
 
     private var canZoomTimelineInFromMenu: Bool {
