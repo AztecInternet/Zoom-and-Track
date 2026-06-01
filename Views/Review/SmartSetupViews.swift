@@ -282,7 +282,7 @@ private extension SmartSetupSuggestion {
         return nil
     }
 
-    fileprivate var editIntent: SmartSuggestionEditIntent {
+    private var editIntent: SmartSuggestionEditIntent {
         if case .zoomAdjustment = proposal {
             return .adjust
         }

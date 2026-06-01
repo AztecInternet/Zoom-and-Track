@@ -1,6 +1,6 @@
 # Smart Suggestions Map
 
-Generated: 2026-06-01 05:55:50
+Generated: 2026-06-01 05:57:54
 
 ## Files
 
@@ -219,7 +219,7 @@ Generated: 2026-06-01 05:55:50
 - Line 217:    var badgeTitle: String? {
 - Line 234:    var accentRole: FlowTrackAccentRole {
 - Line 241:    var providerBadgeTitle: String? {
-- Line 285:    fileprivate var editIntent: SmartSuggestionEditIntent {
+- Line 285:    private var editIntent: SmartSuggestionEditIntent {
 - Line 292:        let title = (userTitle ?? headlineFallbackTitle).trimmingCharacters(in: .whitespacesAndNewlines)
 - Line 293:        let lowercasedTitle = title.lowercased()
 - Line 313:    private var isExistingEffectReviewSuggestion: Bool {
