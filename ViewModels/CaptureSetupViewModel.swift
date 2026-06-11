@@ -14,6 +14,7 @@ private struct SmartSetupAnalysisResult {
     let frameDiagnostics: ActivityRegionFrameSamplingDiagnostics
     let ocrDiagnostics: SmartSuggestionOCRDiagnostics
     let visualChangeDiagnostics: SmartSuggestionVisualChangeDiagnostics
+    let coreMLDiagnostics: SmartSuggestionCoreMLDiagnostics
     let regionMetadata: [String: SmartSuggestionOCRRegionMetadata]
 }
 
@@ -607,6 +608,7 @@ final class CaptureSetupViewModel: ObservableObject {
         printSmartSuggestionContextDebug(contextDebugItems)
         printSmartSuggestionOCRDebug(result.ocrDiagnostics)
         printSmartSuggestionVisualChangeDebug(result.visualChangeDiagnostics)
+        printSmartSuggestionCoreMLDebug(result.coreMLDiagnostics)
         pendingSmartSetupSuggestions = result.suggestions
         selectedSmartSetupSuggestionID = result.suggestions.first?.suggestionID
         activeSmartSuggestionPreviewEndTime = nil
@@ -619,7 +621,7 @@ final class CaptureSetupViewModel: ObservableObject {
             )
         smartSetupStatusMessage = result.suggestions.isEmpty
             ? "Smart Suggestions did not find any useful suggestions. \(visionSummary)"
-            : "\(result.suggestions.count) suggestion\(result.suggestions.count == 1 ? "" : "s") found. \(visionSummary)"
+            : "\(result.suggestions.count) suggestion\(result.suggestions.count == 1 ? "" : "s") found. \(visionSummary) • Codex Test"
     }
 
     private func finishCancelledSmartSetupRun(revision: Int) {
@@ -779,6 +781,15 @@ final class CaptureSetupViewModel: ObservableObject {
 
         for line in diagnostics.previewLines {
             print("[SmartSuggestionVisualChange] \(line)")
+        }
+    }
+
+    private func printSmartSuggestionCoreMLDebug(_ diagnostics: SmartSuggestionCoreMLDiagnostics) {
+        let modelName = diagnostics.modelName ?? "none"
+        if diagnostics.isAvailable {
+            print("[SmartSuggestionCoreML] available=true model=\(modelName) observations=\(diagnostics.observationCount) regions=\(diagnostics.analyzedRegionCount) frames=\(diagnostics.analyzedFrameCount)")
+        } else {
+            print("[SmartSuggestionCoreML] available=false model=none regions=\(diagnostics.analyzedRegionCount) frames=\(diagnostics.analyzedFrameCount)")
         }
     }
 
@@ -3465,6 +3476,12 @@ private func makeSmartSetupAnalysis(
     )
     try Task.checkCancellation()
 
+    let coreMLAnalysisResult = await SmartSuggestionCoreMLAnalysisService().analyzeUI(
+        in: frameSamplingResult.samples,
+        regions: activityRegions
+    )
+    try Task.checkCancellation()
+
     let visualChangeResult = SmartSuggestionVisualChangeService().analyzeChanges(
         in: frameSamplingResult.samples,
         regions: activityRegions,
@@ -3497,6 +3514,7 @@ private func makeSmartSetupAnalysis(
         frameDiagnostics: frameSamplingResult.diagnostics,
         ocrDiagnostics: ocrAnalysisResult.diagnostics,
         visualChangeDiagnostics: visualChangeResult.diagnostics,
+        coreMLDiagnostics: coreMLAnalysisResult.diagnostics,
         regionMetadata: regionMetadata
     )
 }

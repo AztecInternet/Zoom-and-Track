@@ -1,6 +1,6 @@
 # Services Map
 
-Generated: 2026-06-01 05:57:54
+Generated: 2026-06-11 10:05:29
 
 ## Files
 
@@ -550,6 +550,92 @@ Generated: 2026-06-01 05:57:54
 - Line 389:        let lhsPoint = normalizedPoint(contentPoint(for: lhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
 - Line 390:        let rhsPoint = normalizedPoint(contentPoint(for: rhs, contentCoordinateSize: contentCoordinateSize), contentCoordinateSize: contentCoordinateSize)
 - Line 391:        let deltaX = lhsPoint.x - rhsPoint.x
+
+### Services/SmartSuggestionCoreMLAnalysisService.swift
+- Lines: 356
+- Imports:
+- import CoreGraphics
+- import CoreML
+- import Foundation
+- import Vision
+- Types:
+- Line 6:enum SmartSuggestionCoreMLUIElementType: String, CaseIterable {
+- Line 20:enum SmartSuggestionCoreMLAnalysisSource: String {
+- Line 26:struct SmartSuggestionCoreMLObservation {
+- Line 37:struct SmartSuggestionCoreMLDiagnostics {
+- Line 49:struct SmartSuggestionCoreMLAnalysisResult {
+- Line 54:struct SmartSuggestionCoreMLAnalysisService {
+- Functions / Vars:
+- Line 27:    let regionID: String
+- Line 28:    let frameTimestamp: Double
+- Line 29:    let uiElementType: SmartSuggestionCoreMLUIElementType
+- Line 30:    let confidence: Double
+- Line 31:    let normalizedBounds: CGRect?
+- Line 32:    let source: SmartSuggestionCoreMLAnalysisSource
+- Line 33:    let modelName: String?
+- Line 34:    let debugReason: String?
+- Line 38:    let isAvailable: Bool
+- Line 39:    let modelName: String?
+- Line 40:    let analyzedRegionCount: Int
+- Line 41:    let analyzedFrameCount: Int
+- Line 42:    let observationCount: Int
+- Line 43:    let averageConfidence: Double
+- Line 44:    let source: SmartSuggestionCoreMLAnalysisSource
+- Line 45:    let debugReason: String?
+- Line 46:    let elapsedSeconds: Double
+- Line 50:    let observations: [SmartSuggestionCoreMLObservation]
+- Line 51:    let diagnostics: SmartSuggestionCoreMLDiagnostics
+- Line 56:        let model: VNCoreMLModel
+- Line 57:        let modelName: String
+- Line 60:    private let modelResourceName: String
+- Line 61:    private let bundle: Bundle
+- Line 62:    private let minimumConfidence = 0.01
+- Line 72:    func analyzeUI(
+- Line 76:        let startDate = Date()
+- Line 104:            let loadedModel = try loadModel(from: modelURL)
+- Line 105:            let observations = try analyzeSamples(
+- Line 110:            let analysisResult = result(
+- Line 123:            let analysisResult = result(
+- Line 138:    private func analyzeSamples(
+- Line 143:        let regionsByID = Dictionary(uniqueKeysWithValues: regions.map { ($0.id, $0) })
+- Line 144:        var observations: [SmartSuggestionCoreMLObservation] = []
+- Line 148:            let region = regionsByID[sample.regionID]
+- Line 149:            let normalizedBounds = normalizedCropRect(for: region)
+- Line 150:            let image = normalizedBounds.flatMap { crop(sample.image, to: $0) } ?? sample.image
+- Line 169:    private func classify(
+- Line 173:        var classificationObservation: VNClassificationObservation?
+- Line 174:        var requestError: Error?
+- Line 175:        let request = VNCoreMLRequest(model: model.model) { request, error in
+- Line 183:        let handler = VNImageRequestHandler(cgImage: image, options: [:])
+- Line 189:        let confidence = clampedConfidence(Double(classificationObservation.confidence))
+- Line 194:    private func loadModel(from url: URL) throws -> LoadedModel {
+- Line 195:        let configuration = MLModelConfiguration()
+- Line 197:        let modelURL = url.pathExtension == "mlmodelc" ? url : try MLModel.compileModel(at: url)
+- Line 198:        let model = try MLModel(contentsOf: modelURL, configuration: configuration)
+- Line 205:    private func result(
+- Line 231:    private func bundledModelURL() -> URL? {
+- Line 232:        let extensions = ["mlmodelc", "mlpackage", "mlmodel"]
+- Line 238:    private func normalizedCropRect(for region: ActivityRegion?) -> CGRect? {
+- Line 240:              let normalizedArea = region.normalizedArea,
+- Line 246:        let padding = cropPadding(for: region)
+- Line 247:        let paddedRect = normalizedArea.insetBy(dx: -padding, dy: -padding)
+- Line 248:        let minimumSize = minimumCropSize(for: region)
+- Line 249:        let expandedRect = CGRect(
+- Line 255:        let unitRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+- Line 256:        let cropRect = expandedRect.intersection(unitRect)
+- Line 260:    private func cropPadding(for region: ActivityRegion) -> CGFloat {
+- Line 273:    private func minimumCropSize(for region: ActivityRegion) -> CGSize {
+- Line 286:    private func crop(_ image: CGImage, to normalizedRect: CGRect) -> CGImage? {
+- Line 287:        let imageRect = CGRect(
+- Line 293:        let clampedRect = imageRect
+- Line 300:    private func uiElementType(for identifier: String) -> SmartSuggestionCoreMLUIElementType {
+- Line 301:        let normalizedIdentifier = identifier
+- Line 339:    private func averageConfidence(for observations: [SmartSuggestionCoreMLObservation]) -> Double {
+- Line 341:        let total = observations.reduce(0) { partialResult, observation in
+- Line 347:    private func clampedConfidence(_ confidence: Double) -> Double {
+- Line 351:    private func printDiagnostics(_ diagnostics: SmartSuggestionCoreMLDiagnostics) {
+- Line 352:        let modelName = diagnostics.modelName ?? "none"
+- Line 353:        let averageConfidence = String(format: "%.2f", diagnostics.averageConfidence)
 
 ### Services/SmartSuggestionFrameSamplerService.swift
 - Lines: 405
